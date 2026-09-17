@@ -62,3 +62,30 @@ export function verifyQrToken(token: string, memberQrSecret: string): QrTokenPay
   if (!crypto.timingSafeEqual(expectedBuf, actualBuf)) return null;
   return payload;
 }
+
+// ─── Station QR (member scans a fixed gym poster, no per-member identity in the token) ───
+
+/** Static, non-rotating token identifying a gym's check-in station — meant to be printed. */
+export function buildStationToken(gymId: string): string {
+  const signature = crypto.createHmac("sha256", getServerSecret()).update(gymId).digest("hex");
+  const body = Buffer.from(gymId).toString("base64url");
+  return `station.${body}.${signature}`;
+}
+
+/** Verifies a scanned station token and returns the gymId it was issued for. */
+export function verifyStationToken(token: string): string | null {
+  const [prefix, body, signature] = token.split(".");
+  if (prefix !== "station" || !body || !signature) return null;
+  let gymId: string;
+  try {
+    gymId = Buffer.from(body, "base64url").toString("utf8");
+  } catch {
+    return null;
+  }
+  const expected = crypto.createHmac("sha256", getServerSecret()).update(gymId).digest("hex");
+  const expectedBuf = Buffer.from(expected, "hex");
+  const actualBuf = Buffer.from(signature, "hex");
+  if (expectedBuf.length !== actualBuf.length) return null;
+  if (!crypto.timingSafeEqual(expectedBuf, actualBuf)) return null;
+  return gymId;
+}

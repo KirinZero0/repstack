@@ -54,6 +54,14 @@ export default async function MyQrPage({
         <img src={qrDataUrl} alt="Your check-in QR code" width={320} height={320} />
       </div>
       <p className="text-sm text-neutral-400">Show this to gym staff at check-in.</p>
+      {session?.kind === "member" && (
+        <a
+          href="/check-in"
+          className="rounded-md bg-white px-4 py-2 text-sm font-medium text-neutral-950 hover:bg-neutral-200"
+        >
+          Check in now →
+        </a>
+      )}
     </main>
   );
 }
