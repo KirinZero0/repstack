@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { setSessionCookie } from "@/lib/session";
 import { memberLoginSchema } from "@/lib/validation/tenant";
+import { compareOrDummy } from "@/lib/passwordTiming";
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const body = await req.json().catch(() => null);
@@ -18,16 +18,24 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const { email, password } = parsed.data;
   const member = await prisma.member.findUnique({ where: { email } });
-  if (!member || member.gymId !== gym.id || !member.passwordHash) {
+  const belongsToGym = Boolean(member && member.gymId === gym.id);
+
+  // Always run bcrypt.compare (against a dummy hash if no match) so a nonexistent email,
+  // an email from another gym, and a wrong password all take the same time to reject.
+  const valid = await compareOrDummy(password, belongsToGym ? member!.passwordHash : null);
+
+  if (!belongsToGym || !valid) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
-  const valid = await bcrypt.compare(password, member.passwordHash);
-  if (!valid) {
-    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+  if (gym.subscriptionStatus === "SUSPENDED" || gym.subscriptionStatus === "CANCELLED") {
+    return NextResponse.json(
+      { error: "This gym's account is suspended. Contact your platform admin." },
+      { status: 403 },
+    );
   }
 
-  await setSessionCookie({ kind: "member", memberId: member.id, gymId: gym.id });
+  await setSessionCookie({ kind: "member", memberId: member!.id, gymId: gym.id });
 
   return NextResponse.json({ ok: true });
 }

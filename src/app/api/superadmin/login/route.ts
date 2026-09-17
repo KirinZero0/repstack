@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { setSessionCookie } from "@/lib/session";
 import { superadminLoginSchema } from "@/lib/validation/superadmin";
+import { compareOrDummy } from "@/lib/passwordTiming";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -13,12 +13,10 @@ export async function POST(req: NextRequest) {
 
   const { email, password } = parsed.data;
   const superadmin = await prisma.superadmin.findUnique({ where: { email } });
-  if (!superadmin) {
-    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
-  }
 
-  const valid = await bcrypt.compare(password, superadmin.passwordHash);
-  if (!valid) {
+  const valid = await compareOrDummy(password, superadmin?.passwordHash ?? null);
+
+  if (!superadmin || !valid) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 

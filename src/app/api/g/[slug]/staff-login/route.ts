@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { setSessionCookie } from "@/lib/session";
 import { staffLoginSchema } from "@/lib/validation/tenant";
+import { compareOrDummy } from "@/lib/passwordTiming";
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const body = await req.json().catch(() => null);
@@ -18,12 +18,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const { email, password } = parsed.data;
   const staff = await prisma.staffUser.findUnique({ where: { email } });
-  if (!staff || staff.gymId !== gym.id) {
-    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
-  }
+  const belongsToGym = Boolean(staff && staff.gymId === gym.id);
 
-  const valid = await bcrypt.compare(password, staff.passwordHash);
-  if (!valid) {
+  const valid = await compareOrDummy(password, belongsToGym ? staff!.passwordHash : null);
+
+  if (!belongsToGym || !valid) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
@@ -34,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     );
   }
 
-  await setSessionCookie({ kind: "staff", staffUserId: staff.id, gymId: gym.id, role: staff.role });
+  await setSessionCookie({ kind: "staff", staffUserId: staff!.id, gymId: gym.id, role: staff!.role });
 
-  return NextResponse.json({ ok: true, role: staff.role });
+  return NextResponse.json({ ok: true, role: staff!.role });
 }

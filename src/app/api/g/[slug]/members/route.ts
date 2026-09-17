@@ -28,9 +28,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
   const data = parsed.data;
 
+  // Member.email is globally unique across all tenants (schema constraint), so this check is
+  // inherently cross-tenant. Keep the error generic — don't confirm the email belongs to a
+  // member at another gym specifically.
   const existingEmail = await prisma.member.findUnique({ where: { email: data.email } });
   if (existingEmail) {
-    return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+    return NextResponse.json({ error: "Unable to add member with this email" }, { status: 409 });
   }
 
   const plan = await prisma.membershipPlan.findUnique({ where: { id: data.planId } });
