@@ -140,16 +140,18 @@ export default function ActivatePage({ params }: { params: { token: string } }) 
             className="mb-4 h-24 w-24 rounded-full object-cover"
           />
         )}
-        <label className="mb-1 block text-sm text-neutral-300">Profile picture (optional)</label>
+        <label htmlFor="photo" className="mb-1 block text-sm text-neutral-300">Profile picture (optional)</label>
         <input
+          id="photo"
           type="file"
           accept="image/jpeg,image/png,image/webp"
           onChange={handlePhotoChange}
           className="mb-4 w-full text-sm text-neutral-300"
         />
 
-        <label className="mb-1 block text-sm text-neutral-300">Password</label>
+        <label htmlFor="password" className="mb-1 block text-sm text-neutral-300">Password</label>
         <input
+          id="password"
           type="password"
           required
           minLength={8}
@@ -158,8 +160,9 @@ export default function ActivatePage({ params }: { params: { token: string } }) 
           className="mb-4 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-white outline-none focus:border-neutral-500"
         />
 
-        <label className="mb-1 block text-sm text-neutral-300">Confirm password</label>
+        <label htmlFor="confirmPassword" className="mb-1 block text-sm text-neutral-300">Confirm password</label>
         <input
+          id="confirmPassword"
           type="password"
           required
           minLength={8}

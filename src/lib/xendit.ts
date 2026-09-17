@@ -27,6 +27,9 @@ function getSecretKey(): string {
 export async function createXenditInvoice(
   params: CreateInvoiceParams,
 ): Promise<XenditInvoiceResponse> {
+  if (!process.env.XENDIT_SECRET_KEY) {
+    throw new Error("XENDIT_SECRET_KEY not configured — skipping real invoice creation");
+  }
   const auth = Buffer.from(`${getSecretKey()}:`).toString("base64");
   const res = await fetch(`${XENDIT_API_BASE}/v2/invoices`, {
     method: "POST",

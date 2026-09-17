@@ -41,8 +41,9 @@ export default function SuperadminLoginPage() {
         <h1 className="mb-1 text-xl font-semibold text-white">Iron Ledger</h1>
         <p className="mb-6 text-sm text-neutral-400">Superadmin login</p>
 
-        <label className="mb-1 block text-sm text-neutral-300">Email</label>
+        <label htmlFor="email" className="mb-1 block text-sm text-neutral-300">Email</label>
         <input
+          id="email"
           type="email"
           required
           value={email}
@@ -50,8 +51,9 @@ export default function SuperadminLoginPage() {
           className="mb-4 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-white outline-none focus:border-neutral-500"
         />
 
-        <label className="mb-1 block text-sm text-neutral-300">Password</label>
+        <label htmlFor="password" className="mb-1 block text-sm text-neutral-300">Password</label>
         <input
+          id="password"
           type="password"
           required
           value={password}
