@@ -76,6 +76,24 @@ export default async function globalSetup() {
     },
   });
 
+  // A second active member, dedicated to the duplicate-scan test — kept separate from
+  // "Active Member" so that test isn't coupled to whether another spec already checked
+  // that member in today (spec files share one seeded DB for the whole run).
+  const duplicateTestPhone = "081200000004";
+  await prisma.member.create({
+    data: {
+      gymId: gymA.id,
+      planId: planA.id,
+      fullName: "Duplicate Scan Member",
+      email: "duplicate-scan-member@test.local",
+      phoneWhatsapp: encrypt(duplicateTestPhone),
+      phoneWhatsappLookup: hmacLookup(duplicateTestPhone),
+      passwordHash: await bcrypt.hash("member-pass-123", 10),
+      status: "ACTIVE",
+      membershipExpiry: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    },
+  });
+
   // An expired member on Gym A.
   const expiredPhone = "081200000002";
   await prisma.member.create({

@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "./prisma";
 
 /** Generates a random token; returns both the raw token (goes in the URL) and its hash (stored in DB). */
 export function generateMagicToken(): { token: string; tokenHash: string } {

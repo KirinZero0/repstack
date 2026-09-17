@@ -48,11 +48,17 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     if (photo.size > MAX_PHOTO_BYTES) {
       return NextResponse.json({ error: "Photo must be under 2MB" }, { status: 400 });
     }
-    const blob = await put(`member-photos/${link.memberId}-${Date.now()}`, photo, {
-      access: "private",
-      contentType: photo.type,
-    });
-    photoUrl = blob.url;
+    // Photo is optional — never let a Blob failure (bad/missing creds, network) block the
+    // member from setting their password, which is the part of activation that matters.
+    try {
+      const blob = await put(`member-photos/${link.memberId}-${Date.now()}`, photo, {
+        access: "private",
+        contentType: photo.type,
+      });
+      photoUrl = blob.url;
+    } catch (err) {
+      console.error("Profile photo upload failed, continuing activation without it", err);
+    }
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 10);
