@@ -1,0 +1,265 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Platform layer ─────────────────────────────────────────
+
+model Superadmin {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  auditLogs AuditLog[]
+}
+
+model SaasPlan {
+  id                  String   @id @default(uuid())
+  name                String
+  price               Decimal
+  currency            String   @default("IDR")
+  billingInterval     String // "monthly" | "annual"
+  maxMembers          Int
+  maxStaff            Int
+  maxWhatsappPerMonth Int
+  customBranding      Boolean  @default(false)
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+
+  gyms             Gym[]
+  platformPayments PlatformPayment[]
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+}
+
+model Gym {
+  id                 String             @id @default(uuid())
+  saasPlanId         String
+  saasPlan           SaasPlan           @relation(fields: [saasPlanId], references: [id])
+  name               String
+  slug               String             @unique
+  timezone           String             @default("Asia/Jakarta")
+  subscriptionStatus SubscriptionStatus @default(TRIALING)
+  nextBillingDate    DateTime?
+  isLifetime         Boolean            @default(false) // true = never billed by subscription cron (e.g. founding/investor deals)
+  settings           Json               @default("{}")
+  createdAt          DateTime           @default(now())
+
+  staff            StaffUser[]
+  members          Member[]
+  plans            MembershipPlan[]
+  platformPayments PlatformPayment[]
+  whatsappConfig   WhatsappSenderConfig?
+  auditLogs        AuditLog[]
+  checkins         CheckIn[]
+  payments         Payment[]
+  notifications    NotificationLog[]
+
+  @@index([subscriptionStatus])
+}
+
+model PlatformPayment {
+  id                String        @id @default(uuid())
+  gymId             String
+  gym               Gym           @relation(fields: [gymId], references: [id])
+  saasPlanId        String
+  saasPlan          SaasPlan      @relation(fields: [saasPlanId], references: [id])
+  provider          String // "xendit" | "midtrans"
+  externalInvoiceId String?       @unique
+  amount            Decimal
+  status            PaymentStatus @default(PENDING)
+  createdAt         DateTime      @default(now())
+  paidAt            DateTime?
+
+  @@index([gymId])
+}
+
+model WhatsappSenderConfig {
+  id              String  @id @default(uuid())
+  gymId           String  @unique
+  gym             Gym     @relation(fields: [gymId], references: [id])
+  gatewayProvider String // "fonnte" | "wablas"
+  senderNumber    String
+  apiKeyEncrypted String // AES-256-GCM encrypted at application layer — never store plain
+  isActive        Boolean @default(true)
+}
+
+// ─── Tenant layer ───────────────────────────────────────────
+
+enum Role {
+  OWNER
+  STAFF
+}
+
+model StaffUser {
+  id           String   @id @default(uuid())
+  gymId        String
+  gym          Gym      @relation(fields: [gymId], references: [id])
+  name         String
+  email        String   @unique
+  phone        String? // used for platform WhatsApp notifications (billing reminders)
+  passwordHash String
+  role         Role     @default(STAFF)
+  createdAt    DateTime @default(now())
+
+  checkins CheckIn[]
+
+  @@index([gymId])
+}
+
+model MembershipPlan {
+  id           String   @id @default(uuid())
+  gymId        String
+  gym          Gym      @relation(fields: [gymId], references: [id])
+  name         String
+  durationDays Int
+  price        Decimal
+  currency     String   @default("IDR")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  members  Member[]
+  payments Payment[]
+
+  @@index([gymId])
+}
+
+enum MemberStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  EXPIRED
+  FROZEN
+  CANCELLED
+}
+
+model Member {
+  id                  String         @id @default(uuid())
+  gymId               String
+  gym                 Gym            @relation(fields: [gymId], references: [id])
+  planId              String
+  plan                MembershipPlan @relation(fields: [planId], references: [id])
+  fullName            String
+  phoneWhatsapp       String
+  phoneWhatsappLookup String // HMAC blind-index of normalized phone — for exact-match lookup once phone is encrypted
+  email               String         @unique // login identifier
+  passwordHash        String? // nullable until first-time activation is completed
+  photoUrl            String? // Vercel Blob URL (private access, signed at render time)
+  qrSecret            String         @default(uuid())
+  status              MemberStatus   @default(PENDING_PAYMENT)
+  membershipExpiry    DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  checkins      CheckIn[]
+  payments      Payment[]
+  notifications NotificationLog[]
+  magicLinks    MagicLink[]
+
+  @@index([gymId, status])
+  @@index([membershipExpiry])
+  @@index([phoneWhatsappLookup])
+}
+
+enum CheckInResult {
+  SUCCESS
+  DUPLICATE
+  EXPIRED
+  FROZEN
+  INVALID
+}
+
+model CheckIn {
+  id          String        @id @default(uuid())
+  gymId       String
+  gym         Gym           @relation(fields: [gymId], references: [id])
+  memberId    String
+  member      Member        @relation(fields: [memberId], references: [id])
+  staffUserId String?
+  staffUser   StaffUser?    @relation(fields: [staffUserId], references: [id])
+  checkedInAt DateTime      @default(now())
+  result      CheckInResult
+  deviceLabel String?
+
+  @@index([gymId, checkedInAt])
+  @@index([memberId, checkedInAt])
+}
+
+enum PaymentProvider {
+  XENDIT
+  MIDTRANS
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  EXPIRED
+  FAILED
+}
+
+model Payment {
+  id                String          @id @default(uuid())
+  gymId             String
+  gym               Gym             @relation(fields: [gymId], references: [id])
+  memberId          String
+  member            Member          @relation(fields: [memberId], references: [id])
+  planId            String
+  plan              MembershipPlan  @relation(fields: [planId], references: [id])
+  provider          PaymentProvider
+  externalInvoiceId String?         @unique
+  amount            Decimal
+  currency          String          @default("IDR")
+  status            PaymentStatus   @default(PENDING)
+  createdAt         DateTime        @default(now())
+  paidAt            DateTime?
+
+  @@index([gymId])
+}
+
+model NotificationLog {
+  id       String   @id @default(uuid())
+  gymId    String
+  gym      Gym      @relation(fields: [gymId], references: [id])
+  memberId String
+  member   Member   @relation(fields: [memberId], references: [id])
+  type     String
+  channel  String   @default("whatsapp")
+  status   String
+  sentAt   DateTime @default(now())
+
+  @@index([gymId])
+}
+
+model MagicLink {
+  id        String    @id @default(uuid())
+  memberId  String
+  member    Member    @relation(fields: [memberId], references: [id])
+  tokenHash String    @unique
+  purpose   String    @default("activate") // "activate" (set password/photo) | "qr_fallback" (view QR without login)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model AuditLog {
+  id           String     @id @default(uuid())
+  superadminId String
+  superadmin   Superadmin @relation(fields: [superadminId], references: [id])
+  gymId        String?
+  gym          Gym?       @relation(fields: [gymId], references: [id])
+  action       String
+  metadata     Json       @default("{}")
+  createdAt    DateTime   @default(now())
+}
