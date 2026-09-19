@@ -9,7 +9,8 @@ export async function superadminLoginUI(page: Page, baseURL: string) {
   await page.getByLabel("Email").fill("superadmin@test.local");
   await page.getByLabel("Password").fill("superadmin-pass-123");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL(`${baseURL}/superadmin/gyms`);
+  await page.waitForURL(`${baseURL}/superadmin/dashboard`);
+  await page.goto(`${baseURL}/superadmin/gyms`);
 }
 
 export async function staffLoginUI(page: Page, baseURL: string, slug: string, email: string, password: string) {

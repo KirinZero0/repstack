@@ -45,7 +45,7 @@ test("owner adds a member, member activates, member can log in", async ({ page, 
   await page.locator("#email").fill(newEmail);
   await page.locator("#password").fill("newpassword123");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL(`${baseURL}/my-qr`);
+  await page.waitForURL(`${baseURL}/my`);
 
   const activated = await prisma.member.findUniqueOrThrow({ where: { id: member.id } });
   expect(activated.passwordHash).not.toBeNull();

@@ -25,7 +25,7 @@ export default function MemberLoginPage({ params }: { params: { slug: string } }
         setError(body.error ?? "Login failed");
         return;
       }
-      router.push("/my-qr");
+      router.push("/my");
       router.refresh();
     } finally {
       setLoading(false);

@@ -49,7 +49,10 @@ export default async function SuperadminGymsPage() {
               <span className="text-white">Rp {lifetimeRevenue.toLocaleString("id-ID")}</span>
             </p>
           </div>
-          <LogoutButton />
+          <nav className="flex items-center gap-4 text-sm">
+            <a href="/superadmin/dashboard" className="text-neutral-300 hover:text-white">Dashboard</a>
+            <LogoutButton />
+          </nav>
         </div>
 
         <div className="mb-6">

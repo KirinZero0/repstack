@@ -25,7 +25,7 @@ export default function SuperadminLoginPage() {
         setError(body.error ?? "Login failed");
         return;
       }
-      router.push("/superadmin/gyms");
+      router.push("/superadmin/dashboard");
       router.refresh();
     } finally {
       setLoading(false);

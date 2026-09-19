@@ -10,6 +10,7 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:history": "tsx prisma/seed-history.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

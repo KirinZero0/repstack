@@ -55,6 +55,11 @@ export default async function MyQrPage({
       </div>
       <p className="text-sm text-neutral-400">Show this to gym staff at check-in.</p>
       {session?.kind === "member" && (
+        <a href="/my" className="text-sm text-neutral-500 hover:text-neutral-300">
+          ← Dashboard
+        </a>
+      )}
+      {session?.kind === "member" && (
         <a
           href="/check-in"
           className="rounded-md bg-white px-4 py-2 text-sm font-medium text-neutral-950 hover:bg-neutral-200"

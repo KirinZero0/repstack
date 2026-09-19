@@ -65,9 +65,14 @@ export default async function DashboardPage({ params }: { params: { slug: string
               Staff scanner
             </a>
             {session.role === "OWNER" && (
-              <a href={`/g/${params.slug}/billing`} className="text-neutral-300 hover:text-white">
-                Billing
-              </a>
+              <>
+                <a href={`/g/${params.slug}/finance`} className="text-neutral-300 hover:text-white">
+                  Finance
+                </a>
+                <a href={`/g/${params.slug}/billing`} className="text-neutral-300 hover:text-white">
+                  Billing
+                </a>
+              </>
             )}
             <LogoutButton slug={params.slug} />
           </nav>
