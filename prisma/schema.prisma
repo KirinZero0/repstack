@@ -34,6 +34,7 @@ model SaasPlan {
 
   gyms             Gym[]
   platformPayments PlatformPayment[]
+  signups          GymSignup[]
 }
 
 enum SubscriptionStatus {
@@ -270,4 +271,34 @@ model AppConfig {
   key       String   @id // e.g. "theme.default", "theme.allowUserOverride"
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+// ─── Self-serve signup ──────────────────────────────────────
+// Holds a would-be gym until its first subscription invoice is paid; the Gym and owner
+// StaffUser are only created then. Unpaid rows are ignored after 24h.
+
+enum SignupStatus {
+  PENDING
+  COMPLETED
+  CONFLICT // paid, but the slug/email was taken in the meantime — needs manual follow-up
+}
+
+model GymSignup {
+  id                String       @id @default(uuid())
+  gymName           String
+  slug              String
+  ownerName         String
+  ownerEmail        String
+  ownerPhone        String?
+  passwordHash      String
+  saasPlanId        String
+  saasPlan          SaasPlan     @relation(fields: [saasPlanId], references: [id])
+  status            SignupStatus @default(PENDING)
+  externalInvoiceId String?      @unique
+  gymId             String?
+  createdAt         DateTime     @default(now())
+  completedAt       DateTime?
+
+  @@index([slug])
+  @@index([ownerEmail])
 }

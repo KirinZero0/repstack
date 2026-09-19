@@ -1,8 +1,9 @@
 import { prisma } from "./prisma";
 import type { XenditWebhookEvent } from "./xendit";
+import { completeSignup } from "./signup";
 
 /** Applies a payment event to a member or platform payment. Idempotent. Returns which kind it matched, or null. */
-export async function processPaymentEvent(event: XenditWebhookEvent): Promise<"member" | "platform" | null> {
+export async function processPaymentEvent(event: XenditWebhookEvent): Promise<"member" | "platform" | "signup" | null> {
   const memberPayment = await prisma.payment.findUnique({
     where: { id: event.external_id },
     include: { plan: true },
@@ -21,6 +22,18 @@ export async function processPaymentEvent(event: XenditWebhookEvent): Promise<"m
   if (platformPayment) {
     await handlePlatformPayment(platformPayment, event);
     return "platform";
+  }
+
+  const signup = await prisma.gymSignup.findUnique({ where: { id: event.external_id } });
+  if (signup) {
+    // Only a payment creates the gym; an expired/failed invoice leaves the signup pending and unused.
+    if (event.status === "PAID") {
+      await completeSignup(signup.id, {
+        paidAt: event.paid_at ? new Date(event.paid_at) : new Date(),
+        externalInvoiceId: signup.externalInvoiceId,
+      });
+    }
+    return "signup";
   }
 
   return null;

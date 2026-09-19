@@ -35,3 +35,17 @@ export const createPlanSchema = z.object({ ...planFields, isActive: planFields.i
 export const updatePlanSchema = z.object(planFields).partial().refine((v) => Object.keys(v).length > 0, "Nothing to update");
 
 export const payMembershipSchema = z.object({ planId: z.string().uuid() });
+
+export const signupSchema = z.object({
+  saasPlanId: z.string().uuid(),
+  gymName: z.string().trim().min(2).max(80),
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/, "Use 3-40 letters, numbers or hyphens, starting and ending with a letter or number"),
+  ownerName: z.string().trim().min(2).max(80),
+  ownerEmail: z.string().trim().toLowerCase().email().max(120),
+  ownerPhone: z.string().trim().min(6).max(30).optional().or(z.literal("").transform(() => undefined)),
+  password: z.string().min(8).max(72),
+});

@@ -7,6 +7,8 @@ export interface Tier {
   name: string;
   monthly: number;
   annual: number | null;
+  monthlyId: string;
+  annualId: string | null;
   maxMembers: number;
   maxStaff: number;
   maxWhatsappPerMonth: number;
@@ -16,7 +18,7 @@ export interface Tier {
 const PLATES = ["var(--plate-green)", "var(--plate-blue)", "var(--plate-red)", "var(--plate-yellow)"];
 const rp = (n: number) => `Rp ${Math.round(n).toLocaleString("id-ID")}`;
 
-export default function Pricing({ tiers, contactUrl }: { tiers: Tier[]; contactUrl: string }) {
+export default function Pricing({ tiers }: { tiers: Tier[] }) {
   const [yearly, setYearly] = useState(false);
   const hasAnnual = tiers.some((t) => t.annual !== null);
   const free = tiers.find((t) => t.annual)
@@ -81,7 +83,7 @@ export default function Pricing({ tiers, contactUrl }: { tiers: Tier[]; contactU
               </ul>
 
               <a
-                href={contactUrl}
+                href={`/signup?plan=${showYearly ? t.annualId : t.monthlyId}`}
                 className="mt-8 rounded-lg bg-white px-4 py-2.5 text-center text-sm font-semibold text-neutral-950 transition-colors hover:bg-neutral-200"
               >
                 Start with {t.name}

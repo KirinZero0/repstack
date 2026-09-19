@@ -14,9 +14,14 @@ async function loadTiers(): Promise<Tier[]> {
       const name = p.name.replace(/\s+(monthly|annual|yearly)$/i, "");
       const tier =
         byTier.get(name) ??
-        ({ name, monthly: 0, annual: null, maxMembers: p.maxMembers, maxStaff: p.maxStaff, maxWhatsappPerMonth: p.maxWhatsappPerMonth, customBranding: p.customBranding } as Tier);
-      if (p.billingInterval === "annual") tier.annual = Number(p.price);
-      else tier.monthly = Number(p.price);
+        ({ name, monthly: 0, annual: null, monthlyId: "", annualId: null, maxMembers: p.maxMembers, maxStaff: p.maxStaff, maxWhatsappPerMonth: p.maxWhatsappPerMonth, customBranding: p.customBranding } as Tier);
+      if (p.billingInterval === "annual") {
+        tier.annual = Number(p.price);
+        tier.annualId = p.id;
+      } else {
+        tier.monthly = Number(p.price);
+        tier.monthlyId = p.id;
+      }
       byTier.set(name, tier);
     }
     return Array.from(byTier.values())
@@ -83,7 +88,6 @@ const faqs = [
 
 export default async function Home() {
   const tiers = await loadTiers();
-  const contactUrl = process.env.NEXT_PUBLIC_CONTACT_URL || "#login";
 
   return (
     <div className="bg-neutral-950 text-white">
@@ -114,7 +118,7 @@ export default async function Home() {
               scan a poster to check in, and invoices go out over WhatsApp.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
-              <a href={contactUrl} className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-neutral-950 hover:bg-neutral-200">
+              <a href="#pricing" className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-neutral-950 hover:bg-neutral-200">
                 Set up my gym
               </a>
               <a href="/demo" className="rounded-lg border border-neutral-700 px-6 py-3 text-sm font-semibold text-white hover:bg-neutral-900">
@@ -165,7 +169,7 @@ export default async function Home() {
               member count.
             </p>
             {tiers.length > 0 ? (
-              <Pricing tiers={tiers} contactUrl={contactUrl} />
+              <Pricing tiers={tiers} />
             ) : (
               <p className="text-neutral-400">Plans are being updated. Check back shortly.</p>
             )}

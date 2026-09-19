@@ -7,6 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function DemoPage() {
-  const contactUrl = process.env.NEXT_PUBLIC_CONTACT_URL || "/#login";
-  return <DemoApp contactUrl={contactUrl} />;
+  return <DemoApp contactUrl="/#pricing" />;
 }
