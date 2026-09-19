@@ -73,6 +73,24 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
           <MockCheckout paymentId={mockPayment.id} amount={rp(Number(mockPayment.amount))} planName={mockPayment.plan.name} />
         )}
 
+        <a
+          href="/check-in"
+          className="group mb-3 flex items-center justify-between gap-4 rounded-2xl bg-plate-green px-6 py-6 text-[#ffffff] shadow-[0_12px_40px_-8px_rgba(46,158,91,0.65)] transition hover:brightness-110 active:scale-[0.99] sm:py-7"
+        >
+          <span>
+            <span className="block font-display text-2xl font-semibold sm:text-3xl">Check in</span>
+            <span className="mt-1 block text-sm text-[#ffffff]/85">Scan the code at the gym entrance</span>
+          </span>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+            <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" />
+            <path d="M8 12h8" />
+          </svg>
+        </a>
+        {needsPayment && (
+          <p className="mb-6 text-sm text-amber-400">Your membership isn&apos;t active, so check-in will be declined until you renew.</p>
+        )}
+        {!needsPayment && <div className="mb-6" />}
+
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
           <div>
             <p className="text-sm text-neutral-400">{member.plan.name} membership</p>
@@ -87,24 +105,16 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
               </span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <a
-              href="/my/pay"
-              className={`rounded-md px-4 py-2 text-sm font-medium ${
-                needsPayment || expiringSoon
-                  ? "bg-white text-neutral-950 hover:bg-neutral-200"
-                  : "border border-neutral-700 text-white hover:bg-neutral-800"
-              }`}
-            >
-              {needsPayment ? "Pay for membership" : "Renew"}
-            </a>
-            <a
-              href="/check-in"
-              className="rounded-md border border-neutral-700 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-            >
-              Check in
-            </a>
-          </div>
+          <a
+            href="/my/pay"
+            className={`rounded-md px-4 py-2 text-sm font-medium ${
+              needsPayment || expiringSoon
+                ? "bg-white text-neutral-950 hover:bg-neutral-200"
+                : "border border-neutral-700 text-white hover:bg-neutral-800"
+            }`}
+          >
+            {needsPayment ? "Pay for membership" : "Renew"}
+          </a>
         </div>
 
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
