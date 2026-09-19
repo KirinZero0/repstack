@@ -263,3 +263,11 @@ model AuditLog {
   metadata     Json       @default("{}")
   createdAt    DateTime   @default(now())
 }
+
+// ─── Platform config ────────────────────────────────────────
+
+model AppConfig {
+  key       String   @id // e.g. "theme.default", "theme.allowUserOverride"
+  value     Json
+  updatedAt DateTime @updatedAt
+}

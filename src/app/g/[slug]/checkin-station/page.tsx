@@ -17,9 +17,9 @@ export default async function CheckinStationPage({ params }: { params: { slug: s
   const qrDataUrl = await QRCode.toDataURL(token, { width: 480, margin: 2 });
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-950 px-4 text-white print:bg-white print:text-black">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-950 px-4 text-white print:bg-[#ffffff] print:text-black">
       <h1 className="text-2xl font-semibold">{gym.name} — Check-in</h1>
-      <div className="rounded-xl bg-white p-6">
+      <div className="rounded-xl bg-[#ffffff] p-6">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={qrDataUrl} alt="Gym check-in station QR code" width={480} height={480} />
       </div>

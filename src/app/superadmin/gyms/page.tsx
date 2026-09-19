@@ -51,6 +51,7 @@ export default async function SuperadminGymsPage() {
           </div>
           <nav className="flex items-center gap-4 text-sm">
             <a href="/superadmin/dashboard" className="text-neutral-300 hover:text-white">Dashboard</a>
+            <a href="/superadmin/settings" className="text-neutral-300 hover:text-white">Settings</a>
             <LogoutButton />
           </nav>
         </div>

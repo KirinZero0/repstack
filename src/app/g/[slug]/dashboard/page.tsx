@@ -72,6 +72,9 @@ export default async function DashboardPage({ params }: { params: { slug: string
                 <a href={`/g/${params.slug}/billing`} className="text-neutral-300 hover:text-white">
                   Billing
                 </a>
+                <a href={`/g/${params.slug}/settings`} className="text-neutral-300 hover:text-white">
+                  Settings
+                </a>
               </>
             )}
             <LogoutButton slug={params.slug} />

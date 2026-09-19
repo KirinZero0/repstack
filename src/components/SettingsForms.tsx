@@ -1,0 +1,114 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+const selectCls =
+  "w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-white outline-none focus:border-neutral-500";
+const btnCls =
+  "rounded-md bg-white px-4 py-2 text-sm font-medium text-neutral-950 hover:bg-neutral-200 disabled:opacity-50";
+
+function useSave(url: string) {
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(body: unknown) {
+    setState("saving");
+    setError(null);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const b = await res.json().catch(() => ({}));
+      setError(typeof b.error === "string" ? b.error : "Failed to save");
+      setState("error");
+      return;
+    }
+    setState("saved");
+    router.refresh();
+  }
+  return { state, error, save };
+}
+
+export function PlatformSettingsForm({
+  initialMode,
+  initialOverride,
+}: {
+  initialMode: "light" | "dark" | "system";
+  initialOverride: boolean;
+}) {
+  const [mode, setMode] = useState(initialMode);
+  const [override, setOverride] = useState(initialOverride);
+  const { state, error, save } = useSave("/api/superadmin/settings");
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        save({ themeDefault: mode, allowUserOverride: override });
+      }}
+      className="space-y-4"
+    >
+      <label htmlFor="themeDefault" className="block text-sm text-neutral-300">
+        Default theme
+      </label>
+      <select id="themeDefault" value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} className={selectCls}>
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+        <option value="system">Follow device</option>
+      </select>
+      <label className="flex items-center gap-2 text-sm text-neutral-300">
+        <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} className="h-4 w-4" />
+        Let users switch theme themselves (shows the toggle button)
+      </label>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      <div className="flex items-center gap-3">
+        <button type="submit" disabled={state === "saving"} className={btnCls}>
+          {state === "saving" ? "Saving…" : "Save"}
+        </button>
+        {state === "saved" && <span className="text-sm text-emerald-400">Saved</span>}
+      </div>
+    </form>
+  );
+}
+
+export function GymThemeForm({
+  slug,
+  initial,
+}: {
+  slug: string;
+  initial: "inherit" | "light" | "dark" | "system";
+}) {
+  const [theme, setTheme] = useState(initial);
+  const { state, error, save } = useSave(`/api/g/${slug}/settings`);
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        save({ theme });
+      }}
+      className="space-y-4"
+    >
+      <label htmlFor="gymTheme" className="block text-sm text-neutral-300">
+        Theme for your staff and members
+      </label>
+      <select id="gymTheme" value={theme} onChange={(e) => setTheme(e.target.value as typeof theme)} className={selectCls}>
+        <option value="inherit">Use platform default</option>
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+        <option value="system">Follow device</option>
+      </select>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      <div className="flex items-center gap-3">
+        <button type="submit" disabled={state === "saving"} className={btnCls}>
+          {state === "saving" ? "Saving…" : "Save"}
+        </button>
+        {state === "saved" && <span className="text-sm text-emerald-400">Saved</span>}
+      </div>
+    </form>
+  );
+}

@@ -100,7 +100,7 @@ export default function CheckinScanner({ slug }: { slug: string }) {
 
       {outcome && (
         <div
-          className={`fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 ${OVERLAY_STYLE[outcome.result].bg}`}
+          className={`fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 text-[#ffffff] ${OVERLAY_STYLE[outcome.result].bg}`}
         >
           <p className="text-4xl font-bold">{OVERLAY_STYLE[outcome.result].label}</p>
           {outcome.member && <p className="text-xl">{outcome.member.fullName}</p>}

@@ -20,3 +20,7 @@ export const addMemberSchema = z.object({
 export const activateSchema = z.object({
   password: z.string().min(8).max(72),
 });
+
+export const gymThemeSchema = z.object({
+  theme: z.enum(["inherit", "light", "dark", "system"]),
+});

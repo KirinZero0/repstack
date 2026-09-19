@@ -49,7 +49,7 @@ export default async function MyQrPage({
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-950 px-4 text-white">
       <h1 className="text-xl font-semibold">{member.fullName}</h1>
-      <div className="rounded-xl bg-white p-4">
+      <div className="rounded-xl bg-[#ffffff] p-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={qrDataUrl} alt="Your check-in QR code" width={320} height={320} />
       </div>

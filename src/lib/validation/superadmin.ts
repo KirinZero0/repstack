@@ -19,3 +19,8 @@ export const createGymSchema = z.object({
   ownerPhone: z.string().min(6).max(30).optional(),
   ownerTempPassword: z.string().min(8).max(72),
 });
+
+export const platformSettingsSchema = z.object({
+  themeDefault: z.enum(["light", "dark", "system"]),
+  allowUserOverride: z.boolean(),
+});

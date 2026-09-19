@@ -2,15 +2,103 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Dark palette (default). Values match Tailwind's stock shades. */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --white: #ffffff;
+  --n-200: #e5e5e5;
+  --n-300: #d4d4d4;
+  --n-400: #a3a3a3;
+  --n-500: #737373;
+  --n-600: #525252;
+  --n-700: #404040;
+  --n-800: #262626;
+  --n-900: #171717;
+  --n-950: #0a0a0a;
+  --emerald-400: #34d399;
+  --emerald-700: #047857;
+  --emerald-800: #065f46;
+  --emerald-950: #022c22;
+  --red-400: #f87171;
+  --red-800: #991b1b;
+  --red-950: #450a0a;
+  --amber-400: #fbbf24;
+  --amber-800: #92400e;
+  --amber-950: #451a03;
+  --blue-400: #60a5fa;
+  --blue-800: #1e40af;
+  --blue-950: #172554;
+  --background: var(--n-950);
+  --foreground: #ededed;
 }
 
+/* Light palette: the neutral scale is inverted so existing classes (bg-neutral-950 = page,
+   text-white = strong text, ...) keep their role. */
+[data-theme="light"] {
+  color-scheme: light;
+  --white: #18181b;
+  --n-200: #27272a;
+  --n-300: #3f3f46;
+  --n-400: #52525b;
+  --n-500: #71717a;
+  --n-600: #a1a1aa;
+  --n-700: #d4d4d8;
+  --n-800: #e4e4e7;
+  --n-900: #ffffff;
+  --n-950: #f4f4f5;
+  --emerald-400: #047857;
+  --emerald-700: #6ee7b7;
+  --emerald-800: #6ee7b7;
+  --emerald-950: #d1fae5;
+  --red-400: #b91c1c;
+  --red-800: #fca5a5;
+  --red-950: #fee2e2;
+  --amber-400: #b45309;
+  --amber-800: #fcd34d;
+  --amber-950: #fef3c7;
+  --blue-400: #1d4ed8;
+  --blue-800: #93c5fd;
+  --blue-950: #dbeafe;
+  --background: var(--n-950);
+  --foreground: #18181b;
+}
+
+/* "system" follows the OS; keep in sync with the light block above. */
+@media (prefers-color-scheme: light) {
+  [data-theme="system"] {
+    color-scheme: light;
+    --white: #18181b;
+    --n-200: #27272a;
+    --n-300: #3f3f46;
+    --n-400: #52525b;
+    --n-500: #71717a;
+    --n-600: #a1a1aa;
+    --n-700: #d4d4d8;
+    --n-800: #e4e4e7;
+    --n-900: #ffffff;
+    --n-950: #f4f4f5;
+    --emerald-400: #047857;
+    --emerald-700: #6ee7b7;
+    --emerald-800: #6ee7b7;
+    --emerald-950: #d1fae5;
+    --red-400: #b91c1c;
+    --red-800: #fca5a5;
+    --red-950: #fee2e2;
+    --amber-400: #b45309;
+    --amber-800: #fcd34d;
+    --amber-950: #fef3c7;
+    --blue-400: #1d4ed8;
+    --blue-800: #93c5fd;
+    --blue-950: #dbeafe;
+    --background: var(--n-950);
+    --foreground: #18181b;
+  }
+}
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  [data-theme="system"] {
+    color-scheme: dark;
+    --background: var(--n-950);
   }
 }
 
