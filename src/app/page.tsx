@@ -92,6 +92,7 @@ export default async function Home() {
           <BrandMark />
           <nav className="flex items-center gap-6 text-sm text-neutral-300">
             <a href="#how" className="hidden hover:text-white sm:inline">How it works</a>
+            <a href="/demo" className="hidden hover:text-white sm:inline">Demo</a>
             <a href="#pricing" className="hover:text-white">Pricing</a>
             <a href="#faq" className="hidden hover:text-white sm:inline">FAQ</a>
             <a href="#login" className="rounded-full bg-white px-4 py-1.5 font-medium text-neutral-950 hover:bg-neutral-200">
@@ -116,8 +117,8 @@ export default async function Home() {
               <a href={contactUrl} className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-neutral-950 hover:bg-neutral-200">
                 Set up my gym
               </a>
-              <a href="#pricing" className="rounded-lg border border-neutral-700 px-6 py-3 text-sm font-semibold text-white hover:bg-neutral-900">
-                See pricing
+              <a href="/demo" className="rounded-lg border border-neutral-700 px-6 py-3 text-sm font-semibold text-white hover:bg-neutral-900">
+                Try the demo
               </a>
             </div>
           </div>
