@@ -87,6 +87,28 @@ const STEPS: TourStep[] = [
     tab: "members",
   },
   {
+    title: "Create your first plan",
+    body: "When you first sign up your gym has no plans, so creating them is the first thing you do. This demo gym already has a few, so let's add one more.",
+    target: "new-plan",
+    action: "Click + New plan",
+    advanceOnClick: true,
+    tab: "plans",
+  },
+  {
+    title: "Name it and price it",
+    body: "Say you want a cheaper option for students. Give it a name, how many days it lasts and what it costs. We've filled in an example.",
+    target: "plan-form",
+    action: "Click Create plan in the form",
+    advanceOnSubmit: true,
+    tab: "plans",
+  },
+  {
+    title: "It's on sale straight away",
+    body: "Your new plan shows up in the list, members can buy it from their own payment page, and you can pick it when you add a member. Prices can be edited later; changes only affect new invoices.",
+    target: "new-plan-row",
+    tab: "plans",
+  },
+  {
     title: "Hide plans instead of deleting them",
     body: "Retire a plan with Hide and it stops being offered, while members who already have it keep their access. Try hiding one.",
     target: "plan-table",
@@ -152,6 +174,9 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
   const [plans, setPlans] = useState<DemoPlan[]>(INITIAL_PLANS);
   const [showForm, setShowForm] = useState(false);
   const [sent, setSent] = useState<DemoMember | null>(null);
+  const [showPlanForm, setShowPlanForm] = useState(false);
+  const [newPlanId, setNewPlanId] = useState<string | null>(null);
+  const [planForm, setPlanForm] = useState({ name: "Student month", days: "30", price: "180000" });
   const [form, setForm] = useState({ name: "Nadia Rahma", phone: "0812 5550 0142", plan: "Monthly" });
 
   const onTab = useCallback((t: string) => {
@@ -178,12 +203,26 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
     setShowForm(false);
   }
 
+  function addPlan(e: React.FormEvent) {
+    e.preventDefault();
+    const id = `p${Date.now()}`;
+    setPlans((ps) => [
+      ...ps,
+      { id, name: planForm.name || "New plan", days: Number(planForm.days) || 30, price: Number(planForm.price) || 0, onSale: true, members: 0 },
+    ]);
+    setNewPlanId(id);
+    setShowPlanForm(false);
+  }
+
   function restart() {
     setTab("dashboard");
     setMembers(INITIAL_MEMBERS);
     setPlans(INITIAL_PLANS);
     setShowForm(false);
     setSent(null);
+    setShowPlanForm(false);
+    setNewPlanId(null);
+    setPlanForm({ name: "Student month", days: "30", price: "180000" });
     setTourKey((k) => k + 1);
     setTourOn(true);
   }
@@ -349,7 +388,37 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
 
         {tab === "plans" && (
           <div>
-            <h1 className="mb-6 text-2xl font-semibold">Membership plans</h1>
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <h1 className="text-2xl font-semibold">Membership plans</h1>
+              <button
+                data-tour="new-plan"
+                onClick={() => setShowPlanForm((x) => !x)}
+                className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-neutral-950 hover:bg-neutral-200"
+              >
+                + New plan
+              </button>
+            </div>
+
+            {showPlanForm && (
+              <form data-tour="plan-form" onSubmit={addPlan} className="mb-6 grid gap-3 rounded-xl border border-neutral-800 bg-neutral-900 p-5 sm:grid-cols-[1.4fr_1fr_1fr_auto]">
+                <label className="text-sm text-neutral-300">
+                  <span className="mb-1 block">Plan name</span>
+                  <input className={field} value={planForm.name} onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })} />
+                </label>
+                <label className="text-sm text-neutral-300">
+                  <span className="mb-1 block">Length (days)</span>
+                  <input className={field} type="number" min={1} value={planForm.days} onChange={(e) => setPlanForm({ ...planForm, days: e.target.value })} />
+                </label>
+                <label className="text-sm text-neutral-300">
+                  <span className="mb-1 block">Price (Rp)</span>
+                  <input className={field} type="number" min={1000} step={1000} value={planForm.price} onChange={(e) => setPlanForm({ ...planForm, price: e.target.value })} />
+                </label>
+                <button type="submit" className="self-end rounded-lg bg-white px-4 py-2 text-sm font-semibold text-neutral-950 hover:bg-neutral-200">
+                  Create plan
+                </button>
+              </form>
+            )}
+
             <div data-tour="plan-table" className="overflow-hidden rounded-xl border border-neutral-800">
               <table className="w-full text-left text-sm">
                 <thead className="bg-neutral-900 text-neutral-400">
@@ -364,7 +433,7 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
                 </thead>
                 <tbody>
                   {plans.map((p) => (
-                    <tr key={p.id} className="border-t border-neutral-800">
+                    <tr key={p.id} data-tour={p.id === newPlanId ? "new-plan-row" : undefined} className="border-t border-neutral-800">
                       <td className="px-4 py-3 font-medium">{p.name}</td>
                       <td className="px-4 py-3 text-neutral-400">{p.days} days</td>
                       <td className="px-4 py-3">{rp(p.price)}</td>
