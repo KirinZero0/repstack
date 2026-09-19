@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import { resolveTheme } from "@/lib/theme";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -15,9 +16,15 @@ const geistMono = localFont({
   weight: "100 900",
 });
 
+const display = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Iron Ledger",
-  description: "Gym membership management",
+  description: "Memberships, door check-ins and billing for independent gyms. Know who trained and who paid.",
 };
 
 export default async function RootLayout({
@@ -29,7 +36,7 @@ export default async function RootLayout({
   return (
     <html lang="en" data-theme={theme.mode}>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${display.variable} antialiased`}
       >
         {children}
         {theme.allowUserOverride && <ThemeToggle initial={theme.mode} />}

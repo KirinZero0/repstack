@@ -7,15 +7,15 @@
 [data-theme="dark"] {
   color-scheme: dark;
   --white: #ffffff;
-  --n-200: #e5e5e5;
-  --n-300: #d4d4d4;
-  --n-400: #a3a3a3;
-  --n-500: #737373;
-  --n-600: #525252;
-  --n-700: #404040;
-  --n-800: #262626;
-  --n-900: #171717;
-  --n-950: #0a0a0a;
+  --n-200: #e3e8ee;
+  --n-300: #cdd5de;
+  --n-400: #9aa6b4;
+  --n-500: #6f7c8b;
+  --n-600: #4d5967;
+  --n-700: #333d49;
+  --n-800: #222a33;
+  --n-900: #151b21;
+  --n-950: #0c1014;
   --emerald-400: #34d399;
   --emerald-700: #047857;
   --emerald-800: #065f46;
@@ -30,23 +30,23 @@
   --blue-800: #1e40af;
   --blue-950: #172554;
   --background: var(--n-950);
-  --foreground: #ededed;
+  --foreground: #e8edf2;
 }
 
 /* Light palette: the neutral scale is inverted so existing classes (bg-neutral-950 = page,
    text-white = strong text, ...) keep their role. */
 [data-theme="light"] {
   color-scheme: light;
-  --white: #18181b;
-  --n-200: #27272a;
-  --n-300: #3f3f46;
-  --n-400: #52525b;
-  --n-500: #71717a;
-  --n-600: #a1a1aa;
-  --n-700: #d4d4d8;
-  --n-800: #e4e4e7;
+  --white: #0f151b;
+  --n-200: #222c37;
+  --n-300: #374453;
+  --n-400: #526071;
+  --n-500: #708093;
+  --n-600: #a5b1bf;
+  --n-700: #cfd7e0;
+  --n-800: #dde3ea;
   --n-900: #ffffff;
-  --n-950: #f4f4f5;
+  --n-950: #eef1f4;
   --emerald-400: #047857;
   --emerald-700: #6ee7b7;
   --emerald-800: #6ee7b7;
@@ -61,23 +61,23 @@
   --blue-800: #93c5fd;
   --blue-950: #dbeafe;
   --background: var(--n-950);
-  --foreground: #18181b;
+  --foreground: #0f151b;
 }
 
 /* "system" follows the OS; keep in sync with the light block above. */
 @media (prefers-color-scheme: light) {
   [data-theme="system"] {
     color-scheme: light;
-    --white: #18181b;
-    --n-200: #27272a;
-    --n-300: #3f3f46;
-    --n-400: #52525b;
-    --n-500: #71717a;
-    --n-600: #a1a1aa;
-    --n-700: #d4d4d8;
-    --n-800: #e4e4e7;
+    --white: #0f151b;
+    --n-200: #222c37;
+    --n-300: #374453;
+    --n-400: #526071;
+    --n-500: #708093;
+    --n-600: #a5b1bf;
+    --n-700: #cfd7e0;
+    --n-800: #dde3ea;
     --n-900: #ffffff;
-    --n-950: #f4f4f5;
+    --n-950: #eef1f4;
     --emerald-400: #047857;
     --emerald-700: #6ee7b7;
     --emerald-800: #6ee7b7;
@@ -92,7 +92,7 @@
     --blue-800: #93c5fd;
     --blue-950: #dbeafe;
     --background: var(--n-950);
-    --foreground: #18181b;
+    --foreground: #0f151b;
   }
 }
 @media (prefers-color-scheme: dark) {
@@ -102,10 +102,58 @@
   }
 }
 
+/* Olympic plate colours: fixed in both themes, used as the only accents. */
+:root {
+  --plate-red: #d9342b;
+  --plate-blue: #2568c9;
+  --plate-yellow: #e8b923;
+  --plate-green: #2e9e5b;
+  --paper: #f7f9fb;
+  --paper-rule: #c3d3e4;
+  --paper-ink: #16202a;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "tnum" 1, "cv11" 1;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), var(--font-geist-sans), system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--plate-blue);
+  outline-offset: 2px;
+}
+
+/* Hero ledger: each tally stroke draws in once on load. */
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.tally-stroke {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 0.5s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tally-stroke {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+html {
+  scroll-behavior: smooth;
 }
 
 @layer utilities {

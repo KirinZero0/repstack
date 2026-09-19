@@ -12,7 +12,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: { display: ["var(--font-display)", "var(--font-geist-sans)", "system-ui", "sans-serif"] },
       colors: {
+        plate: { red: "var(--plate-red)", blue: "var(--plate-blue)", yellow: "var(--plate-yellow)", green: "var(--plate-green)" },
+        paper: { DEFAULT: "var(--paper)", rule: "var(--paper-rule)", ink: "var(--paper-ink)" },
         background: "var(--background)",
         foreground: "var(--foreground)",
         white: v("white"),

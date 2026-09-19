@@ -33,8 +33,11 @@ export function gymThemeFromSettings(settings: unknown): ThemeMode | null {
  * > their gym's setting (staff/member sessions) > platform default > "dark".
  */
 export async function resolveTheme(): Promise<{ mode: ThemeMode; allowUserOverride: boolean }> {
+  // Read cookies outside the try/catch: it marks the page as dynamic by throwing, and that
+  // signal must reach Next instead of being swallowed by the fail-soft handler below.
+  const userChoice = cookies().get(THEME_COOKIE)?.value;
   try {
-    return await resolveThemeUnsafe();
+    return await resolveThemeUnsafe(userChoice);
   } catch (err) {
     // Theming is cosmetic: never let a DB hiccup break every page that renders the root layout.
     console.error("Theme resolution failed, falling back to dark", err);
@@ -42,12 +45,11 @@ export async function resolveTheme(): Promise<{ mode: ThemeMode; allowUserOverri
   }
 }
 
-async function resolveThemeUnsafe(): Promise<{ mode: ThemeMode; allowUserOverride: boolean }> {
+async function resolveThemeUnsafe(userChoice: string | undefined): Promise<{ mode: ThemeMode; allowUserOverride: boolean }> {
   const platform = await getPlatformTheme();
 
   if (platform.allowUserOverride) {
-    const cookie = cookies().get(THEME_COOKIE)?.value;
-    if (isThemeMode(cookie)) return { mode: cookie, allowUserOverride: true };
+    if (isThemeMode(userChoice)) return { mode: userChoice, allowUserOverride: true };
   }
 
   const session = await getSession();

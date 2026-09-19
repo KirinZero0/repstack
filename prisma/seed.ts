@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { encrypt, hmacLookup } from "../src/lib/crypto";
+import { PLAN_SEEDS } from "./plans";
 
 const prisma = new PrismaClient();
 
@@ -28,6 +29,10 @@ async function main() {
       maxWhatsappPerMonth: 500,
     },
   });
+
+  for (const p of PLAN_SEEDS.filter((p) => !p.name.startsWith("Starter"))) {
+    await prisma.saasPlan.create({ data: { ...p, currency: "IDR" } });
+  }
 
   const superadminPassword = "changeme123";
   const superadmin = await prisma.superadmin.create({
