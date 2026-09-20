@@ -1,17 +1,13 @@
 import { prisma } from "./prisma";
 import type { XenditWebhookEvent } from "./xendit";
 import { completeSignup } from "./signup";
+import { extendedExpiry } from "./membership";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** New expiry after paying for `days`: adds to the time left, or starts from `paidAt` if already lapsed. */
-export function extendedExpiry(current: Date | null, days: number, paidAt: Date): Date {
-  const base = current && current > paidAt ? current : paidAt;
-  return new Date(base.getTime() + days * DAY_MS);
-}
+export { extendedExpiry };
+import { completeMemberSignup } from "./memberSignup";
 
 /** Applies a payment event to a member or platform payment. Idempotent. Returns which kind it matched, or null. */
-export async function processPaymentEvent(event: XenditWebhookEvent): Promise<"member" | "platform" | "signup" | null> {
+export async function processPaymentEvent(event: XenditWebhookEvent): Promise<"member" | "platform" | "signup" | "join" | null> {
   const memberPayment = await prisma.payment.findUnique({
     where: { id: event.external_id },
     include: { plan: true },
@@ -42,6 +38,14 @@ export async function processPaymentEvent(event: XenditWebhookEvent): Promise<"m
       });
     }
     return "signup";
+  }
+
+  const join = await prisma.memberSignup.findUnique({ where: { id: event.external_id } });
+  if (join) {
+    if (event.status === "PAID") {
+      await completeMemberSignup(join.id, event.paid_at ? new Date(event.paid_at) : new Date());
+    }
+    return "join";
   }
 
   return null;

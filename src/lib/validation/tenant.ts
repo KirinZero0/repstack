@@ -21,9 +21,12 @@ export const activateSchema = z.object({
   password: z.string().min(8).max(72),
 });
 
-export const gymThemeSchema = z.object({
-  theme: z.enum(["inherit", "light", "dark", "system"]),
-});
+export const gymSettingsSchema = z
+  .object({
+    theme: z.enum(["inherit", "light", "dark", "system"]).optional(),
+    acceptSignups: z.boolean().optional(),
+  })
+  .refine((v) => v.theme !== undefined || v.acceptSignups !== undefined, "Nothing to update");
 
 const planFields = {
   name: z.string().trim().min(2).max(60),
@@ -56,4 +59,12 @@ export const recordPaymentSchema = z.object({
   /** YYYY-MM-DD, the day the money was received. Defaults to today; can't be in the future. */
   paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   note: z.string().trim().max(200).optional(),
+});
+
+export const joinSchema = z.object({
+  planId: z.string().uuid(),
+  fullName: z.string().trim().min(2).max(80),
+  email: z.string().trim().toLowerCase().email().max(120),
+  phone: z.string().trim().min(6).max(30),
+  password: z.string().min(8).max(72),
 });

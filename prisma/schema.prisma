@@ -67,6 +67,7 @@ model Gym {
   checkins         CheckIn[]
   payments         Payment[]
   notifications    NotificationLog[]
+  memberSignups    MemberSignup[]
 
   @@index([subscriptionStatus])
 }
@@ -134,6 +135,7 @@ model MembershipPlan {
 
   members  Member[]
   payments Payment[]
+  signups  MemberSignup[]
 
   @@index([gymId])
 }
@@ -306,4 +308,32 @@ model GymSignup {
 
   @@index([slug])
   @@index([ownerEmail])
+}
+
+// ─── Member self-signup ─────────────────────────────────────
+// A would-be member who joined through the public /g/[slug]/join page. The Member and the
+// PAID Payment are only created once their first invoice is paid. Unpaid rows expire after 24h.
+
+model MemberSignup {
+  id                  String       @id @default(uuid())
+  gymId               String
+  gym                 Gym          @relation(fields: [gymId], references: [id])
+  planId              String
+  plan                MembershipPlan @relation(fields: [planId], references: [id])
+  fullName            String
+  email               String
+  phoneWhatsapp       String // AES-256-GCM encrypted, like Member.phoneWhatsapp
+  phoneWhatsappLookup String
+  passwordHash        String
+  amount              Decimal // snapshot of the plan price when the invoice was created
+  status              SignupStatus @default(PENDING)
+  externalInvoiceId   String?      @unique
+  memberId            String?
+  ipHash              String? // keyed hash of the requester's IP, for throttling only
+  createdAt           DateTime     @default(now())
+  completedAt         DateTime?
+
+  @@index([gymId, createdAt])
+  @@index([email])
+  @@index([ipHash, createdAt])
 }

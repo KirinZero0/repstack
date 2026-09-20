@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymThemeFromSettings } from "@/lib/theme";
 import { Card } from "@/components/charts";
-import { GymThemeForm } from "@/components/SettingsForms";
+import { GymThemeForm, JoinSettingsForm } from "@/components/SettingsForms";
+import { gymAcceptsSignups } from "@/lib/memberSignup";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,15 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
           <a href={`/g/${params.slug}/dashboard`} className="text-sm text-neutral-300 hover:text-white">
             ← Dashboard
           </a>
+        </div>
+        <div className="mb-6">
+          <Card title="Online sign-up">
+            <JoinSettingsForm
+              slug={params.slug}
+              initial={gymAcceptsSignups(gym.settings)}
+              joinUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/g/${params.slug}/join`}
+            />
+          </Card>
         </div>
         <Card title="Appearance">
           <GymThemeForm slug={params.slug} initial={gymThemeFromSettings(gym.settings) ?? "inherit"} />

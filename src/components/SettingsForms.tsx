@@ -112,3 +112,50 @@ export function GymThemeForm({
     </form>
   );
 }
+
+export function JoinSettingsForm({ slug, initial, joinUrl }: { slug: string; initial: boolean; joinUrl: string }) {
+  const [on, setOn] = useState(initial);
+  const { state, error, save } = useSave(`/api/g/${slug}/settings`);
+
+  return (
+    <div className="space-y-4">
+      <label className="flex items-start gap-3 text-sm text-neutral-300">
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(e) => {
+            setOn(e.target.checked);
+            save({ acceptSignups: e.target.checked });
+          }}
+          className="mt-0.5 h-4 w-4"
+        />
+        <span>
+          Let people join online
+          <span className="mt-1 block text-neutral-500">
+            Anyone with your join link can pick a plan, pay and get an active membership without visiting the front desk.
+          </span>
+        </span>
+      </label>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {state === "saved" && <p className="text-sm text-emerald-400">Saved</p>}
+      {on && (
+        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm">
+          <p className="text-neutral-400">Your join link</p>
+          <p className="mt-1 break-all font-medium text-white">{joinUrl}</p>
+          <div className="mt-3 flex flex-wrap gap-4">
+            <button
+              type="button"
+              onClick={() => navigator.clipboard?.writeText(joinUrl)}
+              className="rounded-lg border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800"
+            >
+              Copy link
+            </button>
+            <a href={`/g/${slug}/join-poster`} className="rounded-lg border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800">
+              Print QR poster
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { requireTenantSession, SessionError } from "@/lib/session";
-import { gymThemeSchema } from "@/lib/validation/tenant";
+import { gymSettingsSchema } from "@/lib/validation/tenant";
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   let session, gym;
@@ -19,13 +19,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ error: "Only the owner can change gym settings" }, { status: 403 });
   }
 
-  const parsed = gymThemeSchema.safeParse(await req.json().catch(() => null));
+  const parsed = gymSettingsSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const current = (gym.settings ?? {}) as Record<string, unknown>;
-  const rest = { ...current };
-  delete rest.theme;
-  const next = parsed.data.theme === "inherit" ? rest : { ...rest, theme: parsed.data.theme };
+  const next = { ...((gym.settings ?? {}) as Record<string, unknown>) };
+  if (parsed.data.theme !== undefined) {
+    if (parsed.data.theme === "inherit") delete next.theme;
+    else next.theme = parsed.data.theme;
+  }
+  if (parsed.data.acceptSignups !== undefined) next.acceptSignups = parsed.data.acceptSignups;
 
   await prisma.gym.update({ where: { id: gym.id }, data: { settings: next as Prisma.InputJsonValue } });
   return NextResponse.json({ ok: true });
