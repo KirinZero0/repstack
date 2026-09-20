@@ -79,6 +79,28 @@ const STEPS: TourStep[] = [
     tab: "members",
   },
   {
+    title: "When someone pays you directly",
+    body: "Not everyone pays online. Andi's membership expired last week, and he just handed over cash at the front desk. Open his row to record it.",
+    target: "record-pay-btn",
+    action: "Click Record payment",
+    advanceOnClick: true,
+    tab: "members",
+  },
+  {
+    title: "Enter what you received",
+    body: "Pick the plan and the amount you received (change it for a discount). The real form also lets you set the date. A note like \"cash at front desk\" helps later. Owners and staff can both do this.",
+    target: "record-pay-form",
+    action: "Click Save payment in the form",
+    advanceOnSubmit: true,
+    tab: "members",
+  },
+  {
+    title: "Their membership is back on",
+    body: "Andi is active again and his new dates are set. He gets a WhatsApp receipt, the payment shows in your revenue as recorded manually with your name on it, and an owner can void it if you typed something wrong.",
+    target: "paid-row",
+    tab: "members",
+  },
+  {
     title: "Set your own prices",
     body: "Every gym builds its own plans: a name, a length in days and a price. Members only see the plans you have on sale.",
     target: "nav-plans",
@@ -174,6 +196,9 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
   const [plans, setPlans] = useState<DemoPlan[]>(INITIAL_PLANS);
   const [showForm, setShowForm] = useState(false);
   const [sent, setSent] = useState<DemoMember | null>(null);
+  const [payFor, setPayFor] = useState<string | null>(null);
+  const [paidName, setPaidName] = useState<string | null>(null);
+  const [payForm, setPayForm] = useState({ amount: "250000", note: "Cash at front desk" });
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [newPlanId, setNewPlanId] = useState<string | null>(null);
   const [planForm, setPlanForm] = useState({ name: "Student month", days: "30", price: "180000" });
@@ -203,6 +228,14 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
     setShowForm(false);
   }
 
+  function recordPayment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!payFor) return;
+    setMembers((ms) => ms.map((m) => (m.name === payFor ? { ...m, status: "ACTIVE", expiresInDays: 30 } : m)));
+    setPaidName(payFor);
+    setPayFor(null);
+  }
+
   function addPlan(e: React.FormEvent) {
     e.preventDefault();
     const id = `p${Date.now()}`;
@@ -221,6 +254,9 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
     setShowForm(false);
     setSent(null);
     setShowPlanForm(false);
+    setPayFor(null);
+    setPaidName(null);
+    setPayForm({ amount: "250000", note: "Cash at front desk" });
     setNewPlanId(null);
     setPlanForm({ name: "Student month", days: "30", price: "180000" });
     setTourKey((k) => k + 1);
@@ -355,8 +391,39 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
               </div>
             )}
 
+            {payFor && (
+              <form data-tour="record-pay-form" onSubmit={recordPayment} className="mb-6 grid gap-3 rounded-xl border border-neutral-800 bg-neutral-900 p-5 sm:grid-cols-[1fr_1fr_1.4fr_auto]">
+                <p className="col-span-full text-sm text-neutral-300">Record a payment for <span className="font-semibold text-white">{payFor}</span></p>
+                <label className="text-sm text-neutral-300">
+                  <span className="mb-1 block">Plan paid for</span>
+                  <select className={field} defaultValue="Monthly">
+                    {plans.filter((p) => p.onSale).map((p) => (
+                      <option key={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm text-neutral-300">
+                  <span className="mb-1 block">Amount received (Rp)</span>
+                  <input className={field} type="number" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} />
+                </label>
+                <label className="text-sm text-neutral-300">
+                  <span className="mb-1 block">Note</span>
+                  <input className={field} value={payForm.note} onChange={(e) => setPayForm({ ...payForm, note: e.target.value })} />
+                </label>
+                <button type="submit" className="self-end rounded-lg bg-white px-4 py-2 text-sm font-semibold text-neutral-950 hover:bg-neutral-200">
+                  Save payment
+                </button>
+              </form>
+            )}
+
+            {paidName && !payFor && (
+              <p className="mb-6 rounded-lg border border-emerald-800 bg-emerald-950 px-4 py-3 text-sm text-emerald-400">
+                Recorded. {paidName} is active for 30 days, and a WhatsApp receipt is on its way.
+              </p>
+            )}
+
             <div data-tour="member-table" className="overflow-x-auto rounded-xl border border-neutral-800">
-              <table className="w-full min-w-[640px] text-left text-sm">
+              <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="bg-neutral-900 text-neutral-400">
                   <tr>
                     <th className="px-4 py-3 font-normal">Name</th>
@@ -365,11 +432,12 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
                     <th className="px-4 py-3 font-normal">Plan</th>
                     <th className="px-4 py-3 font-normal">Status</th>
                     <th className="px-4 py-3 font-normal">Days left</th>
+                    <th className="px-4 py-3" />
                   </tr>
                 </thead>
                 <tbody>
                   {members.map((m) => (
-                    <tr key={m.name} className="border-t border-neutral-800">
+                    <tr key={m.name} data-tour={m.name === paidName ? "paid-row" : undefined} className="border-t border-neutral-800">
                       <td className="px-4 py-3 font-medium">{m.name}</td>
                       <td className="px-4 py-3 text-neutral-400">{m.email}</td>
                       <td className="px-4 py-3 text-neutral-400">{m.phone}</td>
@@ -378,6 +446,15 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
                         <StatusPill status={m.status} />
                       </td>
                       <td className="px-4 py-3 text-neutral-400">{m.expiresInDays === null ? "—" : m.expiresInDays < 0 ? "expired" : m.expiresInDays}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          data-tour={m.name === "Andi Wijaya" ? "record-pay-btn" : undefined}
+                          onClick={() => setPayFor(m.name)}
+                          className="whitespace-nowrap rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-300 hover:bg-neutral-800"
+                        >
+                          Record payment
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -49,3 +49,11 @@ export const signupSchema = z.object({
   ownerPhone: z.string().trim().min(6).max(30).optional().or(z.literal("").transform(() => undefined)),
   password: z.string().min(8).max(72),
 });
+
+export const recordPaymentSchema = z.object({
+  planId: z.string().uuid(),
+  amount: z.number().int().min(1).max(100_000_000),
+  /** YYYY-MM-DD, the day the money was received. Defaults to today; can't be in the future. */
+  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  note: z.string().trim().max(200).optional(),
+});

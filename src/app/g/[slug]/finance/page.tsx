@@ -68,6 +68,9 @@ export default async function FinancePage({ params }: { params: { slug: string }
           <Card title="This month by plan">
             <HBars data={f.byPlan} format={rp} />
           </Card>
+          <Card title="This month by how they paid">
+            <HBars data={f.byMethod} format={rp} />
+          </Card>
           <Card title="Payments by status (all time)">
             <div className="space-y-2">
               {f.statusCounts.map((s) => (

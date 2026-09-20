@@ -47,11 +47,14 @@ export async function getGymFinance(gymId: string, timezone: string) {
 
   const byMonth = new Map<string, number>(months.map((k) => [k, 0]));
   const byPlan = new Map<string, number>();
+  const byMethod = new Map<string, number>();
   for (const p of paid) {
     const key = monthKey(p.paidAt ?? p.createdAt, timezone);
     if (byMonth.has(key)) byMonth.set(key, (byMonth.get(key) ?? 0) + Number(p.amount));
     if (key === months[months.length - 1]) {
       byPlan.set(p.plan.name, (byPlan.get(p.plan.name) ?? 0) + Number(p.amount));
+      const method = p.provider === "CASH" ? "Recorded manually" : "Online (Xendit)";
+      byMethod.set(method, (byMethod.get(method) ?? 0) + Number(p.amount));
     }
   }
 
@@ -68,6 +71,7 @@ export async function getGymFinance(gymId: string, timezone: string) {
     pendingAmount: Number(pendingAgg._sum.amount ?? 0),
     pendingCount: pendingAgg._count,
     byPlan: Array.from(byPlan.entries()).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value),
+    byMethod: Array.from(byMethod.entries()).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value),
     statusCounts: statusGroups.map((g) => ({ status: g.status, count: g._count })),
     recent: recent.map((p) => ({
       id: p.id,

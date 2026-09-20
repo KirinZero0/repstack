@@ -115,7 +115,8 @@ model StaffUser {
   role         Role     @default(STAFF)
   createdAt    DateTime @default(now())
 
-  checkins CheckIn[]
+  checkins         CheckIn[]
+  recordedPayments Payment[]
 
   @@index([gymId])
 }
@@ -225,8 +226,12 @@ model Payment {
   status            PaymentStatus   @default(PENDING)
   createdAt         DateTime        @default(now())
   paidAt            DateTime?
+  note              String? // free text for manual payments, e.g. "paid at front desk"
+  recordedById      String? // staff member who entered a manual (CASH) payment
+  recordedBy        StaffUser?      @relation(fields: [recordedById], references: [id])
 
   @@index([gymId])
+  @@index([memberId])
 }
 
 model NotificationLog {

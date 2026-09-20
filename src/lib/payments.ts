@@ -2,6 +2,14 @@ import { prisma } from "./prisma";
 import type { XenditWebhookEvent } from "./xendit";
 import { completeSignup } from "./signup";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** New expiry after paying for `days`: adds to the time left, or starts from `paidAt` if already lapsed. */
+export function extendedExpiry(current: Date | null, days: number, paidAt: Date): Date {
+  const base = current && current > paidAt ? current : paidAt;
+  return new Date(base.getTime() + days * DAY_MS);
+}
+
 /** Applies a payment event to a member or platform payment. Idempotent. Returns which kind it matched, or null. */
 export async function processPaymentEvent(event: XenditWebhookEvent): Promise<"member" | "platform" | "signup" | null> {
   const memberPayment = await prisma.payment.findUnique({
@@ -52,11 +60,7 @@ async function handleMemberPayment(
     const member = await prisma.member.findUnique({ where: { id: payment.memberId } });
     if (!member) return;
 
-    const base =
-      member.membershipExpiry && member.membershipExpiry > new Date()
-        ? member.membershipExpiry
-        : new Date();
-    const newExpiry = new Date(base.getTime() + payment.plan.durationDays * 24 * 60 * 60 * 1000);
+    const newExpiry = extendedExpiry(member.membershipExpiry, payment.plan.durationDays, new Date());
 
     await prisma.$transaction([
       prisma.payment.update({

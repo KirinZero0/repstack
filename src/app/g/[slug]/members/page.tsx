@@ -53,8 +53,8 @@ export default async function MembersPage({ params }: { params: { slug: string }
           />
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-neutral-800">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto rounded-xl border border-neutral-800">
+          <table className="w-full min-w-[820px] text-left text-sm">
             <thead className="bg-neutral-900 text-neutral-400">
               <tr>
                 <th className="px-4 py-3">Name</th>
@@ -64,13 +64,18 @@ export default async function MembersPage({ params }: { params: { slug: string }
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Expiry</th>
                 <th className="px-4 py-3">Activated</th>
+                <th className="px-4 py-3"></th>
                 {session.role === "OWNER" && <th className="px-4 py-3"></th>}
               </tr>
             </thead>
             <tbody>
               {rows.map((m) => (
                 <tr key={m.id} className="border-t border-neutral-800">
-                  <td className="px-4 py-3">{m.fullName}</td>
+                  <td className="px-4 py-3">
+                    <a href={`/g/${params.slug}/members/${m.id}`} className="font-medium underline-offset-2 hover:underline">
+                      {m.fullName}
+                    </a>
+                  </td>
                   <td className="px-4 py-3 text-neutral-400">{m.email}</td>
                   <td className="px-4 py-3 text-neutral-400">{m.phone}</td>
                   <td className="px-4 py-3">{m.plan}</td>
@@ -79,6 +84,14 @@ export default async function MembersPage({ params }: { params: { slug: string }
                     {m.membershipExpiry ? new Date(m.membershipExpiry).toLocaleDateString("id-ID") : "—"}
                   </td>
                   <td className="px-4 py-3">{m.activated ? "Yes" : "Pending"}</td>
+                  <td className="px-4 py-3">
+                    <a
+                      href={`/g/${params.slug}/members/${m.id}`}
+                      className="whitespace-nowrap rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-300 hover:bg-neutral-800"
+                    >
+                      Record payment
+                    </a>
+                  </td>
                   {session.role === "OWNER" && (
                     <td className="px-4 py-3">
                       <ResendFallbackButton slug={params.slug} memberId={m.id} />
@@ -88,7 +101,7 @@ export default async function MembersPage({ params }: { params: { slug: string }
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-neutral-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-neutral-500">
                     No members yet.
                   </td>
                 </tr>
