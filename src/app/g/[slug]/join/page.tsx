@@ -32,7 +32,7 @@ export default async function JoinPage({ params }: { params: { slug: string } })
             <p className="text-neutral-300">
               {gym.name} isn&apos;t taking online sign-ups right now. Please ask at the front desk to join.
             </p>
-            <a href={`/g/${params.slug}/member-login`} className="mt-4 inline-block text-sm text-neutral-400 underline underline-offset-2 hover:text-white">
+            <a href={`/g/${params.slug}/login`} className="mt-4 inline-block text-sm text-neutral-400 underline underline-offset-2 hover:text-white">
               Already a member? Log in
             </a>
           </div>
@@ -47,7 +47,7 @@ export default async function JoinPage({ params }: { params: { slug: string } })
                 plans={plans.map((p) => ({ id: p.id, name: p.name, price: Number(p.price), days: p.durationDays }))}
               />
             </div>
-            <a href={`/g/${params.slug}/member-login`} className="mt-8 inline-block text-sm text-neutral-500 hover:text-neutral-300">
+            <a href={`/g/${params.slug}/login`} className="mt-8 inline-block text-sm text-neutral-500 hover:text-neutral-300">
               Already a member? Log in
             </a>
           </>

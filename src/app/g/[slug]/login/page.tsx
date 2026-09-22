@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthShell from "@/components/AuthShell";
 
-export default function StaffLoginPage({ params }: { params: { slug: string } }) {
+export default function GymLoginPage({ params }: { params: { slug: string } }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,17 +16,17 @@ export default function StaffLoginPage({ params }: { params: { slug: string } })
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch(`/api/g/${params.slug}/staff-login`, {
+      const res = await fetch(`/api/g/${params.slug}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         setError(body.error ?? "Login failed");
         return;
       }
-      router.push(`/g/${params.slug}/dashboard`);
+      router.push(body.kind === "staff" ? `/g/${params.slug}/dashboard` : "/my");
       router.refresh();
     } finally {
       setLoading(false);
@@ -35,11 +35,8 @@ export default function StaffLoginPage({ params }: { params: { slug: string } })
 
   return (
     <AuthShell tagline="Your members, your check-ins, your revenue.">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full"
-      >
-        <h1 className="mb-1 text-2xl font-semibold text-white">Staff login</h1>
+      <form onSubmit={handleSubmit} className="w-full">
+        <h1 className="mb-1 text-2xl font-semibold text-white">Log in</h1>
         <p className="mb-6 text-sm text-neutral-400">{params.slug}</p>
 
         <label htmlFor="email" className="mb-1 block text-sm text-neutral-300">Email</label>
@@ -49,6 +46,7 @@ export default function StaffLoginPage({ params }: { params: { slug: string } })
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
           className="mb-4 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-4 py-2.5 text-white outline-none focus:border-plate-blue"
         />
 
@@ -59,6 +57,7 @@ export default function StaffLoginPage({ params }: { params: { slug: string } })
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
           className="mb-4 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-4 py-2.5 text-white outline-none focus:border-plate-blue"
         />
 
@@ -72,12 +71,9 @@ export default function StaffLoginPage({ params }: { params: { slug: string } })
           {loading ? "Signing in…" : "Sign in"}
         </button>
 
-        <a
-          href={`/g/${params.slug}/member-login`}
-          className="mt-4 block text-center text-sm text-neutral-500 hover:text-neutral-300"
-        >
-          Member login instead →
-        </a>
+        <p className="mt-4 text-center text-sm text-neutral-500">
+          Staff and members both sign in here.
+        </p>
       </form>
     </AuthShell>
   );

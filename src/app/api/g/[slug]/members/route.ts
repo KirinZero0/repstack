@@ -73,7 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       payerEmail: data.email,
       description: `${plan.name} membership — ${gym.name}`,
       currency: plan.currency,
-      successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/member-login`,
+      successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/login`,
     });
     invoiceUrl = invoice.invoice_url;
     await prisma.payment.update({

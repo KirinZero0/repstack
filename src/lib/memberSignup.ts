@@ -74,7 +74,7 @@ export async function completeMemberSignup(signupId: string, paidAt: Date) {
 
   await sendGymWhatsapp(signup.gymId, {
     to: decrypt(signup.phoneWhatsapp),
-    message: `Welcome to ${signup.gym.name}, ${signup.fullName}! Your ${signup.plan.name} membership is active until ${expiry.toLocaleDateString("id-ID", { timeZone: signup.gym.timezone })}. Log in with ${signup.email} at ${process.env.NEXT_PUBLIC_APP_URL}/g/${signup.gym.slug}/member-login to see your check-in QR.`,
+    message: `Welcome to ${signup.gym.name}, ${signup.fullName}! Your ${signup.plan.name} membership is active until ${expiry.toLocaleDateString("id-ID", { timeZone: signup.gym.timezone })}. Log in with ${signup.email} at ${process.env.NEXT_PUBLIC_APP_URL}/g/${signup.gym.slug}/login to see your check-in QR.`,
     type: "member_welcome",
     memberId: member.id,
   }).catch((err) => console.error("Member welcome message failed", err));

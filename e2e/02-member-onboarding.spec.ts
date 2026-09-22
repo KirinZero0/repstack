@@ -40,7 +40,7 @@ test("owner adds a member, member activates, member can log in", async ({ page, 
   await page.locator("#photo").setInputFiles(path.join(__dirname, "fixtures", "test-photo.jpg"));
   await page.getByRole("button", { name: "Activate account" }).click();
 
-  await page.waitForURL(`${baseURL}/g/test-gym-a/member-login`, { timeout: 5000 });
+  await page.waitForURL(`${baseURL}/g/test-gym-a/login`, { timeout: 5000 });
 
   await page.locator("#email").fill(newEmail);
   await page.locator("#password").fill("newpassword123");

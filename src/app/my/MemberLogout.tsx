@@ -7,7 +7,7 @@ export default function MemberLogout({ slug }: { slug: string }) {
 
   async function logout() {
     await fetch(`/api/g/${slug}/member-logout`, { method: "POST" });
-    router.push(`/g/${slug}/member-login`);
+    router.push(`/g/${slug}/login`);
     router.refresh();
   }
 

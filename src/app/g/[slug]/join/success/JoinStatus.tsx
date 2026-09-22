@@ -58,7 +58,7 @@ export default function JoinStatus({ slug, signupId, mock }: { slug: string; sig
         <p className="mt-3 max-w-md text-neutral-400">
           Your payment went through and your membership is active. Log in with the email and password you just chose to see your check-in QR code.
         </p>
-        <a href={`/g/${slug}/member-login`} className="mt-8 inline-block rounded-lg bg-plate-green px-6 py-3 text-sm font-semibold text-[#ffffff] hover:brightness-110">
+        <a href={`/g/${slug}/login`} className="mt-8 inline-block rounded-lg bg-plate-green px-6 py-3 text-sm font-semibold text-[#ffffff] hover:brightness-110">
           Log in
         </a>
       </div>
