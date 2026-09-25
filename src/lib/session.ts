@@ -83,7 +83,17 @@ export async function requireTenantSession(slug: string) {
     throw new SessionError("GYM_SUSPENDED", "This gym's subscription is not active");
   }
 
-  return { session, gym };
+  // The JWT can't be revoked, so confirm against the database that this staff account still
+  // exists and is active, and use its current role (a demotion or deactivation applies at once).
+  const staff = await prisma.staffUser.findUnique({
+    where: { id: session.staffUserId },
+    select: { gymId: true, isActive: true, role: true },
+  });
+  if (!staff || !staff.isActive || staff.gymId !== gym.id) {
+    throw new SessionError("UNAUTHENTICATED", "This staff account is no longer active");
+  }
+
+  return { session: { ...session, role: staff.role }, gym };
 }
 
 /** Same choke point for member-facing routes (e.g. /my-qr, member dashboard if added later). */

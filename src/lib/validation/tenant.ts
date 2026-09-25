@@ -49,7 +49,7 @@ export const signupSchema = z.object({
     .regex(/^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/, "Use 3-40 letters, numbers or hyphens, starting and ending with a letter or number"),
   ownerName: z.string().trim().min(2).max(80),
   ownerEmail: z.string().trim().toLowerCase().email().max(120),
-  ownerPhone: z.string().trim().min(6).max(30).optional().or(z.literal("").transform(() => undefined)),
+  ownerPhone: z.string().trim().min(6, "Enter the WhatsApp number we can use to help you get back in.").max(30),
   password: z.string().min(8).max(72),
 });
 
@@ -81,3 +81,19 @@ export const whatsappTestSchema = z.object({
   /** The owner's own number. If given it is saved to their profile and used for the test. */
   phone: z.string().trim().min(6).max(30).optional(),
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(120),
+});
+
+export const resetPasswordSchema = z.object({
+  password: z.string().min(8).max(72),
+});
+
+export const createStaffSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  email: z.string().trim().toLowerCase().email().max(120),
+  phone: z.string().trim().min(6).max(30).optional().or(z.literal("").transform(() => undefined)),
+});
+
+export const staffActiveSchema = z.object({ isActive: z.boolean() });

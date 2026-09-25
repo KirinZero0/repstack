@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     prisma.staffUser.findUnique({ where: { email } }),
     prisma.member.findUnique({ where: { email } }),
   ]);
-  const staffBelongs = Boolean(staff && staff.gymId === gym.id);
+  const staffBelongs = Boolean(staff && staff.gymId === gym.id && staff.isActive);
   const memberBelongs = Boolean(member && member.gymId === gym.id && member.passwordHash);
 
   const [staffValid, memberValid] = await Promise.all([

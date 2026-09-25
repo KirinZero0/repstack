@@ -18,6 +18,7 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "@vercel/blob": "^2.8.0",
+    "@vercel/functions": "^3.9.9",
     "bcryptjs": "^3.0.3",
     "html5-qrcode": "^2.3.8",
     "jsonwebtoken": "^9.0.3",

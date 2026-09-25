@@ -5,6 +5,7 @@ import { decrypt } from "@/lib/crypto";
 import { dayKeyInTimezone } from "@/lib/date";
 import { Card, StatusPill, rp } from "@/components/charts";
 import { RecordPaymentForm, VoidPaymentButton } from "./RecordPayment";
+import PasswordLinkButton from "./PasswordLink";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,9 @@ export default async function MemberDetailPage({ params }: { params: { slug: str
               <div className="flex justify-between gap-4"><dt className="text-neutral-400">WhatsApp</dt><dd>{phone}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-neutral-400">Account</dt><dd>{member.passwordHash ? "Activated" : "Not activated yet"}</dd></div>
             </dl>
+            <div className="mt-4 border-t border-neutral-800 pt-4">
+              <PasswordLinkButton slug={params.slug} memberId={member.id} />
+            </div>
           </Card>
           <Card title="Membership">
             <dl className="space-y-2 text-sm">

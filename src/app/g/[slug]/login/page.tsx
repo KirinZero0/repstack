@@ -71,9 +71,12 @@ export default function GymLoginPage({ params }: { params: { slug: string } }) {
           {loading ? "Signing in…" : "Sign in"}
         </button>
 
-        <p className="mt-4 text-center text-sm text-neutral-500">
-          Staff and members both sign in here.
-        </p>
+        <div className="mt-4 flex items-center justify-between text-sm text-neutral-500">
+          <span>Staff and members both sign in here.</span>
+          <a href={`/g/${params.slug}/forgot`} className="text-neutral-300 underline underline-offset-2 hover:text-white">
+            Forgot password?
+          </a>
+        </div>
       </form>
     </AuthShell>
   );

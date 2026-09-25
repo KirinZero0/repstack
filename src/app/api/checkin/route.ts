@@ -16,8 +16,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ result: "UNAUTHENTICATED" as ResultCode }, { status: 401 });
   }
 
-  const gym = await prisma.gym.findUnique({ where: { id: session.gymId } });
-  if (!gym) {
+  const [gym, staff] = await Promise.all([
+    prisma.gym.findUnique({ where: { id: session.gymId } }),
+    prisma.staffUser.findUnique({ where: { id: session.staffUserId }, select: { isActive: true, gymId: true } }),
+  ]);
+  if (!gym || !staff || !staff.isActive || staff.gymId !== gym.id) {
     return NextResponse.json({ result: "UNAUTHENTICATED" as ResultCode }, { status: 401 });
   }
   if (gym.subscriptionStatus === "SUSPENDED" || gym.subscriptionStatus === "CANCELLED") {

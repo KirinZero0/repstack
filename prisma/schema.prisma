@@ -114,6 +114,7 @@ model StaffUser {
   phone        String? // used for platform WhatsApp notifications (billing reminders)
   passwordHash String
   role         Role     @default(STAFF)
+  isActive     Boolean  @default(true) // deactivated staff can't log in and lose access immediately
   createdAt    DateTime @default(now())
 
   checkins         CheckIn[]
@@ -335,5 +336,24 @@ model MemberSignup {
 
   @@index([gymId, createdAt])
   @@index([email])
+  @@index([ipHash, createdAt])
+}
+
+// ─── Password reset / staff invite ──────────────────────────
+// One-time links for staff and members to set a new password. Only the SHA-256 of the token is
+// stored. "invite" links are used to set the first password of a staff account created by an owner.
+
+model PasswordReset {
+  id        String    @id @default(uuid())
+  kind      String // "staff" | "member"
+  subjectId String
+  tokenHash String    @unique
+  purpose   String    @default("reset") // "reset" | "invite"
+  expiresAt DateTime
+  usedAt    DateTime?
+  ipHash    String? // keyed hash of the requester's IP, for throttling only
+  createdAt DateTime  @default(now())
+
+  @@index([subjectId, createdAt])
   @@index([ipHash, createdAt])
 }

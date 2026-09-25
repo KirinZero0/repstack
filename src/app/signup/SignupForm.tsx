@@ -87,8 +87,9 @@ export default function SignupForm({ planId }: { planId: string }) {
           {err("ownerName")}
         </div>
         <div>
-          <label htmlFor="ownerPhone" className="mb-1 block text-sm text-neutral-300">WhatsApp number <span className="text-neutral-500">(optional)</span></label>
-          <input id="ownerPhone" value={v.ownerPhone} onChange={(e) => set("ownerPhone", e.target.value)} className={input} inputMode="tel" autoComplete="tel" placeholder="0812…" />
+          <label htmlFor="ownerPhone" className="mb-1 block text-sm text-neutral-300">WhatsApp number</label>
+          <input id="ownerPhone" required value={v.ownerPhone} onChange={(e) => set("ownerPhone", e.target.value)} className={input} inputMode="tel" autoComplete="tel" placeholder="0812…" />
+          <p className="mt-1 text-xs text-neutral-500">Used to send you a link if you forget your password.</p>
           {err("ownerPhone")}
         </div>
       </div>

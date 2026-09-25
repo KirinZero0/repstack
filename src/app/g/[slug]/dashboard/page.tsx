@@ -72,6 +72,9 @@ export default async function DashboardPage({ params }: { params: { slug: string
             </a>
             {session.role === "OWNER" && (
               <>
+                <a href={`/g/${params.slug}/staff`} className="text-neutral-300 hover:text-white">
+                  Staff
+                </a>
                 <a href={`/g/${params.slug}/plans`} className="text-neutral-300 hover:text-white">
                   Plans
                 </a>
