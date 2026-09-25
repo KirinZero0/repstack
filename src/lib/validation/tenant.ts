@@ -68,3 +68,16 @@ export const joinSchema = z.object({
   phone: z.string().trim().min(6).max(30),
   password: z.string().min(8).max(72),
 });
+
+export const whatsappConfigSchema = z.object({
+  provider: z.enum(["fonnte", "wablas"]),
+  senderNumber: z.string().trim().min(6).max(30),
+  /** Omit (or send empty) to keep the stored key when only editing other fields. */
+  apiKey: z.string().trim().min(8).max(300).optional().or(z.literal("").transform(() => undefined)),
+  isActive: z.boolean(),
+});
+
+export const whatsappTestSchema = z.object({
+  /** The owner's own number. If given it is saved to their profile and used for the test. */
+  phone: z.string().trim().min(6).max(30).optional(),
+});
