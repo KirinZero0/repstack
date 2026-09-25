@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymSettingsSchema } from "@/lib/validation/tenant";
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
-  let session, gym;
+  let session, gym, db;
   try {
-    ({ session, gym } = await requireTenantSession(params.slug));
+    ({ session, gym, db } = await requireTenantSession(params.slug));
   } catch (err) {
     if (err instanceof SessionError) {
       const status = err.code === "GYM_SUSPENDED" ? 403 : err.code === "NOT_FOUND" ? 404 : 401;
@@ -29,6 +28,6 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
   if (parsed.data.acceptSignups !== undefined) next.acceptSignups = parsed.data.acceptSignups;
 
-  await prisma.gym.update({ where: { id: gym.id }, data: { settings: next as Prisma.InputJsonValue } });
+  await db.gym.update({ where: { id: gym.id }, data: { settings: next as Prisma.InputJsonValue } });
   return NextResponse.json({ ok: true });
 }

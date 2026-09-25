@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { parseQrToken, verifyQrToken } from "@/lib/qr";
 import { evaluateAndLogCheckin } from "@/lib/checkin";
@@ -16,9 +16,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ result: "UNAUTHENTICATED" as ResultCode }, { status: 401 });
   }
 
+  const db = tenantDb(session.gymId);
   const [gym, staff] = await Promise.all([
-    prisma.gym.findUnique({ where: { id: session.gymId } }),
-    prisma.staffUser.findUnique({ where: { id: session.staffUserId }, select: { isActive: true, gymId: true } }),
+    db.gym.findUnique({ where: { id: session.gymId } }),
+    db.staffUser.findUnique({ where: { id: session.staffUserId }, select: { isActive: true, gymId: true } }),
   ]);
   if (!gym || !staff || !staff.isActive || staff.gymId !== gym.id) {
     return NextResponse.json({ result: "UNAUTHENTICATED" as ResultCode }, { status: 401 });
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ result: "INVALID" as ResultCode }, { status: 200 });
   }
 
-  const member = await prisma.member.findUnique({ where: { id: unverifiedPayload.memberId } });
+  const member = await db.member.findUnique({ where: { id: unverifiedPayload.memberId } });
   if (!member || member.gymId !== session.gymId) {
     return NextResponse.json({ result: "INVALID" as ResultCode }, { status: 200 });
   }
@@ -54,6 +55,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ result: "INVALID" as ResultCode }, { status: 200 });
   }
 
-  const outcome = await evaluateAndLogCheckin(member, gym, session.staffUserId);
+  const outcome = await evaluateAndLogCheckin(db, member, gym, session.staffUserId);
   return NextResponse.json({ result: outcome.result as ResultCode, member: outcome.memberSummary });
 }

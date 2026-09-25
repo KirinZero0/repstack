@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { getMemberAttendance } from "@/lib/stats";
 import { BarChart, Card, Heatmap, StatCard, StatusPill, rp } from "@/components/charts";
@@ -22,7 +22,8 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
     );
   }
 
-  const member = await prisma.member.findUnique({
+  const db = tenantDb(session.gymId);
+  const member = await db.member.findUnique({
     where: { id: session.memberId },
     include: { plan: true, gym: true },
   });
@@ -35,8 +36,8 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
   }
 
   const [att, payments] = await Promise.all([
-    getMemberAttendance(member.id, member.gym.timezone),
-    prisma.payment.findMany({
+    getMemberAttendance(db, member.id, member.gym.timezone),
+    db.payment.findMany({
       where: { memberId: member.id, gymId: member.gymId },
       orderBy: { createdAt: "desc" },
       take: 5,
@@ -46,7 +47,7 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
 
   const mockId = isMockMode() ? searchParams["mock-invoice"] : undefined;
   const mockPayment = mockId
-    ? await prisma.payment.findFirst({ where: { id: mockId, memberId: member.id, status: "PENDING" }, include: { plan: true } })
+    ? await db.payment.findFirst({ where: { id: mockId, memberId: member.id, status: "PENDING" }, include: { plan: true } })
     : null;
 
   const daysLeft = member.membershipExpiry

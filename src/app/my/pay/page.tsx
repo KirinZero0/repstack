@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { StatusPill, rp } from "@/components/charts";
 import PayButton from "./PayButton";
@@ -19,7 +19,8 @@ export default async function PayPage() {
     );
   }
 
-  const member = await prisma.member.findUnique({
+  const db = tenantDb(session.gymId);
+  const member = await db.member.findUnique({
     where: { id: session.memberId },
     include: { gym: true, plan: true },
   });
@@ -31,7 +32,7 @@ export default async function PayPage() {
     );
   }
 
-  const plans = await prisma.membershipPlan.findMany({
+  const plans = await db.membershipPlan.findMany({
     where: { gymId: member.gymId, isActive: true },
     orderBy: { price: "asc" },
   });

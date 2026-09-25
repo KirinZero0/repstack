@@ -11,6 +11,8 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "admin": "tsx prisma/admin.ts",
+    "db:rls": "tsx prisma/apply-rls.ts",
+    "db:rls:check": "tsx prisma/check-rls.ts",
     "db:seed:history": "tsx prisma/seed-history.ts",
     "db:seed:plans": "tsx prisma/seed-plans.ts",
     "test:e2e": "playwright test"

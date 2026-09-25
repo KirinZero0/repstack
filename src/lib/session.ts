@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import { prisma, tenantDb } from "@/lib/prisma";
 
 export type SessionPayload =
   | { kind: "staff"; staffUserId: string; gymId: string; role: "OWNER" | "STAFF" }
@@ -83,9 +83,12 @@ export async function requireTenantSession(slug: string) {
     throw new SessionError("GYM_SUSPENDED", "This gym's subscription is not active");
   }
 
+  // From here on every query goes through a client the database itself confines to this gym.
+  const db = tenantDb(gym.id);
+
   // The JWT can't be revoked, so confirm against the database that this staff account still
   // exists and is active, and use its current role (a demotion or deactivation applies at once).
-  const staff = await prisma.staffUser.findUnique({
+  const staff = await db.staffUser.findUnique({
     where: { id: session.staffUserId },
     select: { gymId: true, isActive: true, role: true },
   });
@@ -93,7 +96,7 @@ export async function requireTenantSession(slug: string) {
     throw new SessionError("UNAUTHENTICATED", "This staff account is no longer active");
   }
 
-  return { session: { ...session, role: staff.role }, gym };
+  return { session: { ...session, role: staff.role }, gym, db };
 }
 
 /** Same choke point for member-facing routes (e.g. /my-qr, member dashboard if added later). */
@@ -110,7 +113,7 @@ export async function requireMemberSession(slug: string) {
     throw new SessionError("FORBIDDEN", "Session does not belong to this gym");
   }
 
-  return { session, gym };
+  return { session, gym, db: tenantDb(gym.id) };
 }
 
 export async function requireSuperadminSession() {

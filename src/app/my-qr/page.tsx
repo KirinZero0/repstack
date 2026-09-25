@@ -1,5 +1,5 @@
 import QRCode from "qrcode";
-import { prisma } from "@/lib/prisma";
+import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { buildQrToken } from "@/lib/qr";
 import { findValidMagicLink } from "@/lib/magicLink";
@@ -17,7 +17,7 @@ export default async function MyQrPage({
     null;
 
   if (session?.kind === "member") {
-    member = await prisma.member.findUnique({ where: { id: session.memberId } });
+    member = await tenantDb(session.gymId).member.findUnique({ where: { id: session.memberId } });
   } else if (searchParams.token) {
     const link = await findValidMagicLink(searchParams.token, "qr_fallback");
     if (link) {

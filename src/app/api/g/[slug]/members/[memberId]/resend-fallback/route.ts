@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { createMagicLink } from "@/lib/magicLink";
 import { sendGymWhatsapp } from "@/lib/whatsapp";
@@ -11,9 +10,9 @@ export async function POST(
   _req: Request,
   { params }: { params: { slug: string; memberId: string } },
 ) {
-  let gym;
+  let gym, db;
   try {
-    ({ gym } = await requireTenantSession(params.slug));
+    ({ gym, db } = await requireTenantSession(params.slug));
   } catch (err) {
     if (err instanceof SessionError) {
       const status = err.code === "GYM_SUSPENDED" ? 403 : err.code === "NOT_FOUND" ? 404 : 401;
@@ -22,7 +21,7 @@ export async function POST(
     throw err;
   }
 
-  const member = await prisma.member.findUnique({ where: { id: params.memberId } });
+  const member = await db.member.findUnique({ where: { id: params.memberId } });
   if (!member || member.gymId !== gym.id) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }

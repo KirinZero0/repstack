@@ -1,106 +1,87 @@
-# Row-Level Security hardening (optional pre-go-live, required before second tenant)
+# Row-level security
 
-Application code enforces tenant isolation today via `requireTenantSession(slug)`
-(`src/lib/session.ts`) — every gym-scoped query filters by `gymId` taken from the verified
-session, never from a client-supplied value. This is sufficient for a single paying tenant
-where the only code path touching the database is this app.
-
-Before onboarding a **second real paying tenant**, add Postgres RLS as defense-in-depth: a bug
-in a future query (missing a `where: { gymId }` clause) would otherwise leak data across tenants
-silently. RLS makes that a hard database-level failure instead.
+Iron Ledger keeps gyms apart in two layers. Application code always filters by the gym in the
+verified session (`requireTenantSession`), and Postgres enforces the same rule underneath, so a
+missing `where gymId` in some future query can't leak another gym's data.
 
 ## How it works
 
-1. Every tenant-scoped table gets a policy that only allows rows where `gym_id` matches
-   `current_setting('app.current_gym_id')`.
-2. The app sets that session variable at the start of each request, right after
-   `requireTenantSession` resolves the gym — e.g. via `SET LOCAL app.current_gym_id = $1`
-   inside a transaction, or a Prisma `$executeRaw` call before the query. Prisma's connection
-   pooling means this must be set per-transaction, not per-connection.
-3. Superadmin routes and the `Superadmin`/`SaasPlan` tables are exempt — they intentionally
-   see across all tenants — and should run as a Postgres role that bypasses RLS
-   (`BYPASSRLS`) or against a policy that allows `current_setting('app.is_superadmin', true) = 'true'`.
+The app connects to Postgres two ways:
 
-## SQL (apply via a migration once ready)
+| Client | Connects as | RLS | Used for |
+|---|---|---|---|
+| `prisma` (`src/lib/prisma.ts`) | database owner (`DATABASE_URL`) | bypassed | login, public sign-up/join/forgot-password, webhooks, cron, superadmin, theme lookup, and the internal helpers those call (WhatsApp, magic links, password resets) |
+| `tenantDb(gymId)` | restricted role (`APP_DATABASE_URL`) | enforced | every gym-scoped page and API route (staff and member sessions) |
 
-```sql
--- Enable RLS on every tenant-scoped table.
-ALTER TABLE "Gym" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "StaffUser" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "MembershipPlan" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "Member" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "CheckIn" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "Payment" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "NotificationLog" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "WhatsappSenderConfig" ENABLE ROW LEVEL SECURITY;
+`requireTenantSession()` returns a ready-made `db = tenantDb(gym.id)`. Member-session code calls
+`tenantDb(session.gymId)`. **Always take the gym id from a verified session, never from the client.**
 
--- Gym itself is matched on its own id, not a gym_id column.
-CREATE POLICY tenant_isolation_gym ON "Gym"
-  USING (
-    current_setting('app.is_superadmin', true) = 'true'
-    OR id::text = current_setting('app.current_gym_id', true)
-  );
+Each query through `tenantDb` runs as a tiny transaction that first executes
+`set_config('app.current_gym_id', <gym>, true)` on the same connection, then the query. That is
+what makes it safe with pooled connections (including Neon's pooler): the setting only lives for
+that transaction. Multi-statement work uses `tenantTransaction(gymId, tx => ...)`.
 
--- Every other tenant-scoped table follows this shape (repeat per table, substituting the name):
-CREATE POLICY tenant_isolation_staffuser ON "StaffUser"
-  USING (
-    current_setting('app.is_superadmin', true) = 'true'
-    OR "gymId"::text = current_setting('app.current_gym_id', true)
-  );
+The policies (`prisma/rls.sql`) allow a row only when its `gymId` (or `id` for `Gym`) equals
+`current_setting('app.current_gym_id', true)`, for reads and writes. With no gym set the comparison is
+NULL, so the restricted role sees nothing and can write nothing.
 
-CREATE POLICY tenant_isolation_membershipplan ON "MembershipPlan"
-  USING (
-    current_setting('app.is_superadmin', true) = 'true'
-    OR "gymId"::text = current_setting('app.current_gym_id', true)
-  );
+The restricted role is also only **granted** the tables gym code needs. `Superadmin`, `AuditLog`,
+`GymSignup`, `MemberSignup`, `MagicLink`, `PasswordReset` and `AppConfig` are not readable by it at all.
 
-CREATE POLICY tenant_isolation_member ON "Member"
-  USING (
-    current_setting('app.is_superadmin', true) = 'true'
-    OR "gymId"::text = current_setting('app.current_gym_id', true)
-  );
+## Setting it up
 
-CREATE POLICY tenant_isolation_checkin ON "CheckIn"
-  USING (
-    current_setting('app.is_superadmin', true) = 'true'
-    OR "gymId"::text = current_setting('app.current_gym_id', true)
-  );
+RLS is only real if `APP_DATABASE_URL` connects as a role that is **not** the table owner, not a
+superuser and does not have `BYPASSRLS`. If it points at the owner, Postgres skips the policies
+silently. The check script below catches that.
 
-CREATE POLICY tenant_isolation_payment ON "Payment"
-  USING (
-    current_setting('app.is_superadmin', true) = 'true'
-    OR "gymId"::text = current_setting('app.current_gym_id', true)
-  );
+1. With `DATABASE_URL` set to the database owner, create the role and apply the policies:
 
-CREATE POLICY tenant_isolation_notificationlog ON "NotificationLog"
-  USING (
-    current_setting('app.is_superadmin', true) = 'true'
-    OR "gymId"::text = current_setting('app.current_gym_id', true)
-  );
+   ```bash
+   APP_DB_PASSWORD='a-long-random-password' npm run db:rls
+   ```
 
-CREATE POLICY tenant_isolation_whatsappconfig ON "WhatsappSenderConfig"
-  USING (
-    current_setting('app.is_superadmin', true) = 'true'
-    OR "gymId"::text = current_setting('app.current_gym_id', true)
-  );
-```
+   Re-run it after every schema change that adds tables (`prisma db push` on a reset database drops
+   policies). It is idempotent, and re-running with a new password rotates the role's password.
 
-## App-side wiring (not yet implemented)
+2. Set `APP_DATABASE_URL` to a connection string for that role, same host and database:
 
-`requireTenantSession` would need to run its Prisma calls inside a transaction that opens with:
+   ```
+   postgresql://iron_app:<password>@<host>/<db>?sslmode=require
+   ```
 
-```ts
-await tx.$executeRawUnsafe(`SET LOCAL app.current_gym_id = '${gym.id}'`);
-```
+   On Neon use the **pooled** host for this URL and add `&pgbouncer=true` so Prisma disables
+   prepared statements. Keep `DATABASE_URL` pointing at the owner (use the direct host for it if you run
+   migrations).
 
-(parameterized properly, not string-interpolated as shown — `SET LOCAL` doesn't accept bind
-parameters directly, so use `set_config('app.current_gym_id', $1, true)` via `$queryRaw`
-instead). This is a non-trivial refactor of every Prisma call site into transactions and is
-**deliberately deferred** past tonight's scope — the brief calls it a hardening step, not a
-go-live blocker, for a single-tenant launch.
+3. Verify:
 
-## Why this file exists but isn't applied yet
+   ```bash
+   npm run db:rls:check
+   ```
 
-Applying RLS without the app-side `SET LOCAL` wiring would break the app (every query would
-return zero rows once RLS is enabled, since `current_setting` would be unset). Ship this as a
-tracked follow-up, not a partial migration.
+   It fails loudly if the role is a superuser or has `BYPASSRLS`, if a tenant table lacks a policy, if
+   the role can see rows with no gym set, if a gym sees another gym's rows, or if it can write
+   into another gym.
+
+In production the app logs an error at startup if `APP_DATABASE_URL` is missing, since tenant queries
+would then run as the owner with RLS not enforced. Local development works without it (it falls back to
+`DATABASE_URL`), but the e2e suite always runs with the restricted role.
+
+## Adding a table
+
+- Has a `gymId` column and holds gym data: add `ENABLE ROW LEVEL SECURITY`, a `tenant_isolation`
+  policy and a `GRANT` in `prisma/rls.sql`, and add it to `check-rls.ts`.
+- System-only (the app role must never touch it): leave it ungranted and add it to `SYSTEM_ONLY` in
+  `e2e/15-row-level-security.spec.ts`.
+
+The e2e test "every table with a gymId column is protected" fails until you do one of these.
+
+## What this does not cover
+
+- Code that uses the owner `prisma` client is not restricted. Those paths are deliberately limited to the
+  places listed above and take ids that were already verified. Prefer `tenantDb` for anything new that
+  handles one gym's data.
+- Helpers like `sendGymWhatsapp` run as the owner but are only ever handed ids that a gym-scoped handler
+  already authorised.
+- It protects data at rest in the database, not the application logic: authorisation such as owner vs
+  staff is still enforced in code.

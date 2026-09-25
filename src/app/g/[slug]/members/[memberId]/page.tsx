@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { decrypt } from "@/lib/crypto";
 import { dayKeyInTimezone } from "@/lib/date";
@@ -10,27 +9,27 @@ import PasswordLinkButton from "./PasswordLink";
 export const dynamic = "force-dynamic";
 
 export default async function MemberDetailPage({ params }: { params: { slug: string; memberId: string } }) {
-  let session, gym;
+  let session, gym, db;
   try {
-    ({ session, gym } = await requireTenantSession(params.slug));
+    ({ session, gym, db } = await requireTenantSession(params.slug));
   } catch (err) {
     if (err instanceof SessionError) redirect(`/g/${params.slug}/login`);
     throw err;
   }
 
-  const member = await prisma.member.findUnique({ where: { id: params.memberId }, include: { plan: true } });
+  const member = await db.member.findUnique({ where: { id: params.memberId }, include: { plan: true } });
   if (!member || member.gymId !== gym.id) notFound();
 
   const [plans, payments, visits, lastVisit] = await Promise.all([
-    prisma.membershipPlan.findMany({ where: { gymId: gym.id, isActive: true }, orderBy: { price: "asc" } }),
-    prisma.payment.findMany({
+    db.membershipPlan.findMany({ where: { gymId: gym.id, isActive: true }, orderBy: { price: "asc" } }),
+    db.payment.findMany({
       where: { memberId: member.id, gymId: gym.id },
       orderBy: { createdAt: "desc" },
       take: 30,
       include: { plan: { select: { name: true } }, recordedBy: { select: { name: true } } },
     }),
-    prisma.checkIn.count({ where: { memberId: member.id, gymId: gym.id, result: "SUCCESS" } }),
-    prisma.checkIn.findFirst({ where: { memberId: member.id, gymId: gym.id, result: "SUCCESS" }, orderBy: { checkedInAt: "desc" } }),
+    db.checkIn.count({ where: { memberId: member.id, gymId: gym.id, result: "SUCCESS" } }),
+    db.checkIn.findFirst({ where: { memberId: member.id, gymId: gym.id, result: "SUCCESS" }, orderBy: { checkedInAt: "desc" } }),
   ]);
 
   // Full contact details are only decrypted here, on the member's own detail view.

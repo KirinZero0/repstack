@@ -1,14 +1,13 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import PlansManager from "./PlansManager";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlansPage({ params }: { params: { slug: string } }) {
-  let session, gym;
+  let session, gym, db;
   try {
-    ({ session, gym } = await requireTenantSession(params.slug));
+    ({ session, gym, db } = await requireTenantSession(params.slug));
   } catch (err) {
     if (err instanceof SessionError) redirect(`/g/${params.slug}/login`);
     throw err;
@@ -22,7 +21,7 @@ export default async function PlansPage({ params }: { params: { slug: string } }
     );
   }
 
-  const plans = await prisma.membershipPlan.findMany({
+  const plans = await db.membershipPlan.findMany({
     where: { gymId: gym.id },
     orderBy: [{ isActive: "desc" }, { price: "asc" }],
     include: { _count: { select: { members: true } } },

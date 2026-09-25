@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { payMembershipSchema } from "@/lib/validation/tenant";
 import { createXenditInvoice, getXenditInvoice } from "@/lib/xendit";
@@ -11,12 +11,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Log in as a member to pay" }, { status: 401 });
   }
 
+  const db = tenantDb(session.gymId);
   const parsed = payMembershipSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
   const [member, gym] = await Promise.all([
-    prisma.member.findUnique({ where: { id: session.memberId } }),
-    prisma.gym.findUnique({ where: { id: session.gymId } }),
+    db.member.findUnique({ where: { id: session.memberId } }),
+    db.gym.findUnique({ where: { id: session.gymId } }),
   ]);
   if (!member || !gym || member.gymId !== gym.id) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
@@ -29,14 +30,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Tenant isolation: only plans that belong to the member's own gym, and are on sale.
-  const plan = await prisma.membershipPlan.findUnique({ where: { id: parsed.data.planId } });
+  const plan = await db.membershipPlan.findUnique({ where: { id: parsed.data.planId } });
   if (!plan || plan.gymId !== gym.id || !plan.isActive) {
     return NextResponse.json({ error: "That plan isn't available" }, { status: 400 });
   }
 
   try {
     // Resume an unpaid invoice for the same plan instead of stacking duplicates.
-    const pending = await prisma.payment.findFirst({
+    const pending = await db.payment.findFirst({
       where: { memberId: member.id, planId: plan.id, status: "PENDING", externalInvoiceId: { not: null } },
       orderBy: { createdAt: "desc" },
     });
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const payment = await prisma.payment.create({
+    const payment = await db.payment.create({
       data: {
         gymId: gym.id,
         memberId: member.id,
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
       currency: plan.currency,
       successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/my`,
     });
-    await prisma.payment.update({ where: { id: payment.id }, data: { externalInvoiceId: invoice.id } });
+    await db.payment.update({ where: { id: payment.id }, data: { externalInvoiceId: invoice.id } });
 
     return NextResponse.json({ invoiceUrl: invoice.invoice_url });
   } catch (err) {

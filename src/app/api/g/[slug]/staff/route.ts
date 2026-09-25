@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
-import { prisma } from "@/lib/prisma";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { createStaffSchema } from "@/lib/validation/tenant";
 import { createPasswordReset, deliverResetLink, resetUrl, unusablePasswordHash } from "@/lib/passwordReset";
 
 /** Owner adds a staff account. The staff member sets their own password through a one-time link. */
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
-  let session, gym;
+  let session, gym, db;
   try {
-    ({ session, gym } = await requireTenantSession(params.slug));
+    ({ session, gym, db } = await requireTenantSession(params.slug));
   } catch (err) {
     if (err instanceof SessionError) {
       const status = err.code === "GYM_SUSPENDED" ? 403 : err.code === "NOT_FOUND" ? 404 : 401;
@@ -28,8 +27,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
   const d = parsed.data;
 
-  const plan = await prisma.saasPlan.findUnique({ where: { id: gym.saasPlanId } });
-  const activeStaff = await prisma.staffUser.count({ where: { gymId: gym.id, isActive: true } });
+  const plan = await db.saasPlan.findUnique({ where: { id: gym.saasPlanId } });
+  const activeStaff = await db.staffUser.count({ where: { gymId: gym.id, isActive: true } });
   if (plan && activeStaff >= plan.maxStaff) {
     return NextResponse.json(
       { error: `Your ${plan.name} plan allows ${plan.maxStaff} staff accounts, including you. Deactivate someone or upgrade to add more.` },
@@ -38,11 +37,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   // StaffUser.email is unique across every gym, so keep the message the same either way.
-  if (await prisma.staffUser.findUnique({ where: { email: d.email } })) {
+  if (await db.staffUser.findUnique({ where: { email: d.email } })) {
     return NextResponse.json({ error: "That email can't be used for a staff account.", field: "email" }, { status: 409 });
   }
 
-  const staff = await prisma.staffUser.create({
+  const staff = await db.staffUser.create({
     data: {
       gymId: gym.id,
       name: d.name,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { tenantTransaction } from "@/lib/prisma";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { recordPaymentSchema } from "@/lib/validation/tenant";
 import { extendedExpiry } from "@/lib/payments";
@@ -9,9 +9,9 @@ import { sendGymWhatsapp } from "@/lib/whatsapp";
 
 /** Owner or staff records money a member paid in person (cash, bank transfer) and activates them. */
 export async function POST(req: NextRequest, { params }: { params: { slug: string; memberId: string } }) {
-  let session, gym;
+  let session, gym, db;
   try {
-    ({ session, gym } = await requireTenantSession(params.slug));
+    ({ session, gym, db } = await requireTenantSession(params.slug));
   } catch (err) {
     if (err instanceof SessionError) {
       const status = err.code === "GYM_SUSPENDED" ? 403 : err.code === "NOT_FOUND" ? 404 : 401;
@@ -28,8 +28,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   // Tenant isolation: member and plan must both belong to the session's gym.
   const [member, plan] = await Promise.all([
-    prisma.member.findUnique({ where: { id: params.memberId } }),
-    prisma.membershipPlan.findUnique({ where: { id: d.planId } }),
+    db.member.findUnique({ where: { id: params.memberId } }),
+    db.membershipPlan.findUnique({ where: { id: d.planId } }),
   ]);
   if (!member || member.gymId !== gym.id) return NextResponse.json({ error: "Member not found" }, { status: 404 });
   if (!plan || plan.gymId !== gym.id) return NextResponse.json({ error: "That plan isn't available" }, { status: 400 });
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const paidAt = !d.paidOn || d.paidOn === todayKey ? now : new Date(`${d.paidOn}T12:00:00Z`);
 
   // Guard against a double-click or a repeated submit creating the same entry twice.
-  const dupe = await prisma.payment.findFirst({
+  const dupe = await db.payment.findFirst({
     where: {
       memberId: member.id,
       provider: "CASH",
@@ -60,8 +60,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const newExpiry = extendedExpiry(member.membershipExpiry, plan.durationDays, paidAt);
 
-  const [payment] = await prisma.$transaction([
-    prisma.payment.create({
+  // Both writes succeed or neither does, still confined to this gym.
+  const payment = await tenantTransaction(gym.id, async (tx) => {
+    const created = await tx.payment.create({
       data: {
         gymId: gym.id,
         memberId: member.id,
@@ -74,8 +75,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         note: d.note || null,
         recordedById: session.staffUserId,
       },
-    }),
-    prisma.member.update({
+    });
+    await tx.member.update({
       where: { id: member.id },
       data: {
         planId: plan.id,
@@ -83,8 +84,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         // A frozen member stays frozen; everyone else is active if the new expiry is still ahead.
         ...(member.status === "FROZEN" ? {} : { status: newExpiry > now ? "ACTIVE" : "EXPIRED" }),
       },
-    }),
-  ]);
+    });
+    return created;
+  });
 
   await sendGymWhatsapp(gym.id, {
     to: decrypt(member.phoneWhatsapp),

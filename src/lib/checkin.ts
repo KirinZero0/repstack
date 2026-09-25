@@ -1,14 +1,14 @@
-import { prisma } from "@/lib/prisma";
+import type { TenantDb } from "@/lib/prisma";
 import { dayKeyInTimezone } from "@/lib/date";
 import type { CheckInResult, Gym, Member } from "@prisma/client";
 
-async function logAttempt(params: {
+async function logAttempt(db: TenantDb, params: {
   gymId: string;
   memberId: string;
   staffUserId: string | null;
   result: CheckInResult;
 }) {
-  await prisma.checkIn.create({
+  await db.checkIn.create({
     data: {
       gymId: params.gymId,
       memberId: params.memberId,
@@ -25,12 +25,13 @@ async function logAttempt(params: {
  * (and what gets logged) can't drift between them.
  */
 export async function evaluateAndLogCheckin(
+  db: TenantDb,
   member: Member,
   gym: Gym,
   staffUserId: string | null,
 ): Promise<{ result: CheckInResult; memberSummary?: { fullName: string; photoUrl: string | null } }> {
   if (member.status === "FROZEN") {
-    await logAttempt({ gymId: gym.id, memberId: member.id, staffUserId, result: "FROZEN" });
+    await logAttempt(db, { gymId: gym.id, memberId: member.id, staffUserId, result: "FROZEN" });
     return { result: "FROZEN" };
   }
 
@@ -41,12 +42,12 @@ export async function evaluateAndLogCheckin(
     !member.membershipExpiry ||
     member.membershipExpiry < new Date()
   ) {
-    await logAttempt({ gymId: gym.id, memberId: member.id, staffUserId, result: "EXPIRED" });
+    await logAttempt(db, { gymId: gym.id, memberId: member.id, staffUserId, result: "EXPIRED" });
     return { result: "EXPIRED" };
   }
 
   const todayKey = dayKeyInTimezone(new Date(), gym.timezone);
-  const todaysCheckins = await prisma.checkIn.findMany({
+  const todaysCheckins = await db.checkIn.findMany({
     where: { memberId: member.id, result: "SUCCESS" },
     orderBy: { checkedInAt: "desc" },
     take: 5,
@@ -55,10 +56,10 @@ export async function evaluateAndLogCheckin(
     (c) => dayKeyInTimezone(c.checkedInAt, gym.timezone) === todayKey,
   );
   if (alreadyCheckedInToday) {
-    await logAttempt({ gymId: gym.id, memberId: member.id, staffUserId, result: "DUPLICATE" });
+    await logAttempt(db, { gymId: gym.id, memberId: member.id, staffUserId, result: "DUPLICATE" });
     return { result: "DUPLICATE" };
   }
 
-  await logAttempt({ gymId: gym.id, memberId: member.id, staffUserId, result: "SUCCESS" });
+  await logAttempt(db, { gymId: gym.id, memberId: member.id, staffUserId, result: "SUCCESS" });
   return { result: "SUCCESS", memberSummary: { fullName: member.fullName, photoUrl: member.photoUrl } };
 }

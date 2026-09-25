@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { decrypt, maskPhone, maskEmail } from "@/lib/crypto";
 import AddMemberForm from "./AddMemberForm";
@@ -8,21 +7,21 @@ import ResendFallbackButton from "./ResendFallbackButton";
 export const dynamic = "force-dynamic";
 
 export default async function MembersPage({ params }: { params: { slug: string } }) {
-  let session, gym;
+  let session, gym, db;
   try {
-    ({ session, gym } = await requireTenantSession(params.slug));
+    ({ session, gym, db } = await requireTenantSession(params.slug));
   } catch (err) {
     if (err instanceof SessionError) redirect(`/g/${params.slug}/login`);
     throw err;
   }
 
   const [members, plans] = await Promise.all([
-    prisma.member.findMany({
+    db.member.findMany({
       where: { gymId: gym.id },
       include: { plan: true },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.membershipPlan.findMany({ where: { gymId: gym.id, isActive: true } }),
+    db.membershipPlan.findMany({ where: { gymId: gym.id, isActive: true } }),
   ]);
 
   const rows = members.map((m) => ({

@@ -6,9 +6,9 @@ import { BarChart, Card, HBars, StatCard, StatusPill, rp } from "@/components/ch
 export const dynamic = "force-dynamic";
 
 export default async function FinancePage({ params }: { params: { slug: string } }) {
-  let session, gym;
+  let session, gym, db;
   try {
-    ({ session, gym } = await requireTenantSession(params.slug));
+    ({ session, gym, db } = await requireTenantSession(params.slug));
   } catch (err) {
     if (err instanceof SessionError) redirect(`/g/${params.slug}/login`);
     throw err;
@@ -22,7 +22,7 @@ export default async function FinancePage({ params }: { params: { slug: string }
     );
   }
 
-  const f = await getGymFinance(gym.id, gym.timezone);
+  const f = await getGymFinance(db, gym.id, gym.timezone);
   const short = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
   const change =
     f.changePct === null ? "no prior month" : `${f.changePct >= 0 ? "+" : ""}${f.changePct.toFixed(0)}% vs last month`;

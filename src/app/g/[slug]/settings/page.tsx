@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymThemeFromSettings } from "@/lib/theme";
 import { Card } from "@/components/charts";
@@ -12,9 +11,9 @@ export const dynamic = "force-dynamic";
 const STATUS_TONE: Record<string, string> = { SENT: "text-emerald-400", FAILED: "text-red-400", SKIPPED: "text-amber-400" };
 
 export default async function GymSettingsPage({ params }: { params: { slug: string } }) {
-  let session, gym;
+  let session, gym, db;
   try {
-    ({ session, gym } = await requireTenantSession(params.slug));
+    ({ session, gym, db } = await requireTenantSession(params.slug));
   } catch (err) {
     if (err instanceof SessionError) redirect(`/g/${params.slug}/login`);
     throw err;
@@ -29,9 +28,9 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
   }
 
   const [wa, owner, recent] = await Promise.all([
-    prisma.whatsappSenderConfig.findUnique({ where: { gymId: gym.id } }),
-    prisma.staffUser.findUnique({ where: { id: session.staffUserId }, select: { phone: true } }),
-    prisma.notificationLog.findMany({ where: { gymId: gym.id }, orderBy: { sentAt: "desc" }, take: 5 }),
+    db.whatsappSenderConfig.findUnique({ where: { gymId: gym.id } }),
+    db.staffUser.findUnique({ where: { id: session.staffUserId }, select: { phone: true } }),
+    db.notificationLog.findMany({ where: { gymId: gym.id }, orderBy: { sentAt: "desc" }, take: 5 }),
   ]);
 
   return (

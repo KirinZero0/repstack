@@ -1,13 +1,12 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { requireTenantSession, SessionError } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function BillingPage({ params }: { params: { slug: string } }) {
-  let session, gym;
+  let session, gym, db;
   try {
-    ({ session, gym } = await requireTenantSession(params.slug));
+    ({ session, gym, db } = await requireTenantSession(params.slug));
   } catch (err) {
     if (err instanceof SessionError) redirect(`/g/${params.slug}/login`);
     throw err;
@@ -22,8 +21,8 @@ export default async function BillingPage({ params }: { params: { slug: string }
   }
 
   const [saasPlan, payments] = await Promise.all([
-    prisma.saasPlan.findUnique({ where: { id: gym.saasPlanId } }),
-    prisma.platformPayment.findMany({
+    db.saasPlan.findUnique({ where: { id: gym.saasPlanId } }),
+    db.platformPayment.findMany({
       where: { gymId: gym.id },
       orderBy: { createdAt: "desc" },
     }),

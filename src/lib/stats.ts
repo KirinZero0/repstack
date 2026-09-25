@@ -1,4 +1,4 @@
-import { prisma } from "./prisma";
+import { prisma, type TenantDb } from "./prisma";
 import { dayKeyInTimezone } from "./date";
 
 export function monthKey(date: Date, timezone: string): string {
@@ -26,18 +26,18 @@ function monthlyEquivalent(price: number, interval: string) {
   return interval === "annual" ? price / 12 : price;
 }
 
-export async function getGymFinance(gymId: string, timezone: string) {
+export async function getGymFinance(db: TenantDb, gymId: string, timezone: string) {
   const months = lastMonthKeys(12, timezone);
   const since = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
 
   const [paid, pendingAgg, statusGroups, recent] = await Promise.all([
-    prisma.payment.findMany({
+    db.payment.findMany({
       where: { gymId, status: "PAID", paidAt: { gte: since } },
       include: { plan: { select: { name: true } } },
     }),
-    prisma.payment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
-    prisma.payment.groupBy({ by: ["status"], where: { gymId }, _count: true }),
-    prisma.payment.findMany({
+    db.payment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
+    db.payment.groupBy({ by: ["status"], where: { gymId }, _count: true }),
+    db.payment.findMany({
       where: { gymId },
       orderBy: { createdAt: "desc" },
       take: 10,
@@ -137,13 +137,13 @@ export async function getPlatformFinance(timezone = "Asia/Jakarta") {
   };
 }
 
-export async function getMemberAttendance(memberId: string, timezone: string) {
+export async function getMemberAttendance(db: TenantDb, memberId: string, timezone: string) {
   const since = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000);
-  const checkins = await prisma.checkIn.findMany({
+  const checkins = await db.checkIn.findMany({
     where: { memberId, result: "SUCCESS", checkedInAt: { gte: since } },
     orderBy: { checkedInAt: "desc" },
   });
-  const total = await prisma.checkIn.count({ where: { memberId, result: "SUCCESS" } });
+  const total = await db.checkIn.count({ where: { memberId, result: "SUCCESS" } });
 
   const days = new Set(checkins.map((c) => dayKeyInTimezone(c.checkedInAt, timezone)));
 

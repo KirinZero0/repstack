@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { addMemberSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
@@ -10,9 +9,9 @@ import { sendGymWhatsapp } from "@/lib/whatsapp";
 const ACTIVATION_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
-  let gym;
+  let gym, db;
   try {
-    ({ gym } = await requireTenantSession(params.slug));
+    ({ gym, db } = await requireTenantSession(params.slug));
   } catch (err) {
     if (err instanceof SessionError) {
       const status = err.code === "GYM_SUSPENDED" ? 403 : err.code === "NOT_FOUND" ? 404 : 401;
@@ -31,17 +30,17 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // Member.email is globally unique across all tenants (schema constraint), so this check is
   // inherently cross-tenant. Keep the error generic — don't confirm the email belongs to a
   // member at another gym specifically.
-  const existingEmail = await prisma.member.findUnique({ where: { email: data.email } });
+  const existingEmail = await db.member.findUnique({ where: { email: data.email } });
   if (existingEmail) {
     return NextResponse.json({ error: "Unable to add member with this email" }, { status: 409 });
   }
 
-  const plan = await prisma.membershipPlan.findUnique({ where: { id: data.planId } });
+  const plan = await db.membershipPlan.findUnique({ where: { id: data.planId } });
   if (!plan || plan.gymId !== gym.id || !plan.isActive) {
     return NextResponse.json({ error: "Invalid membership plan" }, { status: 400 });
   }
 
-  const member = await prisma.member.create({
+  const member = await db.member.create({
     data: {
       gymId: gym.id,
       planId: plan.id,
@@ -53,7 +52,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     },
   });
 
-  const payment = await prisma.payment.create({
+  const payment = await db.payment.create({
     data: {
       gymId: gym.id,
       memberId: member.id,
@@ -76,7 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/login`,
     });
     invoiceUrl = invoice.invoice_url;
-    await prisma.payment.update({
+    await db.payment.update({
       where: { id: payment.id },
       data: { externalInvoiceId: invoice.id },
     });

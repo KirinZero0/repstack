@@ -13,6 +13,10 @@ export default async function globalSetup() {
     env: process.env,
   });
 
+  // The forced reset above drops policies and grants, so re-apply row-level security. The app
+  // then runs as the restricted role (APP_DATABASE_URL), exactly as in production.
+  execSync("npx tsx prisma/apply-rls.ts", { stdio: "inherit", env: process.env });
+
   const prisma = new PrismaClient();
 
   const plan = await prisma.saasPlan.create({

@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { dayKeyInTimezone } from "@/lib/date";
 import LogoutButton from "./LogoutButton";
@@ -7,9 +6,9 @@ import LogoutButton from "./LogoutButton";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({ params }: { params: { slug: string } }) {
-  let session, gym;
+  let session, gym, db;
   try {
-    ({ session, gym } = await requireTenantSession(params.slug));
+    ({ session, gym, db } = await requireTenantSession(params.slug));
   } catch (err) {
     if (err instanceof SessionError) redirect(`/g/${params.slug}/login`);
     throw err;
@@ -17,7 +16,7 @@ export default async function DashboardPage({ params }: { params: { slug: string
 
   const waConfig =
     session.role === "OWNER"
-      ? await prisma.whatsappSenderConfig.findUnique({ where: { gymId: gym.id }, select: { isActive: true } })
+      ? await db.whatsappSenderConfig.findUnique({ where: { gymId: gym.id }, select: { isActive: true } })
       : null;
   const needsWhatsapp = session.role === "OWNER" && (!waConfig || !waConfig.isActive);
 
@@ -26,15 +25,15 @@ export default async function DashboardPage({ params }: { params: { slug: string
   const soonCutoff = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const [activeMembers, todaysCheckins, monthPayments, expiringSoon] = await Promise.all([
-    prisma.member.count({ where: { gymId: gym.id, status: "ACTIVE" } }),
-    prisma.checkIn.findMany({
+    db.member.count({ where: { gymId: gym.id, status: "ACTIVE" } }),
+    db.checkIn.findMany({
       where: { gymId: gym.id, checkedInAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) } },
       orderBy: { checkedInAt: "desc" },
     }),
-    prisma.payment.findMany({
+    db.payment.findMany({
       where: { gymId: gym.id, status: "PAID", paidAt: { gte: monthStart } },
     }),
-    prisma.member.findMany({
+    db.member.findMany({
       where: {
         gymId: gym.id,
         status: "ACTIVE",
