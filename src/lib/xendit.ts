@@ -40,6 +40,21 @@ export async function getXenditInvoice(invoiceId: string): Promise<XenditInvoice
   return (await res.json()) as XenditInvoiceResponse;
 }
 
+/** Best effort: stops an unpaid invoice from being paid later. Failures are logged, never thrown. */
+export async function expireXenditInvoice(invoiceId: string): Promise<void> {
+  if (isMockMode()) return;
+  try {
+    const auth = Buffer.from(`${getSecretKey()}:`).toString("base64");
+    const res = await fetch(`${XENDIT_API_BASE}/invoices/${invoiceId}/expire!`, {
+      method: "POST",
+      headers: { Authorization: `Basic ${auth}` },
+    });
+    if (!res.ok) console.error(`Could not expire Xendit invoice ${invoiceId} (${res.status})`);
+  } catch (err) {
+    console.error(`Could not expire Xendit invoice ${invoiceId}`, err);
+  }
+}
+
 function getSecretKey(): string {
   const key = process.env.XENDIT_SECRET_KEY;
   if (!key) throw new Error("XENDIT_SECRET_KEY env var not set");

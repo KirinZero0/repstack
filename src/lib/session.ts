@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { prisma, tenantDb } from "@/lib/prisma";
+import { suspendedForNonPayment } from "@/lib/suspension";
 
 export type SessionPayload =
   | { kind: "staff"; staffUserId: string; gymId: string; role: "OWNER" | "STAFF" }
@@ -66,7 +67,7 @@ export class SessionError extends Error {
  * Re-verifies the session's gymId against the slug in the URL — never trust a client-supplied gymId.
  * Also rejects if the gym's subscription is SUSPENDED or CANCELLED.
  */
-export async function requireTenantSession(slug: string) {
+export async function requireTenantSession(slug: string, opts: { billing?: boolean } = {}) {
   const session = await getSession();
   if (!session || session.kind !== "staff") {
     throw new SessionError("UNAUTHENTICATED", "Staff session required");
@@ -79,7 +80,10 @@ export async function requireTenantSession(slug: string) {
     throw new SessionError("FORBIDDEN", "Session does not belong to this gym");
   }
 
-  if (gym.subscriptionStatus === "SUSPENDED" || gym.subscriptionStatus === "CANCELLED") {
+  // A gym suspended for an unpaid subscription still lets its owner reach the billing page (and only
+  // that, via opts.billing) so they can pay and switch it back on. The owner check is below.
+  const ownerMayPay = Boolean(opts.billing) && gym.subscriptionStatus === "SUSPENDED" && suspendedForNonPayment(gym.settings);
+  if ((gym.subscriptionStatus === "SUSPENDED" && !ownerMayPay) || gym.subscriptionStatus === "CANCELLED") {
     throw new SessionError("GYM_SUSPENDED", "This gym's subscription is not active");
   }
 
@@ -94,6 +98,9 @@ export async function requireTenantSession(slug: string) {
   });
   if (!staff || !staff.isActive || staff.gymId !== gym.id) {
     throw new SessionError("UNAUTHENTICATED", "This staff account is no longer active");
+  }
+  if (ownerMayPay && staff.role !== "OWNER") {
+    throw new SessionError("GYM_SUSPENDED", "This gym's subscription is not active");
   }
 
   return { session: { ...session, role: staff.role }, gym, db };

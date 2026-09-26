@@ -28,6 +28,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
   if (parsed.data.acceptSignups !== undefined) next.acceptSignups = parsed.data.acceptSignups;
 
-  await db.gym.update({ where: { id: gym.id }, data: { settings: next as Prisma.InputJsonValue } });
+  await db.gym.update({
+    where: { id: gym.id },
+    data: {
+      settings: next as Prisma.InputJsonValue,
+      ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
+      ...(parsed.data.timezone !== undefined ? { timezone: parsed.data.timezone } : {}),
+    },
+  });
   return NextResponse.json({ ok: true });
 }

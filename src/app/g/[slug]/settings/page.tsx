@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymThemeFromSettings } from "@/lib/theme";
 import { Card } from "@/components/charts";
-import { GymThemeForm, JoinSettingsForm } from "@/components/SettingsForms";
+import { GymDetailsForm, GymThemeForm, JoinSettingsForm } from "@/components/SettingsForms";
 import { gymAcceptsSignups } from "@/lib/memberSignup";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +44,12 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
           <a href={`/g/${params.slug}/dashboard`} className="text-sm text-neutral-300 hover:text-white">
             ← Dashboard
           </a>
+        </div>
+
+        <div className="mb-6">
+          <Card title="Gym details">
+            <GymDetailsForm slug={params.slug} initialName={gym.name} initialTimezone={gym.timezone} />
+          </Card>
         </div>
 
         <div className="mb-6">

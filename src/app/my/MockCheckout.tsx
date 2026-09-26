@@ -4,7 +4,17 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 /** Shown only in dev mock mode, in place of the Xendit-hosted page. */
-export default function MockCheckout({ paymentId, amount, planName }: { paymentId: string; amount: string; planName: string }) {
+export default function MockCheckout({
+  paymentId,
+  amount,
+  planName,
+  returnTo = "/my",
+}: {
+  paymentId: string;
+  amount: string;
+  planName: string;
+  returnTo?: string;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -15,7 +25,7 @@ export default function MockCheckout({ paymentId, amount, planName }: { paymentI
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ paymentId }),
     });
-    router.replace("/my");
+    router.replace(returnTo);
     router.refresh();
   }
 

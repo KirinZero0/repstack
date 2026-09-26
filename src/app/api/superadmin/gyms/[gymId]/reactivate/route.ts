@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSuperadminSession, SessionError } from "@/lib/session";
 import { writeAuditLog } from "@/lib/audit";
+import { withSuspensionReason } from "@/lib/suspension";
 
 export async function POST(_req: Request, { params }: { params: { gymId: string } }) {
   let session;
@@ -21,7 +22,7 @@ export async function POST(_req: Request, { params }: { params: { gymId: string 
 
   await prisma.gym.update({
     where: { id: gym.id },
-    data: { subscriptionStatus: "ACTIVE" },
+    data: { subscriptionStatus: "ACTIVE", settings: withSuspensionReason(gym.settings, null) },
   });
 
   await writeAuditLog({

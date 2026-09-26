@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import type { XenditWebhookEvent } from "./xendit";
 import { completeSignup } from "./signup";
+import { suspendedForNonPayment, withSuspensionReason } from "./suspension";
 import { extendedExpiry } from "./membership";
 
 export { extendedExpiry };
@@ -102,6 +103,9 @@ async function handlePlatformPayment(
     const base = gym.nextBillingDate && gym.nextBillingDate > new Date() ? gym.nextBillingDate : new Date();
     const newBillingDate = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
 
+    // Paying reactivates a gym that was suspended for non-payment, but never one a superadmin suspended.
+    const adminSuspended = gym.subscriptionStatus === "SUSPENDED" && !suspendedForNonPayment(gym.settings);
+
     await prisma.$transaction([
       prisma.platformPayment.update({
         where: { id: payment.id },
@@ -109,13 +113,19 @@ async function handlePlatformPayment(
       }),
       prisma.gym.update({
         where: { id: gym.id },
-        data: { subscriptionStatus: "ACTIVE", nextBillingDate: newBillingDate },
+        data: {
+          nextBillingDate: newBillingDate,
+          // The invoice's plan is the one being paid for: this is what switches the gym to a new plan after a plan change.
+          saasPlanId: payment.saasPlanId,
+          ...(adminSuspended ? {} : { subscriptionStatus: "ACTIVE", settings: withSuspensionReason(gym.settings, null) }),
+        },
       }),
     ]);
   } else if (event.status === "EXPIRED") {
     await prisma.$transaction([
       prisma.platformPayment.update({ where: { id: payment.id }, data: { status: "EXPIRED" } }),
-      prisma.gym.update({ where: { id: payment.gymId }, data: { subscriptionStatus: "PAST_DUE" } }),
+      // Only a gym in good standing moves to past due; a suspended one must not be switched back on by an expiry.
+      prisma.gym.updateMany({ where: { id: payment.gymId, subscriptionStatus: { in: ["ACTIVE", "TRIALING"] } }, data: { subscriptionStatus: "PAST_DUE" } }),
     ]);
   }
 }

@@ -159,3 +159,53 @@ export function JoinSettingsForm({ slug, initial, joinUrl }: { slug: string; ini
     </div>
   );
 }
+
+const TIMEZONES: { id: string; label: string }[] = [
+  { id: "Asia/Jakarta", label: "WIB, Jakarta (UTC+7)" },
+  { id: "Asia/Makassar", label: "WITA, Makassar (UTC+8)" },
+  { id: "Asia/Jayapura", label: "WIT, Jayapura (UTC+9)" },
+  { id: "Asia/Singapore", label: "Singapore (UTC+8)" },
+  { id: "Asia/Kuala_Lumpur", label: "Kuala Lumpur (UTC+8)" },
+  { id: "Asia/Bangkok", label: "Bangkok (UTC+7)" },
+  { id: "Asia/Manila", label: "Manila (UTC+8)" },
+  { id: "Australia/Perth", label: "Perth (UTC+8)" },
+];
+
+export function GymDetailsForm({ slug, initialName, initialTimezone }: { slug: string; initialName: string; initialTimezone: string }) {
+  const [name, setName] = useState(initialName);
+  const [timezone, setTimezone] = useState(initialTimezone);
+  const { state, error, save } = useSave(`/api/g/${slug}/settings`);
+  const options = TIMEZONES.some((t) => t.id === initialTimezone) ? TIMEZONES : [{ id: initialTimezone, label: initialTimezone }, ...TIMEZONES];
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        save({ name, timezone });
+      }}
+      className="space-y-4"
+    >
+      <div>
+        <label htmlFor="gymName" className="mb-1 block text-sm text-neutral-300">Gym name</label>
+        <input id="gymName" required minLength={2} maxLength={80} value={name} onChange={(e) => setName(e.target.value)} className={selectCls} />
+        <p className="mt-1 text-xs text-neutral-500">Shown to your members and at the start of every WhatsApp message. Your web address doesn&apos;t change.</p>
+      </div>
+      <div>
+        <label htmlFor="gymTimezone" className="mb-1 block text-sm text-neutral-300">Timezone</label>
+        <select id="gymTimezone" value={timezone} onChange={(e) => setTimezone(e.target.value)} className={selectCls}>
+          {options.map((t) => (
+            <option key={t.id} value={t.id}>{t.label}</option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-neutral-500">Decides what counts as &ldquo;today&rdquo; for check-ins (one per day) and your reports.</p>
+      </div>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      <div className="flex items-center gap-3">
+        <button type="submit" disabled={state === "saving"} className={btnCls}>
+          {state === "saving" ? "Saving…" : "Save"}
+        </button>
+        {state === "saved" && <span className="text-sm text-emerald-400">Saved</span>}
+      </div>
+    </form>
+  );
+}

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { setSessionCookie } from "@/lib/session";
 import { staffLoginSchema } from "@/lib/validation/tenant";
 import { compareOrDummy } from "@/lib/passwordTiming";
+import { suspendedForNonPayment } from "@/lib/suspension";
 
 /**
  * One login form for both staff and members of a gym. Looks up both tables and runs a
@@ -37,6 +38,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   ]);
 
   if (staffBelongs && staffValid) {
+    // An owner of a gym suspended for non-payment gets in, but only to the billing page (see requireTenantSession).
+    const ownerMayPay = staff!.role === "OWNER" && gym.subscriptionStatus === "SUSPENDED" && suspendedForNonPayment(gym.settings);
+    if (ownerMayPay) {
+      await setSessionCookie({ kind: "staff", staffUserId: staff!.id, gymId: gym.id, role: staff!.role });
+      return NextResponse.json({ ok: true, kind: "staff", role: staff!.role, billingOnly: true });
+    }
     if (gym.subscriptionStatus === "SUSPENDED" || gym.subscriptionStatus === "CANCELLED") {
       return NextResponse.json(
         { error: "This gym's account is suspended. Contact your platform admin." },

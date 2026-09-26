@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSuperadminSession, SessionError } from "@/lib/session";
 import { writeAuditLog } from "@/lib/audit";
+import { withSuspensionReason } from "@/lib/suspension";
 
 export async function POST(_req: Request, { params }: { params: { gymId: string } }) {
   let session;
@@ -21,7 +22,8 @@ export async function POST(_req: Request, { params }: { params: { gymId: string 
 
   await prisma.gym.update({
     where: { id: gym.id },
-    data: { subscriptionStatus: "SUSPENDED" },
+    // No reason stored: a superadmin suspension is not something the owner can pay their way out of.
+    data: { subscriptionStatus: "SUSPENDED", settings: withSuspensionReason(gym.settings, null) },
   });
 
   await writeAuditLog({

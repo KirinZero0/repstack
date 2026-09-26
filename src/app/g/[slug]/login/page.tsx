@@ -26,7 +26,7 @@ export default function GymLoginPage({ params }: { params: { slug: string } }) {
         setError(body.error ?? "Login failed");
         return;
       }
-      router.push(body.kind === "staff" ? `/g/${params.slug}/dashboard` : "/my");
+      router.push(body.billingOnly ? `/g/${params.slug}/billing` : body.kind === "staff" ? `/g/${params.slug}/dashboard` : "/my");
       router.refresh();
     } finally {
       setLoading(false);
