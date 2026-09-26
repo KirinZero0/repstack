@@ -1,5 +1,4 @@
 import { prisma } from "./prisma";
-import { decrypt } from "./crypto";
 
 export type GatewayProvider = "fonnte" | "wablas";
 
@@ -66,28 +65,49 @@ function skippedSend(to: string, message: string): SendResult {
   return { ok: false, skipped: true, providerResponse: { skipped: true } };
 }
 
-/** Sends a WhatsApp message on behalf of a specific gym, using that gym's own gateway config. */
+/** The platform's own gateway account. Dev/test mock mode works without a real key. */
+function platformGateway(): { provider: GatewayProvider; apiKey: string } | null {
+  const mock = process.env.WHATSAPP_MOCK === "1" && process.env.NODE_ENV !== "production";
+  const apiKey = process.env.PLATFORM_WHATSAPP_API_KEY || (mock ? "mock-platform-key" : "");
+  if (!apiKey) return null;
+  return { provider: (process.env.PLATFORM_WHATSAPP_PROVIDER ?? "fonnte") as GatewayProvider, apiKey };
+}
+
+/** Messages sent for a gym so far this calendar month (SENT only, so failures and blocked sends don't use up the quota). */
+export async function gymWhatsappUsage(gymId: string): Promise<number> {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  return prisma.notificationLog.count({ where: { gymId, channel: "whatsapp", status: "SENT", sentAt: { gte: monthStart } } });
+}
+
+/**
+ * Sends a WhatsApp message on behalf of a gym. Everything goes out from the platform's own
+ * number (gyms don't need a gateway account), prefixed with the gym's name, and counts against the
+ * gym plan's monthly WhatsApp allowance.
+ */
 export async function sendGymWhatsapp(
   gymId: string,
   opts: { to: string; message: string; type: string; memberId: string },
 ): Promise<SendResult> {
-  const config = await prisma.whatsappSenderConfig.findUnique({ where: { gymId } });
+  const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, saasPlan: { select: { maxWhatsappPerMonth: true } } } });
+  const gateway = platformGateway();
 
   let result: SendResult;
-  if (!config || !config.isActive) {
+  let status: "SENT" | "FAILED" | "SKIPPED" | "LIMIT";
+  if (!gym || !gateway) {
     result = skippedSend(opts.to, opts.message);
+    status = "SKIPPED";
+  } else if ((await gymWhatsappUsage(gymId)) >= gym.saasPlan.maxWhatsappPerMonth) {
+    console.log(`[whatsapp:limit] gym ${gymId} reached its monthly allowance, not sending to ${opts.to}`);
+    result = { ok: false, skipped: true, error: "Monthly WhatsApp limit reached", providerResponse: { limit: true } };
+    status = "LIMIT";
   } else {
-    result = await sendWithGateway(config.gatewayProvider as GatewayProvider, decrypt(config.apiKeyEncrypted), opts.to, opts.message);
+    result = await sendWithGateway(gateway.provider, gateway.apiKey, opts.to, `*${gym.name}*\n${opts.message}`);
+    status = result.ok ? "SENT" : "FAILED";
   }
 
   await prisma.notificationLog.create({
-    data: {
-      gymId,
-      memberId: opts.memberId,
-      type: opts.type,
-      channel: "whatsapp",
-      status: result.skipped ? "SKIPPED" : result.ok ? "SENT" : "FAILED",
-    },
+    data: { gymId, memberId: opts.memberId, type: opts.type, channel: "whatsapp", status },
   });
 
   return result;
@@ -95,9 +115,7 @@ export async function sendGymWhatsapp(
 
 /** Sends a platform-level WhatsApp message (billing reminders, payment failures) to a gym owner. */
 export async function sendPlatformWhatsapp(opts: { to: string; message: string }): Promise<SendResult> {
-  const apiKey = process.env.PLATFORM_WHATSAPP_API_KEY;
-  if (!apiKey) return skippedSend(opts.to, opts.message);
-
-  const provider = (process.env.PLATFORM_WHATSAPP_PROVIDER ?? "fonnte") as GatewayProvider;
-  return sendWithGateway(provider, apiKey, opts.to, opts.message);
+  const gateway = platformGateway();
+  if (!gateway) return skippedSend(opts.to, opts.message);
+  return sendWithGateway(gateway.provider, gateway.apiKey, opts.to, opts.message);
 }

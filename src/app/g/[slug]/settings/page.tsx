@@ -3,12 +3,11 @@ import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymThemeFromSettings } from "@/lib/theme";
 import { Card } from "@/components/charts";
 import { GymThemeForm, JoinSettingsForm } from "@/components/SettingsForms";
-import WhatsappForm from "@/components/WhatsappForm";
 import { gymAcceptsSignups } from "@/lib/memberSignup";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_TONE: Record<string, string> = { SENT: "text-emerald-400", FAILED: "text-red-400", SKIPPED: "text-amber-400" };
+const STATUS_TONE: Record<string, string> = { SENT: "text-emerald-400", FAILED: "text-red-400", SKIPPED: "text-amber-400", LIMIT: "text-amber-400" };
 
 export default async function GymSettingsPage({ params }: { params: { slug: string } }) {
   let session, gym, db;
@@ -27,9 +26,10 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
     );
   }
 
-  const [wa, owner, recent] = await Promise.all([
-    db.whatsappSenderConfig.findUnique({ where: { gymId: gym.id } }),
-    db.staffUser.findUnique({ where: { id: session.staffUserId }, select: { phone: true } }),
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const [plan, used, recent] = await Promise.all([
+    db.saasPlan.findUnique({ where: { id: gym.saasPlanId } }),
+    db.notificationLog.count({ where: { gymId: gym.id, channel: "whatsapp", status: "SENT", sentAt: { gte: monthStart } } }),
     db.notificationLog.findMany({ where: { gymId: gym.id }, orderBy: { sentAt: "desc" }, take: 5 }),
   ]);
 
@@ -49,18 +49,15 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
         <div className="mb-6">
           <Card title="WhatsApp messages">
             <p className="mb-4 text-sm text-neutral-400">
-              Activation links, payment receipts and expiry reminders go to your members from your own WhatsApp number, through a gateway account (Fonnte or Wablas).
+              Activation links, payment receipts and expiry reminders are sent to your members by Iron Ledger, with your gym&apos;s name on each message. Nothing to set up.
             </p>
-            <WhatsappForm
-              slug={params.slug}
-              configured={Boolean(wa)}
-              initial={{
-                provider: (wa?.gatewayProvider as "fonnte" | "wablas") ?? "fonnte",
-                senderNumber: wa?.senderNumber ?? "",
-                isActive: wa?.isActive ?? true,
-              }}
-              ownerPhone={owner?.phone ?? ""}
-            />
+            {plan && (
+              <p className="text-sm text-neutral-300">
+                <span className="font-semibold tabular-nums">{used.toLocaleString("id-ID")}</span> of{" "}
+                <span className="tabular-nums">{plan.maxWhatsappPerMonth.toLocaleString("id-ID")}</span> messages used this month.
+                {used >= plan.maxWhatsappPerMonth && <span className="ml-1 text-amber-400">Limit reached: further messages aren&apos;t sent until next month or an upgrade.</span>}
+              </p>
+            )}
             {recent.length > 0 && (
               <div className="mt-6 border-t border-neutral-800 pt-4">
                 <p className="mb-2 text-sm text-neutral-400">Latest messages</p>
@@ -70,7 +67,7 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
                       <span className="text-neutral-300">{n.type.replace(/_/g, " ")}</span>
                       <span className="flex gap-3">
                         <span className={STATUS_TONE[n.status] ?? "text-neutral-400"}>
-                          {n.status === "SKIPPED" ? "Not sent (WhatsApp not set up)" : n.status.toLowerCase()}
+                          {n.status === "SKIPPED" ? "Not sent (WhatsApp unavailable)" : n.status === "LIMIT" ? "Not sent (monthly limit reached)" : n.status.toLowerCase()}
                         </span>
                         <span className="text-neutral-500">{n.sentAt.toLocaleString("id-ID")}</span>
                       </span>

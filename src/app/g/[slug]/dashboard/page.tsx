@@ -14,12 +14,6 @@ export default async function DashboardPage({ params }: { params: { slug: string
     throw err;
   }
 
-  const waConfig =
-    session.role === "OWNER"
-      ? await db.whatsappSenderConfig.findUnique({ where: { gymId: gym.id }, select: { isActive: true } })
-      : null;
-  const needsWhatsapp = session.role === "OWNER" && (!waConfig || !waConfig.isActive);
-
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const soonCutoff = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -91,16 +85,6 @@ export default async function DashboardPage({ params }: { params: { slug: string
             <LogoutButton slug={params.slug} />
           </nav>
         </div>
-
-        {needsWhatsapp && (
-          <a
-            href={`/g/${params.slug}/settings`}
-            className="mb-6 block rounded-xl border border-amber-800 bg-amber-950 px-5 py-4 text-sm text-amber-400 hover:brightness-110"
-          >
-            <span className="font-semibold">WhatsApp isn&apos;t set up yet.</span> Members won&apos;t get activation links,
-            receipts or expiry reminders until you connect your WhatsApp number in Settings.
-          </a>
-        )}
 
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatCard label="Active members" value={activeMembers.toString()} />

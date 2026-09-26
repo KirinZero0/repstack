@@ -93,7 +93,6 @@ test("staff can do front-desk work but not owner-only work", async ({ request, b
   expect((await request.post(`${baseURL}/api/g/test-gym-a/members/${member.id}/payments/${paymentId}/void`)).status()).toBe(403);
   expect((await request.post(`${baseURL}/api/g/test-gym-a/staff`, { data: { name: "Nope", email: `${uniq("no")}@test.local` } })).status()).toBe(403);
   expect((await request.post(`${baseURL}/api/g/test-gym-a/plans`, { data: { name: "Sneaky", durationDays: 30, price: 1000 } })).status()).toBe(403);
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/whatsapp`, { data: { provider: "fonnte", senderNumber: "0812000000", apiKey: "sneaky-token-1", isActive: true } })).status()).toBe(403);
   expect((await request.post(`${baseURL}/api/g/test-gym-a/settings`, { data: { acceptSignups: true } })).status()).toBe(403);
 });
 
