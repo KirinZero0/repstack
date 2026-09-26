@@ -17,7 +17,8 @@ export default async function MyQrPage({
     null;
 
   if (session?.kind === "member") {
-    member = await tenantDb(session.gymId).member.findUnique({ where: { id: session.memberId } });
+    const own = await tenantDb(session.gymId).member.findUnique({ where: { id: session.memberId } });
+    if (own && !own.anonymizedAt) member = own;
   } else if (searchParams.token) {
     const link = await findValidMagicLink(searchParams.token, "qr_fallback");
     if (link) {

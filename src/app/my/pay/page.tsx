@@ -24,7 +24,7 @@ export default async function PayPage() {
     where: { id: session.memberId },
     include: { gym: true, plan: true },
   });
-  if (!member || member.gymId !== session.gymId) {
+  if (!member || member.gymId !== session.gymId || member.anonymizedAt) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 text-white">
         <p className="text-red-400">Account not found.</p>

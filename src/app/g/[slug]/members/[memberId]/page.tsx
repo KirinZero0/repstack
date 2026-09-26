@@ -5,6 +5,7 @@ import { dayKeyInTimezone } from "@/lib/date";
 import { Card, StatusPill, rp } from "@/components/charts";
 import { RecordPaymentForm, VoidPaymentButton } from "./RecordPayment";
 import PasswordLinkButton from "./PasswordLink";
+import MemberActions from "./MemberActions";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,28 @@ export default async function MemberDetailPage({ params }: { params: { slug: str
               <div className="flex justify-between gap-4"><dt className="text-neutral-400">Visits</dt><dd>{visits}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-neutral-400">Last visit</dt><dd>{lastVisit ? lastVisit.checkedInAt.toLocaleDateString("id-ID") : "—"}</dd></div>
             </dl>
+          </Card>
+        </div>
+
+        <div className="mb-6">
+          <Card title="Manage membership">
+            {member.anonymizedAt ? (
+              <p className="text-sm text-neutral-400">
+                This member&apos;s personal data was erased on {member.anonymizedAt.toLocaleDateString("id-ID")}. Payment and visit history is kept, anonymised.
+              </p>
+            ) : (
+              <MemberActions
+                slug={params.slug}
+                memberId={member.id}
+                fullName={member.fullName}
+                email={member.email}
+                phone={phone}
+                planId={member.planId}
+                status={member.status}
+                isOwner={isOwner}
+                plans={plans.map((p) => ({ id: p.id, name: p.name }))}
+              />
+            )}
           </Card>
         </div>
 

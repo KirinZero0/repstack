@@ -73,7 +73,12 @@ async function handleMemberPayment(
       }),
       prisma.member.update({
         where: { id: member.id },
-        data: { status: "ACTIVE", membershipExpiry: newExpiry, planId: payment.planId },
+        // A frozen or cancelled member keeps that status (the owner decides when to lift it); the money still counts.
+        data: {
+          status: member.status === "FROZEN" || member.status === "CANCELLED" ? member.status : "ACTIVE",
+          membershipExpiry: newExpiry,
+          planId: payment.planId,
+        },
       }),
     ]);
   } else if (event.status === "EXPIRED") {

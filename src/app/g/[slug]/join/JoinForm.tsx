@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import TermsConsent from "@/components/TermsConsent";
 
 interface Plan {
   id: string;
@@ -17,6 +18,7 @@ export default function JoinForm({ slug, plans }: { slug: string; plans: Plan[] 
   const [planId, setPlanId] = useState(plans[0].id);
   const [v, setV] = useState({ fullName: "", email: "", phone: "", password: "" });
   const [error, setError] = useState<{ field: string; message: string } | null>(null);
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -27,7 +29,7 @@ export default function JoinForm({ slug, plans }: { slug: string; plans: Plan[] 
       const res = await fetch(`/api/g/${slug}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, ...v }),
+        body: JSON.stringify({ planId, ...v, acceptTerms }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.invoiceUrl) {
@@ -95,6 +97,8 @@ export default function JoinForm({ slug, plans }: { slug: string; plans: Plan[] 
           {err("password")}
         </div>
       </div>
+
+      <TermsConsent checked={acceptTerms} onChange={setAcceptTerms} error={error?.field === "acceptTerms" ? error.message : null} />
 
       {error && error.field === "form" && <p className="text-sm text-red-400">{error.message}</p>}
 

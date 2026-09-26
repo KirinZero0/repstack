@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import TermsConsent from "@/components/TermsConsent";
 
 const input =
   "w-full rounded-lg border border-neutral-700 bg-neutral-950 px-4 py-2.5 text-white outline-none placeholder:text-neutral-500 focus:border-plate-blue";
@@ -16,6 +17,7 @@ function slugify(name: string) {
 
 export default function SignupForm({ planId }: { planId: string }) {
   const [v, setV] = useState({ gymName: "", slug: "", ownerName: "", ownerEmail: "", ownerPhone: "", password: "" });
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [slugTouched, setSlugTouched] = useState(false);
   const [error, setError] = useState<{ field: string; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -32,7 +34,7 @@ export default function SignupForm({ planId }: { planId: string }) {
       const res = await fetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ saasPlanId: planId, ...v }),
+        body: JSON.stringify({ saasPlanId: planId, ...v, acceptTerms }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.invoiceUrl) {
@@ -106,6 +108,8 @@ export default function SignupForm({ planId }: { planId: string }) {
         <p className="mt-1 text-xs text-neutral-500">At least 8 characters.</p>
         {err("password")}
       </div>
+
+      <TermsConsent checked={acceptTerms} onChange={setAcceptTerms} error={error?.field === "acceptTerms" ? error.message : null} />
 
       {error && (error.field === "form" || error.field === "saasPlanId") && <p className="text-sm text-red-400">{error.message}</p>}
 

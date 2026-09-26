@@ -20,6 +20,7 @@ const details = (planId: string, tag: string) => ({
   email: `join-${tag}-${Date.now()}-${seq++}@join.test`,
   phone: `0815${Date.now().toString().slice(-8)}`,
   password: "long-enough-1",
+  acceptTerms: true,
 });
 
 test("public sign-up is off by default, then a paid join creates an active member who can log in", async ({ request, baseURL }) => {

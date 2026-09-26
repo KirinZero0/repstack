@@ -50,6 +50,7 @@ export async function completeMemberSignup(signupId: string, paidAt: Date) {
         passwordHash: signup.passwordHash,
         status: "ACTIVE",
         membershipExpiry: expiry,
+        termsAcceptedAt: signup.termsAcceptedAt,
       },
     });
     await tx.payment.create({

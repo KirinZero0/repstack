@@ -15,6 +15,7 @@ test("self-serve signup: gym only exists after payment, then the owner can log i
     ownerEmail: `owner-${stamp}@signup.test`,
     ownerPhone: "081200007777",
     password: "correct-horse-1",
+    acceptTerms: true,
   };
 
   const started = await request.post(`${baseURL}/api/signup`, { data: details });
@@ -64,7 +65,7 @@ test("self-serve signup: gym only exists after payment, then the owner can log i
 
 test("signup rejects taken, reserved and invalid details", async ({ request, baseURL }) => {
   const plan = await prisma.saasPlan.findFirstOrThrow({ where: { isActive: true } });
-  const base = { saasPlanId: plan.id, gymName: "X Gym", slug: `ok-${Date.now()}`, ownerName: "Owner", ownerEmail: `ok-${Date.now()}@signup.test`, ownerPhone: "081200007777", password: "long-enough-1" };
+  const base = { saasPlanId: plan.id, gymName: "X Gym", slug: `ok-${Date.now()}`, ownerName: "Owner", ownerEmail: `ok-${Date.now()}@signup.test`, ownerPhone: "081200007777", password: "long-enough-1", acceptTerms: true };
   const post = (over: object) => request.post(`${baseURL}/api/signup`, { data: { ...base, ...over } });
 
   const takenSlug = await post({ slug: "test-gym-a" });
@@ -86,7 +87,7 @@ test("a paid signup whose address was taken meanwhile is flagged, not duplicated
   const stamp = Date.now() + 1;
   const slug = `race-gym-${stamp}`;
   const started = await request.post(`${baseURL}/api/signup`, {
-    data: { saasPlanId: plan.id, gymName: "Race Gym", slug, ownerName: "Racer", ownerEmail: `race-${stamp}@signup.test`, ownerPhone: "081200007777", password: "long-enough-1" },
+    data: { saasPlanId: plan.id, gymName: "Race Gym", slug, ownerName: "Racer", ownerEmail: `race-${stamp}@signup.test`, ownerPhone: "081200007777", password: "long-enough-1", acceptTerms: true },
   });
   const { signupId } = await started.json();
 

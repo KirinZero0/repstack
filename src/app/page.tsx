@@ -211,7 +211,11 @@ export default async function Home() {
       <footer className="border-t border-neutral-800">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-neutral-500">
           <BrandMark />
-          <a href="/superadmin/login" className="hover:text-neutral-300">Platform admin</a>
+          <nav className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <a href="/terms" className="hover:text-neutral-300">Terms</a>
+            <a href="/privacy" className="hover:text-neutral-300">Privacy</a>
+            <a href="/superadmin/login" className="hover:text-neutral-300">Platform admin</a>
+          </nav>
         </div>
       </footer>
     </div>

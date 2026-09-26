@@ -33,9 +33,13 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
   }
 
-  const parsed = activateSchema.safeParse({ password: form.get("password") });
+  const parsed = activateSchema.safeParse({ password: form.get("password"), acceptTerms: form.get("acceptTerms") === "true" });
   if (!parsed.success) {
-    return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
+    const termsMissing = parsed.error.issues.some((i) => i.path[0] === "acceptTerms");
+    return NextResponse.json(
+      { error: termsMissing ? "Please accept the terms and privacy policy to continue." : "Password must be at least 8 characters" },
+      { status: 400 },
+    );
   }
 
   const photo = form.get("photo");
@@ -66,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   await prisma.$transaction([
     prisma.member.update({
       where: { id: link.memberId },
-      data: { passwordHash, ...(photoUrl ? { photoUrl } : {}) },
+      data: { passwordHash, termsAcceptedAt: new Date(), ...(photoUrl ? { photoUrl } : {}) },
     }),
     prisma.magicLink.update({
       where: { id: link.id },

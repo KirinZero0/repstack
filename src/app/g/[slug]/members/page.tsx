@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { decrypt, maskPhone, maskEmail } from "@/lib/crypto";
+import { countMemberSeats } from "@/lib/limits";
 import AddMemberForm from "./AddMemberForm";
 import ResendFallbackButton from "./ResendFallbackButton";
 
@@ -15,13 +16,15 @@ export default async function MembersPage({ params }: { params: { slug: string }
     throw err;
   }
 
-  const [members, plans] = await Promise.all([
+  const [members, plans, saasPlan, seats] = await Promise.all([
     db.member.findMany({
-      where: { gymId: gym.id },
+      where: { gymId: gym.id, anonymizedAt: null },
       include: { plan: true },
       orderBy: { createdAt: "desc" },
     }),
     db.membershipPlan.findMany({ where: { gymId: gym.id, isActive: true } }),
+    db.saasPlan.findUnique({ where: { id: gym.saasPlanId } }),
+    countMemberSeats(db, gym.id),
   ]);
 
   const rows = members.map((m) => ({
@@ -41,7 +44,14 @@ export default async function MembersPage({ params }: { params: { slug: string }
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Members</h1>
-            <p className="text-sm text-neutral-400">{gym.name}</p>
+            <p className="text-sm text-neutral-400">
+              {gym.name}
+              {saasPlan && (
+                <span className={seats >= saasPlan.maxMembers ? "ml-3 text-amber-400" : "ml-3 text-neutral-500"}>
+                  {seats.toLocaleString("id-ID")} of {saasPlan.maxMembers.toLocaleString("id-ID")} members on your plan
+                </span>
+              )}
+            </p>
           </div>
         </div>
 

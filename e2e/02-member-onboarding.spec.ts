@@ -38,6 +38,7 @@ test("owner adds a member, member activates, member can log in", async ({ page, 
   await page.locator("#password").fill("newpassword123");
   await page.locator("#confirmPassword").fill("newpassword123");
   await page.locator("#photo").setInputFiles(path.join(__dirname, "fixtures", "test-photo.jpg"));
+  await page.getByLabel(/I agree to the/).check();
   await page.getByRole("button", { name: "Activate account" }).click();
 
   await page.waitForURL(`${baseURL}/g/test-gym-a/login`, { timeout: 5000 });

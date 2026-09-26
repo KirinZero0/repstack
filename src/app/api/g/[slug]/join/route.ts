@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { joinSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
+import { countMemberSeats } from "@/lib/limits";
 import { createXenditInvoice, getXenditInvoice, isMockMode } from "@/lib/xendit";
 import {
   MAX_SIGNUPS_PER_GYM_HOUR,
@@ -51,6 +52,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const plan = await prisma.membershipPlan.findUnique({ where: { id: d.planId } });
   if (!plan || plan.gymId !== gym.id || !plan.isActive) return fieldError("planId", "That plan isn't available. Pick another.", 400);
 
+  // A gym on a full plan can't take more people. Don't expose the numbers to the public.
+  const [saasPlan, seats] = await Promise.all([
+    prisma.saasPlan.findUnique({ where: { id: gym.saasPlanId } }),
+    countMemberSeats(prisma, gym.id),
+  ]);
+  if (saasPlan && seats >= saasPlan.maxMembers) {
+    return NextResponse.json({ error: "This gym isn't taking new members right now. Please ask at the front desk." }, { status: 403 });
+  }
+
   // Member.email is unique across every gym, so this can also mean "member of another gym".
   // The wording is deliberately the same for both.
   if (await prisma.member.findUnique({ where: { email: d.email } })) {
@@ -87,6 +97,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           passwordHash: await bcrypt.hash(d.password, 10),
           amount: plan.price,
           ipHash,
+          termsAcceptedAt: new Date(),
         },
       }));
 

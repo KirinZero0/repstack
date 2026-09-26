@@ -5,6 +5,7 @@ import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
 import { createMagicLink } from "@/lib/magicLink";
 import { createXenditInvoice } from "@/lib/xendit";
 import { sendGymWhatsapp } from "@/lib/whatsapp";
+import { countMemberSeats, memberLimitMessage } from "@/lib/limits";
 
 const ACTIVATION_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -38,6 +39,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const plan = await db.membershipPlan.findUnique({ where: { id: data.planId } });
   if (!plan || plan.gymId !== gym.id || !plan.isActive) {
     return NextResponse.json({ error: "Invalid membership plan" }, { status: 400 });
+  }
+
+  const saasPlan = await db.saasPlan.findUnique({ where: { id: gym.saasPlanId } });
+  if (saasPlan && (await countMemberSeats(db, gym.id)) >= saasPlan.maxMembers) {
+    return NextResponse.json({ error: memberLimitMessage(saasPlan.name, saasPlan.maxMembers) }, { status: 403 });
   }
 
   const member = await db.member.create({

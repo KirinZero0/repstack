@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { getMemberAttendance } from "@/lib/stats";
 import { BarChart, Card, Heatmap, StatCard, StatusPill, rp } from "@/components/charts";
 import MemberLogout from "./MemberLogout";
+import DeleteAccount from "./DeleteAccount";
 import MockCheckout from "./MockCheckout";
 import { isMockMode } from "@/lib/xendit";
 
@@ -27,7 +28,7 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
     where: { id: session.memberId },
     include: { plan: true, gym: true },
   });
-  if (!member || member.gymId !== session.gymId) {
+  if (!member || member.gymId !== session.gymId || member.anonymizedAt) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 text-white">
         <p className="text-red-400">Account not found.</p>
@@ -87,10 +88,15 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
             <path d="M8 12h8" />
           </svg>
         </a>
-        {needsPayment && (
+        {member.status === "FROZEN" ? (
+          <p className="mb-6 text-sm text-amber-400">Your membership is frozen, so check-in is paused. Ask the front desk to unfreeze it.</p>
+        ) : member.status === "CANCELLED" ? (
+          <p className="mb-6 text-sm text-amber-400">Your membership was cancelled, so check-in will be declined. Ask the front desk to reactivate it.</p>
+        ) : needsPayment ? (
           <p className="mb-6 text-sm text-amber-400">Your membership isn&apos;t active, so check-in will be declined until you renew.</p>
+        ) : (
+          <div className="mb-6" />
         )}
-        {!needsPayment && <div className="mb-6" />}
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
           <div>
@@ -171,6 +177,10 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
               </ul>
             )}
           </Card>
+        </div>
+
+        <div className="mt-10 border-t border-neutral-800 pt-6">
+          <DeleteAccount />
         </div>
       </div>
     </main>

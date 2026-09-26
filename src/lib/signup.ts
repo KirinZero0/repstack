@@ -39,6 +39,7 @@ export async function completeSignup(signupId: string, invoice: { paidAt: Date; 
         saasPlanId: signup.saasPlanId,
         subscriptionStatus: "ACTIVE",
         nextBillingDate,
+        termsAcceptedAt: signup.termsAcceptedAt,
       },
     });
     await tx.staffUser.create({

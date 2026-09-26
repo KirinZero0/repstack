@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { resizeImageTo512 } from "@/lib/resizeImage";
+import TermsConsent from "@/components/TermsConsent";
 
 interface ActivateInfo {
   fullName: string;
@@ -17,6 +18,7 @@ export default function ActivatePage({ params }: { params: { token: string } }) 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +61,7 @@ export default function ActivatePage({ params }: { params: { token: string } }) 
     try {
       const formData = new FormData();
       formData.set("password", password);
+      formData.set("acceptTerms", String(acceptTerms));
       if (photoFile) {
         const resized = await resizeImageTo512(photoFile);
         formData.set("photo", resized, "profile.jpg");
@@ -170,6 +173,10 @@ export default function ActivatePage({ params }: { params: { token: string } }) 
           onChange={(e) => setConfirmPassword(e.target.value)}
           className="mb-4 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-white outline-none focus:border-neutral-500"
         />
+
+        <div className="mb-4">
+          <TermsConsent checked={acceptTerms} onChange={setAcceptTerms} />
+        </div>
 
         {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 

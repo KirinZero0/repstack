@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
               ownerPhone: d.ownerPhone,
               passwordHash: await bcrypt.hash(d.password, 10),
               saasPlanId: plan.id,
+              termsAcceptedAt: new Date(),
             },
           });
 

@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     db.member.findUnique({ where: { id: session.memberId } }),
     db.gym.findUnique({ where: { id: session.gymId } }),
   ]);
-  if (!member || !gym || member.gymId !== gym.id) {
+  if (!member || !gym || member.gymId !== gym.id || member.anonymizedAt) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
   if (gym.subscriptionStatus === "SUSPENDED" || gym.subscriptionStatus === "CANCELLED") {

@@ -17,16 +17,31 @@ export const addMemberSchema = z.object({
   planId: z.string().uuid(),
 });
 
+/** Every public form makes people accept the terms and privacy policy; the time is stored with the account. */
+export const acceptTermsField = z.literal(true, { message: "Please accept the terms and privacy policy to continue." });
+
 export const activateSchema = z.object({
   password: z.string().min(8).max(72),
+  acceptTerms: acceptTermsField,
 });
+
+export function isValidTimezone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export const gymSettingsSchema = z
   .object({
     theme: z.enum(["inherit", "light", "dark", "system"]).optional(),
     acceptSignups: z.boolean().optional(),
+    name: z.string().trim().min(2).max(80).optional(),
+    timezone: z.string().trim().max(60).refine(isValidTimezone, "Unknown timezone").optional(),
   })
-  .refine((v) => v.theme !== undefined || v.acceptSignups !== undefined, "Nothing to update");
+  .refine((v) => Object.values(v).some((x) => x !== undefined), "Nothing to update");
 
 const planFields = {
   name: z.string().trim().min(2).max(60),
@@ -51,6 +66,7 @@ export const signupSchema = z.object({
   ownerEmail: z.string().trim().toLowerCase().email().max(120),
   ownerPhone: z.string().trim().min(6, "Enter the WhatsApp number we can use to help you get back in.").max(30),
   password: z.string().min(8).max(72),
+  acceptTerms: acceptTermsField,
 });
 
 export const recordPaymentSchema = z.object({
@@ -67,20 +83,30 @@ export const joinSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(120),
   phone: z.string().trim().min(6).max(30),
   password: z.string().min(8).max(72),
+  acceptTerms: acceptTermsField,
 });
 
-export const whatsappConfigSchema = z.object({
-  provider: z.enum(["fonnte", "wablas"]),
-  senderNumber: z.string().trim().min(6).max(30),
-  /** Omit (or send empty) to keep the stored key when only editing other fields. */
-  apiKey: z.string().trim().min(8).max(300).optional().or(z.literal("").transform(() => undefined)),
-  isActive: z.boolean(),
-});
+export const memberActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("freeze") }),
+  z.object({ action: z.literal("unfreeze") }),
+  z.object({ action: z.literal("cancel") }),
+  z.object({ action: z.literal("reactivate") }),
+  z.object({
+    action: z.literal("edit"),
+    fullName: z.string().trim().min(2).max(120).optional(),
+    email: z.string().trim().toLowerCase().email().max(120).optional(),
+    phone: z.string().trim().min(6).max(30).optional(),
+    planId: z.string().uuid().optional(),
+  }),
+]);
 
-export const whatsappTestSchema = z.object({
-  /** The owner's own number. If given it is saved to their profile and used for the test. */
-  phone: z.string().trim().min(6).max(30).optional(),
-});
+/** Owner erases a member: must type the member's current name, so it can't happen by a stray click. */
+export const eraseMemberSchema = z.object({ confirmName: z.string().trim().min(1).max(120) });
+
+/** A member erases their own account and proves it's them with their password. */
+export const eraseSelfSchema = z.object({ password: z.string().min(1).max(200) });
+
+export const changePlanSchema = z.object({ saasPlanId: z.string().uuid() });
 
 export const forgotPasswordSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(120),
