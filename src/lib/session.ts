@@ -8,7 +8,7 @@ export type SessionPayload =
   | { kind: "superadmin"; superadminId: string }
   | { kind: "member"; memberId: string; gymId: string };
 
-const COOKIE_NAME = "iron_ledger_session";
+const COOKIE_NAME = "repstack_session";
 const SEVEN_DAYS_SECONDS = 60 * 60 * 24 * 7;
 
 function getJwtSecret(): string {

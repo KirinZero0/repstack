@@ -70,7 +70,7 @@ const features = [
 const faqs = [
   {
     q: "Who pays whom?",
-    a: "Your members pay you for their memberships. Iron Ledger bills you separately, monthly or yearly, for the software.",
+    a: "Your members pay you for their memberships. Repstack bills you separately, monthly or yearly, for the software.",
   },
   {
     q: "What do my members need?",
@@ -114,7 +114,7 @@ export default async function Home() {
               Know who trained. Know who paid.
             </h1>
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-neutral-400">
-              Iron Ledger runs memberships, door check-ins and billing for independent gyms. Members
+              Repstack runs memberships, door check-ins and billing for independent gyms. Members
               scan a poster to check in, and invoices go out over WhatsApp.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
@@ -196,7 +196,7 @@ export default async function Home() {
         <section id="login" className="scroll-mt-16 border-t border-neutral-800 bg-neutral-900/40">
           <div className="mx-auto grid max-w-6xl gap-10 px-6 py-24 md:grid-cols-2">
             <div>
-              <h2 className="text-3xl font-semibold sm:text-4xl">Already on Iron Ledger?</h2>
+              <h2 className="text-3xl font-semibold sm:text-4xl">Already on Repstack?</h2>
               <p className="mt-4 max-w-sm text-neutral-400">
                 Enter your gym&apos;s short name (the part after /g/ in your link) to log in as staff or as a member.
               </p>

@@ -1,4 +1,4 @@
-# Iron Ledger — Build Brief for Claude Code
+# Repstack — Build Brief for Claude Code
 
 ## What this is
 

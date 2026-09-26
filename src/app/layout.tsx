@@ -23,7 +23,7 @@ const display = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  title: "Iron Ledger",
+  title: "Repstack",
   description: "Memberships, door check-ins and billing for independent gyms. Know who trained and who paid.",
 };
 

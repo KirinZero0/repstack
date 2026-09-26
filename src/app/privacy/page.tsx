@@ -1,21 +1,21 @@
 import type { Metadata } from "next";
 import LegalPage, { ContactLine } from "@/components/LegalPage";
 
-export const metadata: Metadata = { title: "Privacy Policy · Iron Ledger" };
+export const metadata: Metadata = { title: "Privacy Policy · Repstack" };
 
 export default function PrivacyPage() {
   return (
     <LegalPage title="Privacy Policy" updated="26 September 2026">
       <p>
-        This explains what personal data Iron Ledger handles, why, who sees it and what you can do about it.
+        This explains what personal data Repstack handles, why, who sees it and what you can do about it.
         We follow applicable data protection law, including Indonesia&apos;s Personal Data Protection Law (UU 27/2022).
       </p>
 
       <h2>Who is responsible</h2>
       <p>
         Your gym decides why and how your membership data is used, so for members the <strong>gym is the data controller</strong>.
-        Iron Ledger provides the software and processes that data on the gym&apos;s behalf. For gym owner and staff accounts,
-        and for the subscription itself, Iron Ledger is the controller.
+        Repstack provides the software and processes that data on the gym&apos;s behalf. For gym owner and staff accounts,
+        and for the subscription itself, Repstack is the controller.
       </p>
 
       <h2>What we collect</h2>

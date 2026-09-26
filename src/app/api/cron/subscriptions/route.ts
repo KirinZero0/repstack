@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
       if (owner?.phone) {
         await sendPlatformWhatsapp({
           to: owner.phone,
-          message: `Your Iron Ledger subscription for "${gym.name}" is due. Pay here: ${url.startsWith("/") ? `${process.env.NEXT_PUBLIC_APP_URL}${url}` : url}`,
+          message: `Your Repstack subscription for "${gym.name}" is due. Pay here: ${url.startsWith("/") ? `${process.env.NEXT_PUBLIC_APP_URL}${url}` : url}`,
         });
       }
       invoicesCreated++;

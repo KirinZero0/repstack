@@ -6,7 +6,7 @@ export const SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 /** Slugs that would collide with real routes or read as official. */
 export const RESERVED_SLUGS = new Set([
   "api", "g", "demo", "signup", "superadmin", "activate", "my", "my-qr", "check-in", "login",
-  "admin", "app", "www", "iron-ledger", "ironledger", "support", "billing", "pricing", "static",
+  "admin", "app", "www", "iron-ledger", "ironledger", "repstack", "support", "billing", "pricing", "static",
 ]);
 
 /**
@@ -73,7 +73,7 @@ export async function completeSignup(signupId: string, invoice: { paidAt: Date; 
   if (signup.ownerPhone) {
     await sendPlatformWhatsapp({
       to: signup.ownerPhone,
-      message: `Welcome to Iron Ledger, ${signup.ownerName}! "${gym.name}" is ready. Log in at ${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/login with ${signup.ownerEmail} and the password you chose.`,
+      message: `Welcome to Repstack, ${signup.ownerName}! "${gym.name}" is ready. Log in at ${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/login with ${signup.ownerEmail} and the password you chose.`,
     }).catch((err) => console.error("Signup welcome message failed", err));
   }
 }

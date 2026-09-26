@@ -52,7 +52,7 @@ export interface PlanOption {
   immediate: boolean;
 }
 
-/** Switch to another Iron Ledger plan. Bigger or dearer plans are paid for first; smaller ones apply at once. */
+/** Switch to another Repstack plan. Bigger or dearer plans are paid for first; smaller ones apply at once. */
 export function PlanSwitcher({ slug, options }: { slug: string; options: PlanOption[] }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);

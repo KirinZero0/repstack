@@ -24,7 +24,7 @@ export default async function CheckinStationPage({ params }: { params: { slug: s
         <img src={qrDataUrl} alt="Gym check-in station QR code" width={480} height={480} />
       </div>
       <p className="max-w-sm text-center text-neutral-400 print:text-black">
-        Members: open your Iron Ledger app and scan this code to check yourself in.
+        Members: open your Repstack app and scan this code to check yourself in.
       </p>
       <div className="flex gap-3 print:hidden">
         <PrintButton />

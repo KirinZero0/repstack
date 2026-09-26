@@ -150,7 +150,7 @@ const STEPS: TourStep[] = [
   },
   {
     title: "That's the owner side",
-    body: "Members get their own app with a big Check in button, attendance streaks and a Renew button that pays through Xendit. Ready to run your own gym on Iron Ledger?",
+    body: "Members get their own app with a big Check in button, attendance streaks and a Renew button that pays through Xendit. Ready to run your own gym on Repstack?",
     tab: "dashboard",
     final: true,
   },
@@ -541,7 +541,7 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
             <div data-tour="poster" className="rounded-2xl bg-[#ffffff] p-6">
               <FakeQr />
             </div>
-            <p className="mt-6 max-w-sm text-sm text-neutral-400">Members: open your Iron Ledger app and scan this code to check yourself in.</p>
+            <p className="mt-6 max-w-sm text-sm text-neutral-400">Members: open your Repstack app and scan this code to check yourself in.</p>
           </div>
         )}
 

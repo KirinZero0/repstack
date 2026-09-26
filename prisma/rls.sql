@@ -1,4 +1,4 @@
--- Row-level security for Iron Ledger. Applied by `npm run db:rls` (prisma/apply-rls.ts), which
+-- Row-level security for Repstack. Applied by `npm run db:rls` (prisma/apply-rls.ts), which
 -- fills in {{ROLE}} with the quoted application role. Safe to run repeatedly.
 --
 -- Model: the app connects two ways.

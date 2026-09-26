@@ -55,7 +55,7 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
         <div className="mb-6">
           <Card title="WhatsApp messages">
             <p className="mb-4 text-sm text-neutral-400">
-              Activation links, payment receipts and expiry reminders are sent to your members by Iron Ledger, with your gym&apos;s name on each message. Nothing to set up.
+              Activation links, payment receipts and expiry reminders are sent to your members by Repstack, with your gym&apos;s name on each message. Nothing to set up.
             </p>
             {plan && (
               <p className="text-sm text-neutral-300">

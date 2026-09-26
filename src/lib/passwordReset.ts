@@ -111,7 +111,7 @@ export async function deliverResetLink(target: {
   const url = resetUrl(target.token);
   const message =
     target.purpose === "invite"
-      ? `Hi ${target.name}, you've been added to ${target.gymName} on Iron Ledger. Set your password here: ${url} (valid 7 days)`
+      ? `Hi ${target.name}, you've been added to ${target.gymName} on Repstack. Set your password here: ${url} (valid 7 days)`
       : `Hi ${target.name}, use this link to set a new password for ${target.gymName}: ${url} (valid 1 hour). If you didn't ask for this, ignore it.`;
   try {
     if (target.kind === "staff") {

@@ -4,7 +4,7 @@ import BrandMark from "@/components/BrandMark";
 import { prisma } from "@/lib/prisma";
 import SignupForm from "./SignupForm";
 
-export const metadata: Metadata = { title: "Set up your gym · Iron Ledger" };
+export const metadata: Metadata = { title: "Set up your gym · Repstack" };
 export const dynamic = "force-dynamic";
 
 export default async function SignupPage({ searchParams }: { searchParams: { plan?: string } }) {

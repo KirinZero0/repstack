@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/login`;
     await sendPlatformWhatsapp({
       to: data.ownerPhone,
-      message: `Welcome to Iron Ledger, ${data.ownerName}! Your gym "${data.gymName}" is set up. Log in at ${loginUrl} with email ${data.ownerEmail} and the temporary password you were given.`,
+      message: `Welcome to Repstack, ${data.ownerName}! Your gym "${data.gymName}" is set up. Log in at ${loginUrl} with email ${data.ownerEmail} and the temporary password you were given.`,
     });
   }
 
