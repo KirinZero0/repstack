@@ -8,12 +8,12 @@ import { encrypt, hmacLookup } from "../src/lib/crypto";
  * Requires DATABASE_URL to point at a disposable Postgres database — never run against prod.
  */
 export default async function globalSetup() {
-  execSync("npx prisma db push --force-reset --skip-generate", {
+  execSync("npx prisma migrate reset --force --skip-seed --skip-generate", {
     stdio: "inherit",
     env: process.env,
   });
 
-  // The forced reset above drops policies and grants, so re-apply row-level security. The app
+  // The reset above (it replays every migration, so migrations are tested too) drops policies and grants, so re-apply row-level security. The app
   // then runs as the restricted role (APP_DATABASE_URL), exactly as in production.
   execSync("npx tsx prisma/apply-rls.ts", { stdio: "inherit", env: process.env });
 

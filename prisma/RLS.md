@@ -40,7 +40,7 @@ silently. The check script below catches that.
    APP_DB_PASSWORD='a-long-random-password' npm run db:rls
    ```
 
-   Re-run it after every schema change that adds tables (`prisma db push` on a reset database drops
+   Re-run it after every schema change that adds tables (`prisma migrate reset` drops
    policies). It is idempotent, and re-running with a new password rotates the role's password.
 
 2. Set `APP_DATABASE_URL` to a connection string for that role, same host and database:

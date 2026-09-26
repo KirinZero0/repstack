@@ -56,6 +56,7 @@ model Gym {
   nextBillingDate    DateTime?
   isLifetime         Boolean            @default(false) // true = never billed by subscription cron (e.g. founding/investor deals)
   settings           Json               @default("{}")
+  termsAcceptedAt    DateTime?          // when the owner accepted the terms and privacy policy
   createdAt          DateTime           @default(now())
 
   staff            StaffUser[]
@@ -80,6 +81,7 @@ model PlatformPayment {
   saasPlan          SaasPlan      @relation(fields: [saasPlanId], references: [id])
   provider          String // "xendit" | "midtrans"
   externalInvoiceId String?       @unique
+  invoiceUrl        String?       // Xendit hosted payment page, so the owner can pay from the billing page
   amount            Decimal
   status            PaymentStatus @default(PENDING)
   createdAt         DateTime      @default(now())
@@ -164,6 +166,9 @@ model Member {
   qrSecret            String         @default(uuid())
   status              MemberStatus   @default(PENDING_PAYMENT)
   membershipExpiry    DateTime?
+  frozenAt            DateTime?      // set while status is FROZEN; unfreezing pushes the expiry out by the frozen time
+  termsAcceptedAt     DateTime?
+  anonymizedAt        DateTime?      // personal data erased; the row stays so payment history still adds up
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
@@ -304,6 +309,7 @@ model GymSignup {
   status            SignupStatus @default(PENDING)
   externalInvoiceId String?      @unique
   gymId             String?
+  termsAcceptedAt   DateTime?
   createdAt         DateTime     @default(now())
   completedAt       DateTime?
 
@@ -331,6 +337,7 @@ model MemberSignup {
   externalInvoiceId   String?      @unique
   memberId            String?
   ipHash              String? // keyed hash of the requester's IP, for throttling only
+  termsAcceptedAt     DateTime?
   createdAt           DateTime     @default(now())
   completedAt         DateTime?
 
