@@ -90,12 +90,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return fieldError("email", "This email can't be used to join. If you already have an account, log in instead.");
   }
 
+  // Email must be unique among requests still waiting on staff review — an unauthenticated
+  // resubmit must never be able to overwrite another request's password or contact details
+  // (that would let anyone hijack a pending signup just by knowing the victim's email).
   const holding = await prisma.memberSignup.findFirst({
     where: { email: d.email, status: "PENDING_REVIEW", createdAt: { gte: new Date(Date.now() - MEMBER_SIGNUP_TTL_MS) } },
     orderBy: { createdAt: "desc" },
   });
-  if (holding && (holding.gymId !== gym.id || holding.planId !== plan.id)) {
-    return fieldError("email", "You already started joining with this email. Use the same details to continue, or try again tomorrow.");
+  if (holding) {
+    return fieldError("email", "A request with this email is already waiting for review. Ask the gym if you need to change it, or try again once it's been reviewed.");
   }
 
   let proofImageUrl: string | undefined;
@@ -110,33 +113,22 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   const phone = normalizePhone(d.phone);
-  const signup = holding
-    ? await prisma.memberSignup.update({
-        where: { id: holding.id },
-        data: {
-          fullName: d.fullName,
-          phoneWhatsapp: encrypt(d.phone),
-          phoneWhatsappLookup: hmacLookup(phone),
-          passwordHash: await bcrypt.hash(d.password, 10),
-          ...(proofImageUrl ? { proofImageUrl } : {}),
-        },
-      })
-    : await prisma.memberSignup.create({
-        data: {
-          gymId: gym.id,
-          planId: plan.id,
-          fullName: d.fullName,
-          email: d.email,
-          phoneWhatsapp: encrypt(d.phone),
-          phoneWhatsappLookup: hmacLookup(phone),
-          passwordHash: await bcrypt.hash(d.password, 10),
-          amount: plan.price,
-          status: "PENDING_REVIEW",
-          proofImageUrl,
-          ipHash,
-          termsAcceptedAt: new Date(),
-        },
-      });
+  const signup = await prisma.memberSignup.create({
+    data: {
+      gymId: gym.id,
+      planId: plan.id,
+      fullName: d.fullName,
+      email: d.email,
+      phoneWhatsapp: encrypt(d.phone),
+      phoneWhatsappLookup: hmacLookup(phone),
+      passwordHash: await bcrypt.hash(d.password, 10),
+      amount: plan.price,
+      status: "PENDING_REVIEW",
+      proofImageUrl,
+      ipHash,
+      termsAcceptedAt: new Date(),
+    },
+  });
 
   return NextResponse.json({ signupId: signup.id });
 }

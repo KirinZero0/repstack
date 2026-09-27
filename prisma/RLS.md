@@ -26,7 +26,10 @@ The policies (`prisma/rls.sql`) allow a row only when its `gymId` (or `id` for `
 NULL, so the restricted role sees nothing and can write nothing.
 
 The restricted role is also only **granted** the tables gym code needs. `Superadmin`, `AuditLog`,
-`GymSignup`, `MemberSignup`, `MagicLink`, `PasswordReset` and `AppConfig` are not readable by it at all.
+`GymSignup`, `MagicLink`, `PasswordReset` and `AppConfig` are not readable by it at all. `MemberSignup`
+is granted: staff review and approve/reject manual join requests through `tenantDb`/`tenantTransaction`,
+same as any other tenant table. The public, unauthenticated write path in `/api/g/[slug]/join` still
+uses the owner client, since there's no session yet to take a gym id from.
 
 ## Setting it up
 

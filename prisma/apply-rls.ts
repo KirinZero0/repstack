@@ -22,8 +22,12 @@ async function main() {
   try {
     // Identifier and password quoting are done by Postgres itself (format %I / %L).
     const [{ exists }] = await prisma.$queryRaw<{ exists: boolean }[]>`SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${role}::text) AS exists`;
+    // Postgres only lets an actual superuser touch the SUPERUSER/BYPASSRLS attributes of an
+    // EXISTING role, even to re-state a value it already has — a CREATEROLE-holder (which is all
+    // a Neon/Supabase owner role is) can only set them at CREATE time. They're set once, at
+    // creation, and never need to change again, so the rotate-password path leaves them alone.
     const template = exists
-      ? "ALTER ROLE %I WITH LOGIN PASSWORD %L NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE"
+      ? "ALTER ROLE %I WITH LOGIN PASSWORD %L NOCREATEDB NOCREATEROLE"
       : "CREATE ROLE %I WITH LOGIN PASSWORD %L NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE";
     const [{ sql: roleSql }] = await prisma.$queryRaw<{ sql: string }[]>`SELECT format(${template}::text, ${role}::text, ${password}::text) AS sql`;
     await prisma.$executeRawUnsafe(roleSql);

@@ -23,13 +23,13 @@ test("RLS is switched on for the app: restricted role, no superuser, no bypass",
     expect(me.bypass).toBe(false);
 
     // No gym set means no rows at all, on every tenant table.
-    for (const table of ["Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment"]) {
+    for (const table of ["Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup"]) {
       const [row] = await raw.$queryRawUnsafe<{ n: bigint }[]>(`SELECT count(*)::bigint AS n FROM "${table}"`);
       expect(Number(row.n), table).toBe(0);
     }
 
     // And tables the app never needs are not even readable.
-    for (const table of ["Superadmin", "AuditLog", "GymSignup", "MemberSignup", "MagicLink", "PasswordReset", "AppConfig"]) {
+    for (const table of ["Superadmin", "AuditLog", "GymSignup", "MagicLink", "PasswordReset", "AppConfig"]) {
       await expect(raw.$queryRawUnsafe(`SELECT 1 FROM "${table}" LIMIT 1`), table).rejects.toThrow();
     }
   } finally {

@@ -56,6 +56,13 @@ async function main() {
       check(seen.length === expected && seen.every((m) => m.gymId === gym.id), `gym "${gym.slug}": sees exactly its own ${expected} members`, `saw ${seen.length}`);
     }
 
+    // Every granted tenant table must actually be readable by the app role (RLS being enabled is
+    // not the same as being granted — a missing GRANT fails with "permission denied", not silently).
+    for (const t of TENANT_TABLES) {
+      const readable = await app.$queryRawUnsafe(`SELECT 1 FROM "${t}" LIMIT 1`).then(() => true, () => false);
+      check(readable, `app role can query "${t}" (not just RLS-enabled, actually granted)`);
+    }
+
     if (gyms.length >= 2) {
       const [a, b] = gyms;
       const plan = await owner.membershipPlan.findFirst({ where: { gymId: b.id } });

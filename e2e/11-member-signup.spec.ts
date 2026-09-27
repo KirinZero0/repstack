@@ -84,10 +84,14 @@ test("public sign-up is off by default, then staff approving a manual transfer r
   const signupRow = await prisma.memberSignup.findUniqueOrThrow({ where: { id: signupId } });
   expect(signupRow.proofImageUrl).toBeTruthy();
 
-  // Same details again resume the same request instead of duplicating it.
-  const again = await postJoin(request, baseURL!, "test-gym-a", d, ip);
-  expect((await again.json()).signupId).toBe(signupId);
+  // While it's waiting on review, that email can't be used to file a second request — an
+  // unauthenticated resubmit must never be able to overwrite the waiting request's password.
+  const again = await postJoin(request, baseURL!, "test-gym-a", { ...d, password: "a-different-password-1" }, ip);
+  expect(again.status()).toBe(409);
+  expect((await again.json()).field).toBe("email");
   expect(await prisma.memberSignup.count({ where: { email: d.email } })).toBe(1);
+  const unchanged = await prisma.memberSignup.findUniqueOrThrow({ where: { id: signupId } });
+  expect(unchanged.passwordHash).toBe(signupRow.passwordHash);
 
   // Owner reviews and approves.
   await loginOwner(request, baseURL!, "test-gym-a", "owner-a@test.local");

@@ -11,8 +11,9 @@ REVOKE ALL ON ALL TABLES IN SCHEMA public FROM {{ROLE}};
 GRANT USAGE ON SCHEMA public TO {{ROLE}};
 
 -- The only tables gym-scoped code touches. Everything else (Superadmin, AuditLog, GymSignup,
--- MemberSignup, MagicLink, PasswordReset, AppConfig) is deliberately not granted at all.
-GRANT SELECT, INSERT, UPDATE, DELETE ON "Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment" TO {{ROLE}};
+-- MagicLink, PasswordReset, AppConfig) is deliberately not granted at all. MemberSignup holds the
+-- manual join/bank-transfer requests staff review on /g/[slug]/members and act on via approve/reject.
+GRANT SELECT, INSERT, UPDATE, DELETE ON "Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup" TO {{ROLE}};
 -- The plan catalog is not tenant data; gyms read their own plan's limits.
 GRANT SELECT ON "SaasPlan" TO {{ROLE}};
 
@@ -52,7 +53,6 @@ ALTER TABLE "PlatformPayment" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON "PlatformPayment";
 CREATE POLICY tenant_isolation ON "PlatformPayment" USING ("gymId" = current_setting('app.current_gym_id', true)) WITH CHECK ("gymId" = current_setting('app.current_gym_id', true));
 
--- Not granted to {{ROLE}} today, but if that ever changes these must already be tenant-scoped.
 ALTER TABLE "MemberSignup" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON "MemberSignup";
 CREATE POLICY tenant_isolation ON "MemberSignup" USING ("gymId" = current_setting('app.current_gym_id', true)) WITH CHECK ("gymId" = current_setting('app.current_gym_id', true));
