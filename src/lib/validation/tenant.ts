@@ -15,6 +15,8 @@ export const addMemberSchema = z.object({
   email: z.string().email(),
   phoneWhatsapp: z.string().min(6).max(30),
   planId: z.string().uuid(),
+  /** YYYY-MM-DD. Defaults to the plan's standard duration from today when left blank. */
+  membershipExpiry: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 /** Every public form makes people accept the terms and privacy policy; the time is stored with the account. */

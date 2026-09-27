@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireTenantSession, SessionError } from "@/lib/session";
-import { openPlatformInvoice } from "@/lib/platformBilling";
+import { openPlatformInvoice, PaymentsDisabledError } from "@/lib/platformBilling";
 
 /**
  * Owner pays the gym's subscription now: returns the payable invoice (an open one is reused).
@@ -31,6 +31,9 @@ export async function POST(_req: Request, { params }: { params: { slug: string }
     const { url } = await openPlatformInvoice(gym, plan, "renewal");
     return NextResponse.json({ url });
   } catch (err) {
+    if (err instanceof PaymentsDisabledError) {
+      return NextResponse.json({ error: "Online payments are currently turned off. Contact us to pay your subscription." }, { status: 403 });
+    }
     console.error("Could not create a subscription invoice", err);
     return NextResponse.json({ error: "We couldn't start the payment. Please try again in a moment." }, { status: 502 });
   }

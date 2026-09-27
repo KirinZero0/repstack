@@ -17,8 +17,15 @@ export function hashIp(ip: string): string {
   return crypto.createHmac("sha256", key).update(`ip:${ip}`).digest("hex");
 }
 
+/**
+ * The public join page (bank-transfer request flow) is hidden for every gym until there's a real
+ * business bank account to point it at. Flip to true to bring it back — no other code changes
+ * needed, gyms keep whatever `acceptSignups` setting they already have.
+ */
+export const JOIN_PAGE_ENABLED = false;
+
 export function gymAcceptsSignups(settings: unknown): boolean {
-  return (settings as { acceptSignups?: unknown } | null)?.acceptSignups === true;
+  return JOIN_PAGE_ENABLED && (settings as { acceptSignups?: unknown } | null)?.acceptSignups === true;
 }
 
 /**

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { changePlanSchema } from "@/lib/validation/tenant";
 import { countMemberSeats } from "@/lib/limits";
-import { openPlatformInvoice, retirePendingPlatformInvoices } from "@/lib/platformBilling";
+import { openPlatformInvoice, PaymentsDisabledError, retirePendingPlatformInvoices } from "@/lib/platformBilling";
 
 /**
  * Owner switches the gym's Repstack plan.
@@ -72,6 +72,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const { url } = await openPlatformInvoice(gym, target, "plan change");
     return NextResponse.json({ url });
   } catch (err) {
+    if (err instanceof PaymentsDisabledError) {
+      return NextResponse.json({ error: "Online payments are currently turned off. Contact us to switch to a paid plan." }, { status: 403 });
+    }
     console.error("Could not create a plan change invoice", err);
     return NextResponse.json({ error: "We couldn't start the payment. Please try again in a moment." }, { status: 502 });
   }

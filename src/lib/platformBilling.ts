@@ -1,5 +1,15 @@
 import { prisma } from "./prisma";
-import { createInvoice, expireInvoice, getInvoiceState, isMockMode, platformProviderName } from "./gateway";
+import {
+  createInvoice,
+  expireInvoice,
+  getInvoiceState,
+  isMockMode,
+  onlinePaymentsEnabled,
+  PaymentsDisabledError,
+  platformProviderName,
+} from "./gateway";
+
+export { PaymentsDisabledError };
 
 interface BillableGym {
   id: string;
@@ -35,6 +45,8 @@ export async function openPlatformInvoice(
   plan: BillablePlan,
   purpose: "renewal" | "plan change",
 ): Promise<{ paymentId: string; url: string; created: boolean }> {
+  if (!onlinePaymentsEnabled() && !isMockMode()) throw new PaymentsDisabledError();
+
   const open = await prisma.platformPayment.findFirst({
     where: { gymId: gym.id, status: "PENDING", externalInvoiceId: { not: null } },
     orderBy: { createdAt: "desc" },

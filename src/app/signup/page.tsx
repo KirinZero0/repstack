@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import BrandMark from "@/components/BrandMark";
 import { prisma } from "@/lib/prisma";
+import { isMockMode, onlinePaymentsEnabled } from "@/lib/gateway";
 import SignupForm from "./SignupForm";
 
 export const metadata: Metadata = { title: "Set up your gym · Repstack" };
@@ -33,7 +34,13 @@ export default async function SignupPage({ searchParams }: { searchParams: { pla
             Create your owner account, pay for your plan, and your gym is ready to log in to straight away.
           </p>
           <div className="mt-10">
-            <SignupForm planId={plan.id} />
+            {onlinePaymentsEnabled() || isMockMode() ? (
+              <SignupForm planId={plan.id} />
+            ) : (
+              <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6">
+                <p className="text-neutral-300">Self-serve sign-up is currently unavailable. Please contact us to set up your gym.</p>
+              </div>
+            )}
           </div>
         </div>
 

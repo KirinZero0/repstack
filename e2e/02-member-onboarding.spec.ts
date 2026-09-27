@@ -19,8 +19,13 @@ test("owner adds a member, member activates, member can log in", async ({ page, 
   await expect(page.getByText("Onboarded Member")).toBeVisible({ timeout: 20_000 });
 
   const member = await prisma.member.findUniqueOrThrow({ where: { email: newEmail } });
-  expect(member.status).toBe("PENDING_PAYMENT");
+  expect(member.status).toBe("ACTIVE");
+  expect(member.membershipExpiry).not.toBeNull();
   expect(member.passwordHash).toBeNull();
+
+  const payment = await prisma.payment.findFirstOrThrow({ where: { memberId: member.id } });
+  expect(payment.provider).toBe("CASH");
+  expect(payment.status).toBe("PAID");
 
   const magicLink = await prisma.magicLink.findFirstOrThrow({
     where: { memberId: member.id, purpose: "activate" },

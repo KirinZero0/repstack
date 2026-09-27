@@ -30,6 +30,20 @@ function providerOf(recorded?: string | null): ProviderName {
   return recorded.toLowerCase() === "midtrans" ? "midtrans" : "xendit";
 }
 
+/**
+ * Every online payment (member billing, gym subscriptions, gym self-signup) is off by default.
+ * Set PAYMENTS_ENABLED=1 in Vercel to turn it back on; mock mode (dev/test) is unaffected.
+ */
+export function onlinePaymentsEnabled(): boolean {
+  return process.env.PAYMENTS_ENABLED === "1";
+}
+
+export class PaymentsDisabledError extends Error {
+  constructor() {
+    super("Online payments are currently turned off");
+  }
+}
+
 export interface InvoiceParams {
   externalId: string;
   amount: number;
@@ -44,6 +58,7 @@ export async function createInvoice(params: InvoiceParams): Promise<{ id: string
   if (isMockMode()) {
     return { id: `mock_${params.externalId}`, url: `/my?mock-invoice=${params.externalId}` };
   }
+  if (!onlinePaymentsEnabled()) throw new PaymentsDisabledError();
   if (activeProvider() === "midtrans") return createMidtransTransaction(params);
   const invoice = await createXenditInvoice(params);
   return { id: invoice.id, url: invoice.invoice_url };
