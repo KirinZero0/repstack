@@ -34,6 +34,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       settings: next as Prisma.InputJsonValue,
       ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
       ...(parsed.data.timezone !== undefined ? { timezone: parsed.data.timezone } : {}),
+      ...(parsed.data.bankName !== undefined ? { bankName: parsed.data.bankName || null } : {}),
+      ...(parsed.data.bankAccountNumber !== undefined ? { bankAccountNumber: parsed.data.bankAccountNumber || null } : {}),
+      ...(parsed.data.bankAccountHolder !== undefined ? { bankAccountHolder: parsed.data.bankAccountHolder || null } : {}),
     },
   });
   return NextResponse.json({ ok: true });

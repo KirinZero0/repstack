@@ -4,6 +4,7 @@ import { decrypt, maskPhone, maskEmail } from "@/lib/crypto";
 import { countMemberSeats } from "@/lib/limits";
 import AddMemberForm from "./AddMemberForm";
 import ResendFallbackButton from "./ResendFallbackButton";
+import PendingRequests from "./PendingRequests";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export default async function MembersPage({ params }: { params: { slug: string }
     throw err;
   }
 
-  const [members, plans, saasPlan, seats] = await Promise.all([
+  const [members, plans, saasPlan, seats, pending] = await Promise.all([
     db.member.findMany({
       where: { gymId: gym.id, anonymizedAt: null },
       include: { plan: true },
@@ -25,7 +26,23 @@ export default async function MembersPage({ params }: { params: { slug: string }
     db.membershipPlan.findMany({ where: { gymId: gym.id, isActive: true } }),
     db.saasPlan.findUnique({ where: { id: gym.saasPlanId } }),
     countMemberSeats(db, gym.id),
+    db.memberSignup.findMany({
+      where: { gymId: gym.id, status: "PENDING_REVIEW" },
+      include: { plan: true },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
+
+  const pendingRows = pending.map((p) => ({
+    id: p.id,
+    fullName: p.fullName,
+    email: maskEmail(p.email),
+    phone: maskPhone(decrypt(p.phoneWhatsapp)),
+    plan: p.plan.name,
+    amount: p.amount.toString(),
+    createdAt: p.createdAt.toISOString(),
+    hasProof: Boolean(p.proofImageUrl),
+  }));
 
   const rows = members.map((m) => ({
     id: m.id,
@@ -54,6 +71,8 @@ export default async function MembersPage({ params }: { params: { slug: string }
             </p>
           </div>
         </div>
+
+        <PendingRequests slug={params.slug} requests={pendingRows} />
 
         <div className="mb-6">
           <AddMemberForm

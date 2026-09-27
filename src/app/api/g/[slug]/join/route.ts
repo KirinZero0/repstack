@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { joinSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
 import { countMemberSeats } from "@/lib/limits";
-import { createInvoice, getInvoiceState, isMockMode } from "@/lib/gateway";
 import {
   MAX_SIGNUPS_PER_GYM_HOUR,
   MAX_SIGNUPS_PER_IP_HOUR,
@@ -12,6 +12,9 @@ import {
   gymAcceptsSignups,
   hashIp,
 } from "@/lib/memberSignup";
+
+const MAX_PROOF_BYTES = 2 * 1024 * 1024;
+const ALLOWED_PROOF_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 function fieldError(field: string, message: string, status = 409) {
   return NextResponse.json({ error: message, field }, { status });
@@ -22,7 +25,11 @@ function clientIp(req: NextRequest): string {
   return req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
 }
 
-/** Public: someone joins a gym online. Stores a pending signup and returns the invoice to pay. */
+/**
+ * Public: someone joins a gym online. Payment is a bank transfer straight to the gym's own
+ * account (shown on the join page) — this only files a request, with an optional proof image,
+ * for gym staff to confirm and approve.
+ */
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const gym = await prisma.gym.findUnique({ where: { slug: params.slug } });
   if (!gym) return NextResponse.json({ error: "Gym not found" }, { status: 404 });
@@ -30,14 +37,30 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ error: "This gym isn't taking online sign-ups right now. Please ask at the front desk." }, { status: 403 });
   }
 
-  const parsed = joinSchema.safeParse(await req.json().catch(() => null));
+  const form = await req.formData().catch(() => null);
+  if (!form) return fieldError("form", "Invalid form data", 400);
+
+  const parsed = joinSchema.safeParse({
+    planId: form.get("planId"),
+    fullName: form.get("fullName"),
+    email: form.get("email"),
+    phone: form.get("phone"),
+    password: form.get("password"),
+    acceptTerms: form.get("acceptTerms") === "true",
+  });
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     return fieldError(String(issue.path[0] ?? "form"), issue.message, 400);
   }
   const d = parsed.data;
 
-  // Throttle: every attempt creates a signup row and possibly a payment-provider invoice.
+  const proof = form.get("proof");
+  if (proof instanceof File && proof.size > 0) {
+    if (!ALLOWED_PROOF_MIME.has(proof.type)) return fieldError("proof", "Proof image must be JPEG, PNG, or WebP", 400);
+    if (proof.size > MAX_PROOF_BYTES) return fieldError("proof", "Proof image must be under 2MB", 400);
+  }
+
+  // Throttle: every attempt creates or updates a signup row.
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const ipHash = hashIp(clientIp(req));
   const [ipCount, gymCount] = await Promise.all([
@@ -68,25 +91,37 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   const holding = await prisma.memberSignup.findFirst({
-    where: { email: d.email, status: "PENDING", createdAt: { gte: new Date(Date.now() - MEMBER_SIGNUP_TTL_MS) } },
+    where: { email: d.email, status: "PENDING_REVIEW", createdAt: { gte: new Date(Date.now() - MEMBER_SIGNUP_TTL_MS) } },
     orderBy: { createdAt: "desc" },
   });
+  if (holding && (holding.gymId !== gym.id || holding.planId !== plan.id)) {
+    return fieldError("email", "You already started joining with this email. Use the same details to continue, or try again tomorrow.");
+  }
 
-  try {
-    if (holding && (holding.gymId !== gym.id || holding.planId !== plan.id)) {
-      return fieldError("email", "You already started joining with this email. Use the same details to continue, or try again tomorrow.");
+  let proofImageUrl: string | undefined;
+  if (proof instanceof File && proof.size > 0) {
+    // Proof is optional — never let a Blob failure block the request itself.
+    try {
+      const blob = await put(`join-proofs/${gym.id}-${Date.now()}`, proof, { access: "private", contentType: proof.type });
+      proofImageUrl = blob.url;
+    } catch (err) {
+      console.error("Proof image upload failed, continuing without it", err);
     }
-    if (holding?.externalInvoiceId && holding.invoiceUrl) {
-      const state = await getInvoiceState(holding.externalInvoiceId, holding.createdAt);
-      if (state === "PENDING") {
-        return NextResponse.json({ signupId: holding.id, invoiceUrl: invoiceLink(params.slug, holding.id, holding.invoiceUrl) });
-      }
-    }
+  }
 
-    const phone = normalizePhone(d.phone);
-    const signup =
-      holding ??
-      (await prisma.memberSignup.create({
+  const phone = normalizePhone(d.phone);
+  const signup = holding
+    ? await prisma.memberSignup.update({
+        where: { id: holding.id },
+        data: {
+          fullName: d.fullName,
+          phoneWhatsapp: encrypt(d.phone),
+          phoneWhatsappLookup: hmacLookup(phone),
+          passwordHash: await bcrypt.hash(d.password, 10),
+          ...(proofImageUrl ? { proofImageUrl } : {}),
+        },
+      })
+    : await prisma.memberSignup.create({
         data: {
           gymId: gym.id,
           planId: plan.id,
@@ -96,29 +131,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           phoneWhatsappLookup: hmacLookup(phone),
           passwordHash: await bcrypt.hash(d.password, 10),
           amount: plan.price,
+          status: "PENDING_REVIEW",
+          proofImageUrl,
           ipHash,
           termsAcceptedAt: new Date(),
         },
-      }));
+      });
 
-    const invoice = await createInvoice({
-      externalId: signup.id,
-      amount: Number(signup.amount),
-      payerEmail: d.email,
-      description: `${plan.name} membership — ${gym.name}`,
-      currency: plan.currency,
-      successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/join/success?id=${signup.id}`,
-    });
-    await prisma.memberSignup.update({ where: { id: signup.id }, data: { externalInvoiceId: invoice.id, invoiceUrl: invoice.url } });
-
-    return NextResponse.json({ signupId: signup.id, invoiceUrl: invoiceLink(params.slug, signup.id, invoice.url) });
-  } catch (err) {
-    console.error("Member signup failed to create an invoice", err);
-    return NextResponse.json({ error: "We couldn't start the payment. Please try again in a moment." }, { status: 502 });
-  }
-}
-
-/** In dev mock mode there's no provider page, so use our own test checkout on the success page. */
-function invoiceLink(slug: string, signupId: string, url: string) {
-  return isMockMode() ? `/g/${slug}/join/success?id=${signupId}` : url;
+  return NextResponse.json({ signupId: signup.id });
 }

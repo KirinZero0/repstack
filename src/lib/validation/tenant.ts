@@ -40,6 +40,9 @@ export const gymSettingsSchema = z
     acceptSignups: z.boolean().optional(),
     name: z.string().trim().min(2).max(80).optional(),
     timezone: z.string().trim().max(60).refine(isValidTimezone, "Unknown timezone").optional(),
+    bankName: z.string().trim().max(60).optional(),
+    bankAccountNumber: z.string().trim().max(40).optional(),
+    bankAccountHolder: z.string().trim().max(80).optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), "Nothing to update");
 

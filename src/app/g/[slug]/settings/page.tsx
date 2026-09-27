@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymThemeFromSettings } from "@/lib/theme";
 import { Card } from "@/components/charts";
-import { GymDetailsForm, GymThemeForm, JoinSettingsForm } from "@/components/SettingsForms";
+import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm } from "@/components/SettingsForms";
 import { gymAcceptsSignups } from "@/lib/memberSignup";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +82,19 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
                 </ul>
               </div>
             )}
+          </Card>
+        </div>
+
+        <div className="mb-6">
+          <Card title="Bank transfer details">
+            <BankDetailsForm
+              slug={params.slug}
+              initial={{
+                bankName: gym.bankName ?? "",
+                bankAccountNumber: gym.bankAccountNumber ?? "",
+                bankAccountHolder: gym.bankAccountHolder ?? "",
+              }}
+            />
           </Card>
         </div>
 
