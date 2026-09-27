@@ -229,6 +229,7 @@ model Payment {
   plan              MembershipPlan  @relation(fields: [planId], references: [id])
   provider          PaymentProvider
   externalInvoiceId String?         @unique
+  invoiceUrl        String?         // hosted payment page, so an unpaid invoice can be resumed
   amount            Decimal
   currency          String          @default("IDR")
   status            PaymentStatus   @default(PENDING)
@@ -308,6 +309,7 @@ model GymSignup {
   saasPlan          SaasPlan     @relation(fields: [saasPlanId], references: [id])
   status            SignupStatus @default(PENDING)
   externalInvoiceId String?      @unique
+  invoiceUrl        String?
   gymId             String?
   termsAcceptedAt   DateTime?
   createdAt         DateTime     @default(now())
@@ -335,6 +337,7 @@ model MemberSignup {
   amount              Decimal // snapshot of the plan price when the invoice was created
   status              SignupStatus @default(PENDING)
   externalInvoiceId   String?      @unique
+  invoiceUrl          String?
   memberId            String?
   ipHash              String? // keyed hash of the requester's IP, for throttling only
   termsAcceptedAt     DateTime?

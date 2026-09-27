@@ -3,7 +3,7 @@ import { requireTenantSession, SessionError } from "@/lib/session";
 import { addMemberSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
 import { createMagicLink } from "@/lib/magicLink";
-import { createXenditInvoice } from "@/lib/xendit";
+import { createInvoice, paymentProviderEnum } from "@/lib/gateway";
 import { sendGymWhatsapp } from "@/lib/whatsapp";
 import { countMemberSeats, memberLimitMessage } from "@/lib/limits";
 
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       gymId: gym.id,
       memberId: member.id,
       planId: plan.id,
-      provider: "XENDIT",
+      provider: paymentProviderEnum(),
       amount: plan.price,
       currency: plan.currency,
       status: "PENDING",
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   let invoiceUrl: string | null = null;
   try {
-    const invoice = await createXenditInvoice({
+    const invoice = await createInvoice({
       externalId: payment.id,
       amount: Number(plan.price),
       payerEmail: data.email,
@@ -80,13 +80,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       currency: plan.currency,
       successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/login`,
     });
-    invoiceUrl = invoice.invoice_url;
+    invoiceUrl = invoice.url;
     await db.payment.update({
       where: { id: payment.id },
-      data: { externalInvoiceId: invoice.id },
+      data: { externalInvoiceId: invoice.id, invoiceUrl: invoice.url },
     });
   } catch (err) {
-    console.error("Xendit invoice creation failed", err);
+    console.error("Invoice creation failed", err);
   }
 
   const { token } = await createMagicLink({

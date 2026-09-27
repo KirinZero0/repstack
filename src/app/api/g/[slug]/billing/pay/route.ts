@@ -3,7 +3,7 @@ import { requireTenantSession, SessionError } from "@/lib/session";
 import { openPlatformInvoice } from "@/lib/platformBilling";
 
 /**
- * Owner pays the gym's subscription now: returns the payable Xendit invoice (an open one is reused).
+ * Owner pays the gym's subscription now: returns the payable invoice (an open one is reused).
  * Works for a gym suspended for non-payment too, since that owner is only let in to pay.
  */
 export async function POST(_req: Request, { params }: { params: { slug: string } }) {

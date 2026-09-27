@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signupSchema } from "@/lib/validation/tenant";
 import { RESERVED_SLUGS, SIGNUP_TTL_MS } from "@/lib/signup";
-import { createXenditInvoice, getXenditInvoice, isMockMode } from "@/lib/xendit";
+import { createInvoice, getInvoiceState, isMockMode } from "@/lib/gateway";
 
 function fieldError(field: string, message: string, status = 409) {
   return NextResponse.json({ error: message, field }, { status });
@@ -49,10 +49,10 @@ export async function POST(req: NextRequest) {
         );
       }
       // Same person retrying: resume their unpaid invoice rather than creating a second one.
-      if (holding.externalInvoiceId) {
-        const existing = await getXenditInvoice(holding.externalInvoiceId);
-        if (existing && existing.status === "PENDING") {
-          return NextResponse.json({ signupId: holding.id, invoiceUrl: signupInvoiceUrl(holding.id, existing.invoice_url) });
+      if (holding.externalInvoiceId && holding.invoiceUrl) {
+        const state = await getInvoiceState(holding.externalInvoiceId, holding.createdAt);
+        if (state === "PENDING") {
+          return NextResponse.json({ signupId: holding.id, invoiceUrl: signupInvoiceUrl(holding.id, holding.invoiceUrl) });
         }
       }
     }
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
             },
           });
 
-    const invoice = await createXenditInvoice({
+    const invoice = await createInvoice({
       externalId: signup.id,
       amount: Number(plan.price),
       payerEmail: d.ownerEmail,
@@ -81,16 +81,16 @@ export async function POST(req: NextRequest) {
       currency: plan.currency,
       successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/signup/success?id=${signup.id}`,
     });
-    await prisma.gymSignup.update({ where: { id: signup.id }, data: { externalInvoiceId: invoice.id } });
+    await prisma.gymSignup.update({ where: { id: signup.id }, data: { externalInvoiceId: invoice.id, invoiceUrl: invoice.url } });
 
-    return NextResponse.json({ signupId: signup.id, invoiceUrl: signupInvoiceUrl(signup.id, invoice.invoice_url) });
+    return NextResponse.json({ signupId: signup.id, invoiceUrl: signupInvoiceUrl(signup.id, invoice.url) });
   } catch (err) {
     console.error("Signup failed to create an invoice", err);
     return NextResponse.json({ error: "We couldn't start the payment. Please try again in a moment." }, { status: 502 });
   }
 }
 
-/** In dev mock mode there's no Xendit page, so send people to our own test checkout instead. */
+/** In dev mock mode there's no provider page, so send people to our own test checkout instead. */
 function signupInvoiceUrl(signupId: string, url: string) {
   return isMockMode() ? `/signup/success?id=${signupId}` : url;
 }

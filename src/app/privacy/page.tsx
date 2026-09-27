@@ -24,7 +24,7 @@ export default function PrivacyPage() {
         <li><strong>Gym owners and staff:</strong> name, email, phone number for account help and billing notices, password (hashed), and the gym&apos;s subscription and invoices.</li>
         <li><strong>Technical:</strong> a secure session cookie to keep you logged in. To limit abuse we keep a keyed hash of your IP address on sign-up and password-reset requests, not the address itself.</li>
       </ul>
-      <p>We never see or store card numbers or bank logins. Online payments are taken on Xendit&apos;s page.</p>
+      <p>We never see or store card numbers or bank logins. Online payments are taken on our payment provider&apos;s page.</p>
 
       <h2>Why we use it</h2>
       <ul>
@@ -38,7 +38,7 @@ export default function PrivacyPage() {
       <h2>Who else handles it</h2>
       <ul>
         <li>The <strong>gym</strong> you belong to, and its staff, can see your member details and history. Lists show your phone and email partly masked.</li>
-        <li><strong>Suppliers</strong> that run the service for us: hosting (Vercel), database (Neon), payments (Xendit), WhatsApp delivery (Fonnte or a similar gateway) and image storage (Vercel Blob). They handle data only to provide their service, and some are located outside Indonesia.</li>
+        <li><strong>Suppliers</strong> that run the service for us: hosting (Vercel), database (Neon), payments (Xendit or Midtrans), WhatsApp delivery (Fonnte or a similar gateway) and image storage (Vercel Blob). They handle data only to provide their service, and some are located outside Indonesia.</li>
         <li>Authorities, when the law requires it.</li>
       </ul>
 

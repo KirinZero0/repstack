@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { sendPlatformWhatsapp } from "./whatsapp";
+import { platformProviderName } from "./gateway";
 
 export const SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -56,7 +57,7 @@ export async function completeSignup(signupId: string, invoice: { paidAt: Date; 
       data: {
         gymId: gym.id,
         saasPlanId: signup.saasPlanId,
-        provider: "xendit",
+        provider: platformProviderName(),
         externalInvoiceId: invoice.externalInvoiceId ?? null,
         amount: signup.saasPlan.price,
         status: "PAID",

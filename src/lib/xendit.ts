@@ -20,7 +20,8 @@ interface XenditInvoiceResponse {
 
 /** Local/dev only: fake invoices so the payment flow can be exercised without Xendit credentials. */
 export function isMockMode(): boolean {
-  return process.env.XENDIT_MOCK === "1" && process.env.NODE_ENV !== "production";
+  // XENDIT_MOCK is the original name; PAYMENTS_MOCK is the same switch now that there is more than one provider.
+  return (process.env.PAYMENTS_MOCK === "1" || process.env.XENDIT_MOCK === "1") && process.env.NODE_ENV !== "production";
 }
 
 export async function getXenditInvoice(invoiceId: string): Promise<XenditInvoiceResponse | null> {

@@ -96,7 +96,7 @@ export default async function PayPage() {
           </div>
         )}
         <p className="mt-8 text-xs text-neutral-500">
-          You&apos;ll be taken to a secure Xendit page to pay by bank transfer, e-wallet or card. Your
+          You&apos;ll be taken to a secure payment page to pay by bank transfer, e-wallet or card. Your
           membership switches on as soon as the payment clears.
         </p>
       </div>

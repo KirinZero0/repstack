@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { createXenditInvoice, expireXenditInvoice, getXenditInvoice, isMockMode } from "./xendit";
+import { createInvoice, expireInvoice, getInvoiceState, isMockMode, platformProviderName } from "./gateway";
 
 interface BillableGym {
   id: string;
@@ -13,15 +13,15 @@ interface BillablePlan {
   currency: string;
 }
 
-/** Stops every unpaid subscription invoice of a gym, here and at Xendit, so they can't be paid later. */
+/** Stops every unpaid subscription invoice of a gym, here and at the provider, so they can't be paid later. */
 export async function retirePendingPlatformInvoices(gymId: string, exceptId?: string): Promise<void> {
   const pending = await prisma.platformPayment.findMany({
     where: { gymId, status: "PENDING", ...(exceptId ? { id: { not: exceptId } } : {}) },
   });
   for (const p of pending) {
-    // Mark it first: Xendit's "expired" callback for it is then ignored instead of flagging the gym past due.
+    // Mark it first: the provider's "expired" callback for it is then ignored instead of flagging the gym past due.
     await prisma.platformPayment.updateMany({ where: { id: p.id, status: "PENDING" }, data: { status: "EXPIRED" } });
-    if (p.externalInvoiceId) await expireXenditInvoice(p.externalInvoiceId);
+    if (p.externalInvoiceId) await expireInvoice(p.externalInvoiceId, p.provider);
   }
 }
 
@@ -40,25 +40,25 @@ export async function openPlatformInvoice(
     orderBy: { createdAt: "desc" },
   });
   if (open && open.saasPlanId === plan.id && open.invoiceUrl) {
-    const live = await getXenditInvoice(open.externalInvoiceId!);
-    if (live && live.status === "PENDING") return { paymentId: open.id, url: open.invoiceUrl, created: false };
+    const state = await getInvoiceState(open.externalInvoiceId!, open.createdAt, open.provider);
+    if (state === "PENDING") return { paymentId: open.id, url: open.invoiceUrl, created: false };
   }
 
   await retirePendingPlatformInvoices(gym.id);
 
   const payment = await prisma.platformPayment.create({
-    data: { gymId: gym.id, saasPlanId: plan.id, provider: "xendit", amount: Number(plan.price), status: "PENDING" },
+    data: { gymId: gym.id, saasPlanId: plan.id, provider: platformProviderName(), amount: Number(plan.price), status: "PENDING" },
   });
   try {
-    const invoice = await createXenditInvoice({
+    const invoice = await createInvoice({
       externalId: payment.id,
       amount: Number(plan.price),
       description: `${plan.name}: ${gym.name} ${purpose === "renewal" ? "subscription renewal" : "plan change"}`,
       currency: plan.currency,
       successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/billing`,
     });
-    // In dev mock mode there's no Xendit page, so use our own test checkout on the billing page.
-    const url = isMockMode() ? `/g/${gym.slug}/billing?mock-invoice=${payment.id}` : invoice.invoice_url;
+    // In dev mock mode there's no provider page, so use our own test checkout on the billing page.
+    const url = isMockMode() ? `/g/${gym.slug}/billing?mock-invoice=${payment.id}` : invoice.url;
     await prisma.platformPayment.update({ where: { id: payment.id }, data: { externalInvoiceId: invoice.id, invoiceUrl: url } });
     return { paymentId: payment.id, url, created: true };
   } catch (err) {

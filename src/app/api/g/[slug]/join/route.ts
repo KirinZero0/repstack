@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { joinSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
 import { countMemberSeats } from "@/lib/limits";
-import { createXenditInvoice, getXenditInvoice, isMockMode } from "@/lib/xendit";
+import { createInvoice, getInvoiceState, isMockMode } from "@/lib/gateway";
 import {
   MAX_SIGNUPS_PER_GYM_HOUR,
   MAX_SIGNUPS_PER_IP_HOUR,
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
   const d = parsed.data;
 
-  // Throttle: every attempt creates a signup row and possibly a Xendit invoice.
+  // Throttle: every attempt creates a signup row and possibly a payment-provider invoice.
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const ipHash = hashIp(clientIp(req));
   const [ipCount, gymCount] = await Promise.all([
@@ -76,10 +76,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     if (holding && (holding.gymId !== gym.id || holding.planId !== plan.id)) {
       return fieldError("email", "You already started joining with this email. Use the same details to continue, or try again tomorrow.");
     }
-    if (holding?.externalInvoiceId) {
-      const existing = await getXenditInvoice(holding.externalInvoiceId);
-      if (existing && existing.status === "PENDING") {
-        return NextResponse.json({ signupId: holding.id, invoiceUrl: invoiceLink(params.slug, holding.id, existing.invoice_url) });
+    if (holding?.externalInvoiceId && holding.invoiceUrl) {
+      const state = await getInvoiceState(holding.externalInvoiceId, holding.createdAt);
+      if (state === "PENDING") {
+        return NextResponse.json({ signupId: holding.id, invoiceUrl: invoiceLink(params.slug, holding.id, holding.invoiceUrl) });
       }
     }
 
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         },
       }));
 
-    const invoice = await createXenditInvoice({
+    const invoice = await createInvoice({
       externalId: signup.id,
       amount: Number(signup.amount),
       payerEmail: d.email,
@@ -109,16 +109,16 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       currency: plan.currency,
       successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/join/success?id=${signup.id}`,
     });
-    await prisma.memberSignup.update({ where: { id: signup.id }, data: { externalInvoiceId: invoice.id } });
+    await prisma.memberSignup.update({ where: { id: signup.id }, data: { externalInvoiceId: invoice.id, invoiceUrl: invoice.url } });
 
-    return NextResponse.json({ signupId: signup.id, invoiceUrl: invoiceLink(params.slug, signup.id, invoice.invoice_url) });
+    return NextResponse.json({ signupId: signup.id, invoiceUrl: invoiceLink(params.slug, signup.id, invoice.url) });
   } catch (err) {
     console.error("Member signup failed to create an invoice", err);
     return NextResponse.json({ error: "We couldn't start the payment. Please try again in a moment." }, { status: 502 });
   }
 }
 
-/** In dev mock mode there's no Xendit page, so use our own test checkout on the success page. */
+/** In dev mock mode there's no provider page, so use our own test checkout on the success page. */
 function invoiceLink(slug: string, signupId: string, url: string) {
   return isMockMode() ? `/g/${slug}/join/success?id=${signupId}` : url;
 }

@@ -53,7 +53,7 @@ export default async function SignupPage({ searchParams }: { searchParams: { pla
             {plan.customBranding && <li>Your own branding</li>}
           </ul>
           <p className="mt-6 border-t border-neutral-800 pt-4 text-xs text-neutral-500">
-            You&apos;ll pay on a secure Xendit page by bank transfer, e-wallet or card. Your gym is created as soon as the payment clears.
+            You&apos;ll pay on a secure payment page by bank transfer, e-wallet or card. Your gym is created as soon as the payment clears.
           </p>
         </aside>
       </div>

@@ -106,7 +106,7 @@ export default function JoinForm({ slug, plans }: { slug: string; plans: Plan[] 
         <button type="submit" disabled={busy} className="w-full rounded-lg bg-white px-6 py-3 text-sm font-semibold text-neutral-950 hover:bg-neutral-200 disabled:opacity-60 sm:w-auto">
           {busy ? "Opening payment…" : `Continue to payment · ${rp(chosen.price)}`}
         </button>
-        <p className="mt-3 text-xs text-neutral-500">You&apos;ll pay on a secure Xendit page by bank transfer, e-wallet or card.</p>
+        <p className="mt-3 text-xs text-neutral-500">You&apos;ll pay on a secure payment page by bank transfer, e-wallet or card.</p>
       </div>
     </form>
   );

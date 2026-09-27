@@ -90,7 +90,7 @@ export default function JoinStatus({ slug, signupId, mock }: { slug: string; sig
       {mock && (
         <div className="mt-8 rounded-xl border border-dashed border-plate-yellow p-5">
           <p className="text-sm font-medium">Test checkout (development only)</p>
-          <p className="mt-1 text-sm text-neutral-400">In production this is Xendit&apos;s payment page.</p>
+          <p className="mt-1 text-sm text-neutral-400">In production this is the payment provider&apos;s page.</p>
           <button onClick={simulatePaid} disabled={busy} className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-neutral-950 hover:bg-neutral-200 disabled:opacity-60">
             {busy ? "Confirming…" : "Simulate successful payment"}
           </button>

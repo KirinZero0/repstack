@@ -15,7 +15,8 @@ test("owner adds a member, member activates, member can log in", async ({ page, 
   await page.getByLabel("WhatsApp phone").fill("081299998888");
   await page.getByRole("button", { name: "Add member" }).click();
 
-  await expect(page.getByText("Onboarded Member")).toBeVisible();
+  // The dev server compiles this page and its API on first visit, which can take a few seconds.
+  await expect(page.getByText("Onboarded Member")).toBeVisible({ timeout: 20_000 });
 
   const member = await prisma.member.findUniqueOrThrow({ where: { email: newEmail } });
   expect(member.status).toBe("PENDING_PAYMENT");
@@ -33,7 +34,8 @@ test("owner adds a member, member activates, member can log in", async ({ page, 
   await prisma.magicLink.update({ where: { id: magicLink.id }, data: { tokenHash } });
 
   await page.goto(`${baseURL}/activate/${token}`);
-  await expect(page.getByText("Onboarded Member")).toBeVisible();
+  // The dev server compiles this page and its API on first visit, which can take a few seconds.
+  await expect(page.getByText("Onboarded Member")).toBeVisible({ timeout: 20_000 });
 
   await page.locator("#password").fill("newpassword123");
   await page.locator("#confirmPassword").fill("newpassword123");

@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import { decrypt } from "./crypto";
 import { extendedExpiry } from "./membership";
 import { sendGymWhatsapp } from "./whatsapp";
+import { paymentProviderEnum } from "./gateway";
 
 export const MEMBER_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 /** Max signups one IP can start per hour, and max one gym can receive per hour. */
@@ -58,7 +59,7 @@ export async function completeMemberSignup(signupId: string, paidAt: Date) {
         gymId: signup.gymId,
         memberId: member.id,
         planId: signup.planId,
-        provider: "XENDIT",
+        provider: paymentProviderEnum(),
         externalInvoiceId: signup.externalInvoiceId,
         amount: signup.amount,
         currency: signup.plan.currency,

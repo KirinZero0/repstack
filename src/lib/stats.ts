@@ -53,7 +53,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     if (byMonth.has(key)) byMonth.set(key, (byMonth.get(key) ?? 0) + Number(p.amount));
     if (key === months[months.length - 1]) {
       byPlan.set(p.plan.name, (byPlan.get(p.plan.name) ?? 0) + Number(p.amount));
-      const method = p.provider === "CASH" ? "Recorded manually" : "Online (Xendit)";
+      const method = p.provider === "CASH" ? "Recorded manually" : "Online payment";
       byMethod.set(method, (byMethod.get(method) ?? 0) + Number(p.amount));
     }
   }

@@ -26,12 +26,12 @@ export default function TermsPage() {
 
       <h2>3. Gym owners</h2>
       <ul>
-        <li>You pay the subscription for your plan, monthly or yearly, in rupiah through our payment provider, Xendit. Prices are shown before you pay.</li>
+        <li>You pay the subscription for your plan, monthly or yearly, in rupiah through our payment provider (Xendit or Midtrans). Prices are shown before you pay.</li>
         <li>Your plan sets limits on members, staff accounts and WhatsApp messages each month. Some actions stop when a limit is reached until you upgrade or the month rolls over.</li>
         <li>If a renewal is not paid, your gym is marked past due. After a 3-day grace period the gym is suspended: staff and members cannot log in or check in until the subscription is paid.</li>
         <li>Subscription payments are not refundable once a period has started, except where the law requires it.</li>
         <li>You are responsible for the members&apos; data that you enter or collect through the service, for having a lawful basis to hold it, and for the messages sent in your gym&apos;s name.</li>
-        <li>You decide your own membership plans, prices and rules. We do not handle your members&apos; money: their online payments go through Xendit, and you are responsible for refunds, disputes and taxes on what you charge.</li>
+        <li>You decide your own membership plans, prices and rules. Members&apos; online payments are processed by our payment provider, and you are responsible for refunds, disputes and taxes on what you charge.</li>
       </ul>
 
       <h2>4. Members</h2>

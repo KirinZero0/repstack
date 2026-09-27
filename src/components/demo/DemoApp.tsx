@@ -150,7 +150,7 @@ const STEPS: TourStep[] = [
   },
   {
     title: "That's the owner side",
-    body: "Members get their own app with a big Check in button, attendance streaks and a Renew button that pays through Xendit. Ready to run your own gym on Repstack?",
+    body: "Members get their own app with a big Check in button, attendance streaks and a Renew button that pays online. Ready to run your own gym on Repstack?",
     tab: "dashboard",
     final: true,
   },

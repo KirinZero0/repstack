@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-/** Shown only in dev mock mode, in place of the Xendit-hosted page. */
+/** Shown only in dev mock mode, in place of the payment provider's hosted page. */
 export default function MockCheckout({
   paymentId,
   amount,
@@ -33,7 +33,7 @@ export default function MockCheckout({
     <div className="mb-6 rounded-xl border border-dashed border-plate-yellow p-5">
       <p className="text-sm font-medium text-white">Test checkout (development only)</p>
       <p className="mt-1 text-sm text-neutral-400">
-        In production this is Xendit&apos;s payment page. {planName}: {amount}.
+        In production this is the payment provider&apos;s page. {planName}: {amount}.
       </p>
       <button
         onClick={simulatePaid}

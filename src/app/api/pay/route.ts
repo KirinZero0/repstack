@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { payMembershipSchema } from "@/lib/validation/tenant";
-import { createXenditInvoice, getXenditInvoice } from "@/lib/xendit";
+import { createInvoice, getInvoiceState, paymentProviderEnum } from "@/lib/gateway";
 
 /** A member starts (or resumes) paying for a membership plan; returns the hosted invoice URL. */
 export async function POST(req: NextRequest) {
@@ -41,11 +41,9 @@ export async function POST(req: NextRequest) {
       where: { memberId: member.id, planId: plan.id, status: "PENDING", externalInvoiceId: { not: null } },
       orderBy: { createdAt: "desc" },
     });
-    if (pending?.externalInvoiceId) {
-      const existing = await getXenditInvoice(pending.externalInvoiceId);
-      if (existing && existing.status === "PENDING") {
-        return NextResponse.json({ invoiceUrl: existing.invoice_url });
-      }
+    if (pending?.externalInvoiceId && pending.invoiceUrl) {
+      const state = await getInvoiceState(pending.externalInvoiceId, pending.createdAt, pending.provider);
+      if (state === "PENDING") return NextResponse.json({ invoiceUrl: pending.invoiceUrl });
     }
 
     const payment = await db.payment.create({
@@ -53,14 +51,14 @@ export async function POST(req: NextRequest) {
         gymId: gym.id,
         memberId: member.id,
         planId: plan.id,
-        provider: "XENDIT",
+        provider: paymentProviderEnum(),
         amount: plan.price,
         currency: plan.currency,
         status: "PENDING",
       },
     });
 
-    const invoice = await createXenditInvoice({
+    const invoice = await createInvoice({
       externalId: payment.id,
       amount: Number(plan.price),
       payerEmail: member.email,
@@ -68,9 +66,9 @@ export async function POST(req: NextRequest) {
       currency: plan.currency,
       successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/my`,
     });
-    await db.payment.update({ where: { id: payment.id }, data: { externalInvoiceId: invoice.id } });
+    await db.payment.update({ where: { id: payment.id }, data: { externalInvoiceId: invoice.id, invoiceUrl: invoice.url } });
 
-    return NextResponse.json({ invoiceUrl: invoice.invoice_url });
+    return NextResponse.json({ invoiceUrl: invoice.url });
   } catch (err) {
     console.error("Membership payment failed to start", err);
     return NextResponse.json(
