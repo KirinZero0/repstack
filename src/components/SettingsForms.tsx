@@ -113,6 +113,52 @@ export function GymThemeForm({
   );
 }
 
+export function BankDetailsForm({
+  slug,
+  initial,
+}: {
+  slug: string;
+  initial: { bankName: string; bankAccountNumber: string; bankAccountHolder: string };
+}) {
+  const [bankName, setBankName] = useState(initial.bankName);
+  const [bankAccountNumber, setBankAccountNumber] = useState(initial.bankAccountNumber);
+  const [bankAccountHolder, setBankAccountHolder] = useState(initial.bankAccountHolder);
+  const { state, error, save } = useSave(`/api/g/${slug}/settings`);
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        save({ bankName, bankAccountNumber, bankAccountHolder });
+      }}
+      className="space-y-4"
+    >
+      <p className="text-sm text-neutral-400">
+        Shown on your join page so people know where to send their membership fee. Leave blank to hide it.
+      </p>
+      <div>
+        <label htmlFor="bankName" className="mb-1 block text-sm text-neutral-300">Bank name</label>
+        <input id="bankName" maxLength={60} value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="BCA" className={selectCls} />
+      </div>
+      <div>
+        <label htmlFor="bankAccountNumber" className="mb-1 block text-sm text-neutral-300">Account number</label>
+        <input id="bankAccountNumber" maxLength={40} value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} className={selectCls} />
+      </div>
+      <div>
+        <label htmlFor="bankAccountHolder" className="mb-1 block text-sm text-neutral-300">Account holder name</label>
+        <input id="bankAccountHolder" maxLength={80} value={bankAccountHolder} onChange={(e) => setBankAccountHolder(e.target.value)} className={selectCls} />
+      </div>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      <div className="flex items-center gap-3">
+        <button type="submit" disabled={state === "saving"} className={btnCls}>
+          {state === "saving" ? "Saving…" : "Save"}
+        </button>
+        {state === "saved" && <span className="text-sm text-emerald-400">Saved</span>}
+      </div>
+    </form>
+  );
+}
+
 export function JoinSettingsForm({ slug, initial, joinUrl }: { slug: string; initial: boolean; joinUrl: string }) {
   const [on, setOn] = useState(initial);
   const { state, error, save } = useSave(`/api/g/${slug}/settings`);
@@ -132,7 +178,7 @@ export function JoinSettingsForm({ slug, initial, joinUrl }: { slug: string; ini
         <span>
           Let people join online
           <span className="mt-1 block text-neutral-500">
-            Anyone with your join link can pick a plan, pay and get an active membership without visiting the front desk.
+            Anyone with your join link can pick a plan and submit a bank-transfer join request. You confirm the payment and activate them.
           </span>
         </span>
       </label>

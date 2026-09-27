@@ -39,12 +39,18 @@ export default async function JoinPage({ params }: { params: { slug: string } })
         ) : (
           <>
             <p className="mt-3 max-w-md text-neutral-400">
-              Choose a plan, create your login and pay. Your membership starts as soon as the payment clears.
+              Choose a plan, create your login, then transfer your membership fee to the gym&apos;s account below. Staff
+              confirms the payment and activates your membership.
             </p>
             <div className="mt-10">
               <JoinForm
                 slug={params.slug}
                 plans={plans.map((p) => ({ id: p.id, name: p.name, price: Number(p.price), days: p.durationDays }))}
+                bank={
+                  gym.bankName && gym.bankAccountNumber
+                    ? { bankName: gym.bankName, accountNumber: gym.bankAccountNumber, accountHolder: gym.bankAccountHolder ?? "" }
+                    : null
+                }
               />
             </div>
             <a href={`/g/${params.slug}/login`} className="mt-8 inline-block text-sm text-neutral-500 hover:text-neutral-300">

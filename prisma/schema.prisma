@@ -57,6 +57,9 @@ model Gym {
   isLifetime         Boolean            @default(false) // true = never billed by subscription cron (e.g. founding/investor deals)
   settings           Json               @default("{}")
   termsAcceptedAt    DateTime?          // when the owner accepted the terms and privacy policy
+  bankName           String? // shown on the public join page for manual bank-transfer requests
+  bankAccountNumber  String?
+  bankAccountHolder  String?
   createdAt          DateTime           @default(now())
 
   staff            StaffUser[]
@@ -293,7 +296,9 @@ model AppConfig {
 
 enum SignupStatus {
   PENDING
+  PENDING_REVIEW // MemberSignup only: manual bank-transfer request awaiting staff approval
   COMPLETED
+  REJECTED // MemberSignup only: staff couldn't confirm the transfer
   CONFLICT // paid, but the slug/email was taken in the meantime — needs manual follow-up
 }
 
@@ -320,8 +325,10 @@ model GymSignup {
 }
 
 // ─── Member self-signup ─────────────────────────────────────
-// A would-be member who joined through the public /g/[slug]/join page. The Member and the
-// PAID Payment are only created once their first invoice is paid. Unpaid rows expire after 24h.
+// A would-be member who joined through the public /g/[slug]/join page. They transfer their
+// membership fee to the gym's own bank account (shown on the page) and submit this request,
+// optionally with a proof-of-transfer image; the Member and its PAID Payment are only created
+// once gym staff approves it. Unapproved rows expire after 24h.
 
 model MemberSignup {
   id                  String       @id @default(uuid())
@@ -334,8 +341,9 @@ model MemberSignup {
   phoneWhatsapp       String // AES-256-GCM encrypted, like Member.phoneWhatsapp
   phoneWhatsappLookup String
   passwordHash        String
-  amount              Decimal // snapshot of the plan price when the invoice was created
-  status              SignupStatus @default(PENDING)
+  amount              Decimal // snapshot of the plan price when the request was made
+  status              SignupStatus @default(PENDING_REVIEW)
+  proofImageUrl       String? // Vercel Blob URL (private access), a screenshot of the transfer
   externalInvoiceId   String?      @unique
   invoiceUrl          String?
   memberId            String?
