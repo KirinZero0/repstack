@@ -3,16 +3,16 @@ import { requireTenantSession, SessionError } from "@/lib/session";
 import { addMemberSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
 import { createMagicLink } from "@/lib/magicLink";
-import { createInvoice, isMockMode, onlinePaymentsEnabled, paymentProviderEnum } from "@/lib/gateway";
+import { extendedExpiry } from "@/lib/membership";
 import { sendGymWhatsapp } from "@/lib/whatsapp";
 import { countMemberSeats, memberLimitMessage } from "@/lib/limits";
 
 const ACTIVATION_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
-  let gym, db;
+  let session, gym, db;
   try {
-    ({ gym, db } = await requireTenantSession(params.slug));
+    ({ session, gym, db } = await requireTenantSession(params.slug));
   } catch (err) {
     if (err instanceof SessionError) {
       const status = err.code === "GYM_SUSPENDED" ? 403 : err.code === "NOT_FOUND" ? 404 : 401;
@@ -46,6 +46,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ error: memberLimitMessage(saasPlan.name, saasPlan.maxMembers) }, { status: 403 });
   }
 
+  const now = new Date();
+  // Staff can type a specific expiry (e.g. what was actually paid for); left blank, it's the
+  // plan's standard duration starting today.
+  const membershipExpiry = data.membershipExpiry
+    ? new Date(`${data.membershipExpiry}T23:59:59Z`)
+    : extendedExpiry(null, plan.durationDays, now);
+
+  // No payment gateway is wired up yet: adding a member here is staff saying "this person paid",
+  // so they're created active straight away, with a matching CASH payment for the records.
   const member = await db.member.create({
     data: {
       gymId: gym.id,
@@ -54,44 +63,24 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       email: data.email,
       phoneWhatsapp: encrypt(data.phoneWhatsapp),
       phoneWhatsappLookup: hmacLookup(normalizePhone(data.phoneWhatsapp)),
-      status: "PENDING_PAYMENT",
+      status: "ACTIVE",
+      membershipExpiry,
     },
   });
 
-  // Online invoices are currently off: the member is added without one, and staff records their
-  // payment manually (a bank-transfer request, or "Record payment") once they've paid.
-  let invoiceUrl: string | null = null;
-  if (onlinePaymentsEnabled() || isMockMode()) {
-    const payment = await db.payment.create({
-      data: {
-        gymId: gym.id,
-        memberId: member.id,
-        planId: plan.id,
-        provider: paymentProviderEnum(),
-        amount: plan.price,
-        currency: plan.currency,
-        status: "PENDING",
-      },
-    });
-    try {
-      const invoice = await createInvoice({
-        externalId: payment.id,
-        amount: Number(plan.price),
-        payerEmail: data.email,
-        description: `${plan.name} membership — ${gym.name}`,
-        currency: plan.currency,
-        successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/login`,
-      });
-      invoiceUrl = invoice.url;
-      await db.payment.update({
-        where: { id: payment.id },
-        data: { externalInvoiceId: invoice.id, invoiceUrl: invoice.url },
-      });
-    } catch (err) {
-      console.error("Invoice creation failed", err);
-      await db.payment.delete({ where: { id: payment.id } }).catch(() => undefined);
-    }
-  }
+  await db.payment.create({
+    data: {
+      gymId: gym.id,
+      memberId: member.id,
+      planId: plan.id,
+      provider: "CASH",
+      amount: plan.price,
+      currency: plan.currency,
+      status: "PAID",
+      paidAt: now,
+      recordedById: session.staffUserId,
+    },
+  });
 
   const { token } = await createMagicLink({
     memberId: member.id,
@@ -100,20 +89,16 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   });
   const activationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/activate/${token}`;
 
-  const messageParts = [
-    `Hi ${data.fullName}! You've been added to ${gym.name}.`,
-    `Activate your account and set a password here: ${activationUrl}`,
-  ];
-  if (invoiceUrl) {
-    messageParts.push(`Complete your membership payment: ${invoiceUrl}`);
-  }
-
   await sendGymWhatsapp(gym.id, {
     to: data.phoneWhatsapp,
-    message: messageParts.join("\n"),
+    message: [
+      `Hi ${data.fullName}! You've been added to ${gym.name}.`,
+      `Your membership is active until ${membershipExpiry.toLocaleDateString("id-ID", { timeZone: gym.timezone })}.`,
+      `Set your password and see your check-in QR here: ${activationUrl}`,
+    ].join("\n"),
     type: "member_activation",
     memberId: member.id,
   });
 
-  return NextResponse.json({ memberId: member.id }, { status: 201 });
+  return NextResponse.json({ memberId: member.id, membershipExpiry: membershipExpiry.toISOString() }, { status: 201 });
 }

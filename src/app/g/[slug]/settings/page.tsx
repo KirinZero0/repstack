@@ -3,7 +3,7 @@ import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymThemeFromSettings } from "@/lib/theme";
 import { Card } from "@/components/charts";
 import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm } from "@/components/SettingsForms";
-import { gymAcceptsSignups } from "@/lib/memberSignup";
+import { gymAcceptsSignups, JOIN_PAGE_ENABLED } from "@/lib/memberSignup";
 
 export const dynamic = "force-dynamic";
 
@@ -100,11 +100,17 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
 
         <div className="mb-6">
           <Card title="Online sign-up">
-            <JoinSettingsForm
-              slug={params.slug}
-              initial={gymAcceptsSignups(gym.settings)}
-              joinUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/g/${params.slug}/join`}
-            />
+            {JOIN_PAGE_ENABLED ? (
+              <JoinSettingsForm
+                slug={params.slug}
+                initial={gymAcceptsSignups(gym.settings)}
+                joinUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/g/${params.slug}/join`}
+              />
+            ) : (
+              <p className="text-sm text-neutral-400">
+                Temporarily unavailable. New members are added by staff on the Members page for now.
+              </p>
+            )}
           </Card>
         </div>
 

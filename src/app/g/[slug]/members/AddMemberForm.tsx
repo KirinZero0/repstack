@@ -19,6 +19,7 @@ export default function AddMemberForm({ slug, plans }: { slug: string; plans: Pl
     email: "",
     phoneWhatsapp: "",
     planId: plans[0]?.id ?? "",
+    membershipExpiry: "",
   });
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
@@ -33,7 +34,7 @@ export default function AddMemberForm({ slug, plans }: { slug: string; plans: Pl
       const res = await fetch(`/api/g/${slug}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, membershipExpiry: form.membershipExpiry || undefined }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -41,7 +42,7 @@ export default function AddMemberForm({ slug, plans }: { slug: string; plans: Pl
         return;
       }
       setOpen(false);
-      setForm({ fullName: "", email: "", phoneWhatsapp: "", planId: plans[0]?.id ?? "" });
+      setForm({ fullName: "", email: "", phoneWhatsapp: "", planId: plans[0]?.id ?? "", membershipExpiry: "" });
       router.refresh();
     } finally {
       setLoading(false);
@@ -109,6 +110,20 @@ export default function AddMemberForm({ slug, plans }: { slug: string; plans: Pl
           ))}
         </select>
       </label>
+      <label className="block text-sm text-neutral-300">
+        <span className="mb-1 block">Paid until</span>
+        <input
+          type="date"
+          value={form.membershipExpiry}
+          onChange={(e) => update("membershipExpiry", e.target.value)}
+          className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-white"
+        />
+        <span className="mt-1 block text-xs text-neutral-500">Leave blank to use the plan&apos;s standard length from today.</span>
+      </label>
+
+      <p className="col-span-full text-xs text-neutral-500">
+        No online payment is collected here — the member is marked active and paid straight away, recorded as a cash payment.
+      </p>
 
       {error && <p className="col-span-full text-sm text-red-400">{error}</p>}
 

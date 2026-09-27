@@ -3,9 +3,11 @@ import path from "path";
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import { prisma } from "./helpers";
 import { encrypt, hmacLookup } from "../src/lib/crypto";
+import { JOIN_PAGE_ENABLED } from "../src/lib/memberSignup";
 
 const DAY = 24 * 60 * 60 * 1000;
 const PROOF = path.join(__dirname, "fixtures", "test-photo.jpg");
+const SKIP_REASON = "public join page is disabled until there's a business bank account to point it at";
 
 async function setSignups(request: APIRequestContext, baseURL: string, slug: string, ownerEmail: string, on: boolean) {
   const login = await request.post(`${baseURL}/api/g/${slug}/staff-login`, { data: { email: ownerEmail, password: "owner-pass-123" } });
@@ -56,6 +58,7 @@ test("public sign-up is off by default, then staff approving a manual transfer r
   request,
   baseURL,
 }) => {
+  test.skip(!JOIN_PAGE_ENABLED, SKIP_REASON);
   const gymA = await prisma.gym.findUniqueOrThrow({ where: { slug: "test-gym-a" } });
   const plan = await prisma.membershipPlan.findFirstOrThrow({ where: { gymId: gymA.id, isActive: true } });
   const ip = { "x-forwarded-for": "10.1.0.1" };
@@ -117,6 +120,7 @@ test("public sign-up is off by default, then staff approving a manual transfer r
 });
 
 test("staff rejects a request that can't be verified, and no member is created", async ({ request, baseURL }) => {
+  test.skip(!JOIN_PAGE_ENABLED, SKIP_REASON);
   await setSignups(request, baseURL!, "test-gym-a", "owner-a@test.local", true);
   const gymA = await prisma.gym.findUniqueOrThrow({ where: { slug: "test-gym-a" } });
   const plan = await prisma.membershipPlan.findFirstOrThrow({ where: { gymId: gymA.id, isActive: true } });
@@ -140,6 +144,7 @@ test("staff rejects a request that can't be verified, and no member is created",
 });
 
 test("approving, rejecting and viewing proof of a join request respect tenant isolation", async ({ request, baseURL }) => {
+  test.skip(!JOIN_PAGE_ENABLED, SKIP_REASON);
   await setSignups(request, baseURL!, "test-gym-a", "owner-a@test.local", true);
   const gymA = await prisma.gym.findUniqueOrThrow({ where: { slug: "test-gym-a" } });
   const plan = await prisma.membershipPlan.findFirstOrThrow({ where: { gymId: gymA.id, isActive: true } });
@@ -160,6 +165,7 @@ test("approving, rejecting and viewing proof of a join request respect tenant is
 });
 
 test("join rejects hidden/foreign plans, existing emails and closed gyms", async ({ request, baseURL }) => {
+  test.skip(!JOIN_PAGE_ENABLED, SKIP_REASON);
   await setSignups(request, baseURL!, "test-gym-a", "owner-a@test.local", true);
   const gymA = await prisma.gym.findUniqueOrThrow({ where: { slug: "test-gym-a" } });
   const gymB = await prisma.gym.findUniqueOrThrow({ where: { slug: "test-gym-b" } });
@@ -184,6 +190,7 @@ test("join rejects hidden/foreign plans, existing emails and closed gyms", async
 });
 
 test("a request approved after its email was registered meanwhile is flagged, not duplicated", async ({ request, baseURL }) => {
+  test.skip(!JOIN_PAGE_ENABLED, SKIP_REASON);
   await setSignups(request, baseURL!, "test-gym-a", "owner-a@test.local", true);
   const gymA = await prisma.gym.findUniqueOrThrow({ where: { slug: "test-gym-a" } });
   const plan = await prisma.membershipPlan.findFirstOrThrow({ where: { gymId: gymA.id, isActive: true } });
@@ -204,6 +211,7 @@ test("a request approved after its email was registered meanwhile is flagged, no
 });
 
 test("sign-ups are throttled per IP", async ({ request, baseURL }) => {
+  test.skip(!JOIN_PAGE_ENABLED, SKIP_REASON);
   await setSignups(request, baseURL!, "test-gym-a", "owner-a@test.local", true);
   const gymA = await prisma.gym.findUniqueOrThrow({ where: { slug: "test-gym-a" } });
   const plan = await prisma.membershipPlan.findFirstOrThrow({ where: { gymId: gymA.id, isActive: true } });
