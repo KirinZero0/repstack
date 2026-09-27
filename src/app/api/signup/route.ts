@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signupSchema } from "@/lib/validation/tenant";
 import { RESERVED_SLUGS, SIGNUP_TTL_MS } from "@/lib/signup";
-import { createInvoice, getInvoiceState, isMockMode } from "@/lib/gateway";
+import { createInvoice, getInvoiceState, isMockMode, onlinePaymentsEnabled } from "@/lib/gateway";
 
 function fieldError(field: string, message: string, status = 409) {
   return NextResponse.json({ error: message, field }, { status });
@@ -19,6 +19,10 @@ export async function POST(req: NextRequest) {
   const d = parsed.data;
 
   if (RESERVED_SLUGS.has(d.slug)) return fieldError("slug", "That web address is reserved. Try another.");
+
+  if (!onlinePaymentsEnabled() && !isMockMode()) {
+    return NextResponse.json({ error: "Self-serve sign-up is currently unavailable. Please contact us to set up your gym." }, { status: 403 });
+  }
 
   const plan = await prisma.saasPlan.findUnique({ where: { id: d.saasPlanId } });
   if (!plan || !plan.isActive) return fieldError("saasPlanId", "That plan isn't available", 400);

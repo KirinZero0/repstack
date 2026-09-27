@@ -3,7 +3,7 @@ import { requireTenantSession, SessionError } from "@/lib/session";
 import { addMemberSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
 import { createMagicLink } from "@/lib/magicLink";
-import { createInvoice, paymentProviderEnum } from "@/lib/gateway";
+import { createInvoice, isMockMode, onlinePaymentsEnabled, paymentProviderEnum } from "@/lib/gateway";
 import { sendGymWhatsapp } from "@/lib/whatsapp";
 import { countMemberSeats, memberLimitMessage } from "@/lib/limits";
 
@@ -58,35 +58,39 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     },
   });
 
-  const payment = await db.payment.create({
-    data: {
-      gymId: gym.id,
-      memberId: member.id,
-      planId: plan.id,
-      provider: paymentProviderEnum(),
-      amount: plan.price,
-      currency: plan.currency,
-      status: "PENDING",
-    },
-  });
-
+  // Online invoices are currently off: the member is added without one, and staff records their
+  // payment manually (a bank-transfer request, or "Record payment") once they've paid.
   let invoiceUrl: string | null = null;
-  try {
-    const invoice = await createInvoice({
-      externalId: payment.id,
-      amount: Number(plan.price),
-      payerEmail: data.email,
-      description: `${plan.name} membership — ${gym.name}`,
-      currency: plan.currency,
-      successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/login`,
+  if (onlinePaymentsEnabled() || isMockMode()) {
+    const payment = await db.payment.create({
+      data: {
+        gymId: gym.id,
+        memberId: member.id,
+        planId: plan.id,
+        provider: paymentProviderEnum(),
+        amount: plan.price,
+        currency: plan.currency,
+        status: "PENDING",
+      },
     });
-    invoiceUrl = invoice.url;
-    await db.payment.update({
-      where: { id: payment.id },
-      data: { externalInvoiceId: invoice.id, invoiceUrl: invoice.url },
-    });
-  } catch (err) {
-    console.error("Invoice creation failed", err);
+    try {
+      const invoice = await createInvoice({
+        externalId: payment.id,
+        amount: Number(plan.price),
+        payerEmail: data.email,
+        description: `${plan.name} membership — ${gym.name}`,
+        currency: plan.currency,
+        successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/login`,
+      });
+      invoiceUrl = invoice.url;
+      await db.payment.update({
+        where: { id: payment.id },
+        data: { externalInvoiceId: invoice.id, invoiceUrl: invoice.url },
+      });
+    } catch (err) {
+      console.error("Invoice creation failed", err);
+      await db.payment.delete({ where: { id: payment.id } }).catch(() => undefined);
+    }
   }
 
   const { token } = await createMagicLink({

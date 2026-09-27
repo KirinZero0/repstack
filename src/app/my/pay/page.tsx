@@ -1,6 +1,7 @@
 import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { StatusPill, rp } from "@/components/charts";
+import { isMockMode, onlinePaymentsEnabled } from "@/lib/gateway";
 import PayButton from "./PayButton";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +72,8 @@ export default async function PayPage() {
 
         {blocked ? (
           <p className="text-neutral-300">Payments are paused for this membership. Please speak to the gym.</p>
+        ) : !onlinePaymentsEnabled() && !isMockMode() ? (
+          <p className="text-neutral-300">Online payments are currently turned off. Please pay at the gym.</p>
         ) : plans.length === 0 ? (
           <p className="text-neutral-300">This gym hasn&apos;t published any plans yet. Please ask the front desk.</p>
         ) : (
@@ -95,10 +98,12 @@ export default async function PayPage() {
             })}
           </div>
         )}
-        <p className="mt-8 text-xs text-neutral-500">
-          You&apos;ll be taken to a secure payment page to pay by bank transfer, e-wallet or card. Your
-          membership switches on as soon as the payment clears.
-        </p>
+        {!blocked && (onlinePaymentsEnabled() || isMockMode()) && plans.length > 0 && (
+          <p className="mt-8 text-xs text-neutral-500">
+            You&apos;ll be taken to a secure payment page to pay by bank transfer, e-wallet or card. Your
+            membership switches on as soon as the payment clears.
+          </p>
+        )}
       </div>
     </main>
   );

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
+import { onlinePaymentsEnabled } from "@/lib/gateway";
 import { openPlatformInvoice } from "@/lib/platformBilling";
 import { withSuspensionReason } from "@/lib/suspension";
 import { sendPlatformWhatsapp } from "@/lib/whatsapp";
@@ -10,6 +11,12 @@ const GRACE_PERIOD_MS = 3 * 24 * 60 * 60 * 1000;
 export async function GET(req: NextRequest) {
   if (!isAuthorizedCronRequest(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Online payments are off: don't create renewal invoices nobody can pay, and don't suspend
+  // gyms for non-payment when they have no way to pay their way out.
+  if (!onlinePaymentsEnabled()) {
+    return NextResponse.json({ invoicesCreated: 0, gymsSuspended: 0, paymentsDisabled: true });
   }
 
   const now = new Date();

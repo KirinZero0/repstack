@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { countMemberSeats } from "@/lib/limits";
 import { isMockMode } from "@/lib/xendit";
+import { onlinePaymentsEnabled } from "@/lib/gateway";
 import MockCheckout from "@/app/my/MockCheckout";
 import { PayNowButton, PlanSwitcher } from "./BillingActions";
 
@@ -53,6 +54,7 @@ export default async function BillingPage({
     db.notificationLog.count({ where: { gymId: gym.id, channel: "whatsapp", status: "SENT", sentAt: { gte: monthStart } } }),
   ]);
 
+  const paymentsOn = onlinePaymentsEnabled() || isMockMode();
   const suspended = gym.subscriptionStatus === "SUSPENDED";
   const overdue = gym.subscriptionStatus === "PAST_DUE" || suspended;
   const open = payments.find((p) => p.status === "PENDING" && p.invoiceUrl);
@@ -163,12 +165,18 @@ export default async function BillingPage({
 
           {!gym.isLifetime && saasPlan && (
             <div className="mt-6 border-t border-neutral-800 pt-5">
-              <PayNowButton
-                slug={params.slug}
-                label={overdue ? `Pay Rp ${Number(saasPlan.price).toLocaleString("id-ID")} now` : `Renew early · Rp ${Number(saasPlan.price).toLocaleString("id-ID")}`}
-              />
-              {!overdue && (
-                <p className="mt-2 text-xs text-neutral-500">Renewing early adds a full period after your current billing date.</p>
+              {paymentsOn ? (
+                <>
+                  <PayNowButton
+                    slug={params.slug}
+                    label={overdue ? `Pay Rp ${Number(saasPlan.price).toLocaleString("id-ID")} now` : `Renew early · Rp ${Number(saasPlan.price).toLocaleString("id-ID")}`}
+                  />
+                  {!overdue && (
+                    <p className="mt-2 text-xs text-neutral-500">Renewing early adds a full period after your current billing date.</p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-neutral-400">Online payments are currently turned off. Contact us to pay your subscription.</p>
               )}
             </div>
           )}
@@ -178,9 +186,11 @@ export default async function BillingPage({
           <div className="mb-8 rounded-xl border border-neutral-800 bg-neutral-900 p-6">
             <h2 className="mb-1 text-lg font-medium">Change plan</h2>
             <p className="mb-4 text-sm text-neutral-400">
-              A bigger or dearer plan is paid for first and switches on when the payment clears. A smaller one switches at once if your gym fits its limits, and you keep the time you&apos;ve paid for.
+              {paymentsOn
+                ? "A bigger or dearer plan is paid for first and switches on when the payment clears. A smaller one switches at once if your gym fits its limits, and you keep the time you've paid for."
+                : "A smaller plan switches at once if your gym fits its limits. Bigger or dearer plans need payment, which is currently turned off — contact us to upgrade."}
             </p>
-            <PlanSwitcher slug={params.slug} options={options} />
+            <PlanSwitcher slug={params.slug} options={paymentsOn ? options : options.filter((o) => o.immediate)} />
           </div>
         )}
 

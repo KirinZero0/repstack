@@ -1,14 +1,27 @@
 # Payments
 
-The public join page (`/g/[slug]/join`) currently does **not** use an online gateway: a prospective member
-transfers their fee straight to the gym's own bank account (set in gym settings) and submits a request,
-optionally with a proof-of-transfer image, that staff reviews and approves on `/g/[slug]/members`
-("Pending requests"). No member money passes through the platform's own payment-provider account this way.
-This was disabled deliberately — see the "Who receives the money" section below. Staff adding a member
-directly, and a member paying for a plan change from their own dashboard, still go through the gateway below.
+## Online payments are currently OFF
 
-Every other online payment (a member added directly by staff, plan changes, a new gym's signup, a gym's
-subscription) goes through one payment provider, chosen by `PAYMENT_PROVIDER`:
+Every online invoice everywhere in the app — a member added directly by staff, a member's own plan-change
+payment, a gym's monthly/annual subscription (manual "pay now", plan upgrades, and the daily renewal cron),
+and self-serve gym sign-up — is switched off by default. `createInvoice()` and `openPlatformInvoice()`
+(`src/lib/gateway.ts`, `src/lib/platformBilling.ts`) refuse to create a real invoice unless
+`PAYMENTS_ENABLED=1` is set; every call site checks this and shows a plain "online payments are currently
+turned off" message instead of erroring. The subscription cron also skips creating renewal invoices and
+skips suspending gyms for non-payment while this is off, since there'd be no way for them to pay their way
+out. Mock mode (`PAYMENTS_MOCK=1`, dev/test only) bypasses this switch entirely and keeps working as before.
+
+Turning it back on is a one-line env change in Vercel — set `PAYMENTS_ENABLED=1` — no code change needed.
+
+The public join page (`/g/[slug]/join`) doesn't use this switch at all: it never used an online gateway in
+the first place. A prospective member transfers their fee straight to the gym's own bank account (set in gym
+settings) and submits a request, optionally with a proof-of-transfer image, that staff reviews and approves
+on `/g/[slug]/members` ("Pending requests"). No member money passes through the platform's own
+payment-provider account this way — see "Who receives the money" below for why that matters.
+
+## Providers
+
+Once `PAYMENTS_ENABLED=1`, every online payment goes through one payment provider, chosen by `PAYMENT_PROVIDER`:
 
 | Value | Provider |
 |---|---|
