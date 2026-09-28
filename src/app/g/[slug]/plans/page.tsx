@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
+import GymNav from "@/components/GymNav";
 import PlansManager from "./PlansManager";
 
 export const dynamic = "force-dynamic";
@@ -30,14 +31,12 @@ export default async function PlansPage({ params }: { params: { slug: string } }
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
       <div className="mx-auto max-w-4xl">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">Membership plans</h1>
             <p className="text-sm text-neutral-400">{gym.name}</p>
           </div>
-          <a href={`/g/${params.slug}/dashboard`} className="text-sm text-neutral-300 hover:text-white">
-            ← Dashboard
-          </a>
+          <GymNav slug={params.slug} role={session.role} current="plans" />
         </div>
         <PlansManager
           slug={params.slug}

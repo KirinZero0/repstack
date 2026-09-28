@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { dayKeyInTimezone } from "@/lib/date";
-import LogoutButton from "./LogoutButton";
+import GymNav from "@/components/GymNav";
 
 export const dynamic = "force-dynamic";
 
@@ -48,42 +48,12 @@ export default async function DashboardPage({ params }: { params: { slug: string
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">{gym.name}</h1>
             <p className="text-sm text-neutral-400">Dashboard</p>
           </div>
-          <nav className="flex items-center gap-4 text-sm">
-            <a href={`/g/${params.slug}/members`} className="text-neutral-300 hover:text-white">
-              Members
-            </a>
-            <a href={`/g/${params.slug}/checkin-station`} className="text-neutral-300 hover:text-white">
-              Check-in poster
-            </a>
-            <a href={`/g/${params.slug}/checkin`} className="text-neutral-300 hover:text-white">
-              Staff scanner
-            </a>
-            {session.role === "OWNER" && (
-              <>
-                <a href={`/g/${params.slug}/staff`} className="text-neutral-300 hover:text-white">
-                  Staff
-                </a>
-                <a href={`/g/${params.slug}/plans`} className="text-neutral-300 hover:text-white">
-                  Plans
-                </a>
-                <a href={`/g/${params.slug}/finance`} className="text-neutral-300 hover:text-white">
-                  Finance
-                </a>
-                <a href={`/g/${params.slug}/billing`} className="text-neutral-300 hover:text-white">
-                  Billing
-                </a>
-                <a href={`/g/${params.slug}/settings`} className="text-neutral-300 hover:text-white">
-                  Settings
-                </a>
-              </>
-            )}
-            <LogoutButton slug={params.slug} />
-          </nav>
+          <GymNav slug={params.slug} role={session.role} current="dashboard" />
         </div>
 
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">

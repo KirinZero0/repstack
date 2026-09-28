@@ -3,6 +3,7 @@ import { requireTenantSession, SessionError } from "@/lib/session";
 import { countMemberSeats } from "@/lib/limits";
 import { isMockMode } from "@/lib/xendit";
 import { onlinePaymentsEnabled } from "@/lib/gateway";
+import GymNav from "@/components/GymNav";
 import MockCheckout from "@/app/my/MockCheckout";
 import { PayNowButton, PlanSwitcher } from "./BillingActions";
 
@@ -85,16 +86,12 @@ export default async function BillingPage({
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
       <div className="mx-auto max-w-3xl">
-        <div className="mb-8 flex items-start justify-between gap-4">
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="mb-1 text-2xl font-semibold">Billing</h1>
             <p className="text-sm text-neutral-400">{gym.name}</p>
           </div>
-          {!suspended && (
-            <a href={`/g/${params.slug}/dashboard`} className="text-sm text-neutral-300 hover:text-white">
-              ← Dashboard
-            </a>
-          )}
+          <GymNav slug={params.slug} role={session.role} current="billing" billingOnly={suspended} />
         </div>
 
         {mockPayment && (

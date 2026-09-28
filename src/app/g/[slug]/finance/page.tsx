@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { getGymFinance } from "@/lib/stats";
 import { BarChart, Card, HBars, StatCard, StatusPill, rp } from "@/components/charts";
+import GymNav from "@/components/GymNav";
 
 export const dynamic = "force-dynamic";
 
@@ -30,15 +31,12 @@ export default async function FinancePage({ params }: { params: { slug: string }
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">Financials</h1>
             <p className="text-sm text-neutral-400">{gym.name}</p>
           </div>
-          <nav className="flex gap-4 text-sm">
-            <a href={`/g/${params.slug}/dashboard`} className="text-neutral-300 hover:text-white">← Dashboard</a>
-            <a href={`/g/${params.slug}/billing`} className="text-neutral-300 hover:text-white">Platform billing</a>
-          </nav>
+          <GymNav slug={params.slug} role={session.role} current="finance" />
         </div>
 
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">

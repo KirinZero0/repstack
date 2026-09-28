@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { decrypt, maskPhone, maskEmail } from "@/lib/crypto";
 import { countMemberSeats } from "@/lib/limits";
+import GymNav from "@/components/GymNav";
 import AddMemberForm from "./AddMemberForm";
 import ResendFallbackButton from "./ResendFallbackButton";
 import PendingRequests from "./PendingRequests";
@@ -58,7 +59,7 @@ export default async function MembersPage({ params }: { params: { slug: string }
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">Members</h1>
             <p className="text-sm text-neutral-400">
@@ -70,6 +71,7 @@ export default async function MembersPage({ params }: { params: { slug: string }
               )}
             </p>
           </div>
+          <GymNav slug={params.slug} role={session.role} current="members" />
         </div>
 
         <PendingRequests slug={params.slug} requests={pendingRows} />
