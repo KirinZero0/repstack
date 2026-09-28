@@ -4,9 +4,16 @@ import { platformProviderName } from "./gateway";
 
 export const SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** Slugs that would collide with real routes or read as official. */
+/**
+ * Slugs that would collide with real routes or read as official. Every top-level page/API segment
+ * under src/app must be listed here — a gym slug is now the first path segment (repstack.com/slug),
+ * same depth as these, so Next.js would always route the literal name to the static page instead of
+ * the gym (no data ever leaks either way, but that gym's own pages would be permanently unreachable
+ * at that name). "g" stays reserved for the old /g/[slug]/... links, which now redirect (middleware.ts).
+ */
 export const RESERVED_SLUGS = new Set([
   "api", "g", "demo", "signup", "superadmin", "activate", "my", "my-qr", "check-in", "login",
+  "privacy", "terms", "reset",
   "admin", "app", "www", "iron-ledger", "ironledger", "repstack", "support", "billing", "pricing", "static",
 ]);
 
@@ -74,7 +81,7 @@ export async function completeSignup(signupId: string, invoice: { paidAt: Date; 
   if (signup.ownerPhone) {
     await sendPlatformWhatsapp({
       to: signup.ownerPhone,
-      message: `Welcome to Repstack, ${signup.ownerName}! "${gym.name}" is ready. Log in at ${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/login with ${signup.ownerEmail} and the password you chose.`,
+      message: `Welcome to Repstack, ${signup.ownerName}! "${gym.name}" is ready. Log in at ${process.env.NEXT_PUBLIC_APP_URL}/${gym.slug}/login with ${signup.ownerEmail} and the password you chose.`,
     }).catch((err) => console.error("Signup welcome message failed", err));
   }
 }

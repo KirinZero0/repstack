@@ -78,7 +78,7 @@ export default function ActivatePage({ params }: { params: { token: string } }) 
       }
       setDone(true);
       if (info?.gymSlug) {
-        setTimeout(() => router.push(`/g/${info.gymSlug}/login`), 1500);
+        setTimeout(() => router.push(`/${info.gymSlug}/login`), 1500);
       }
     } finally {
       setSubmitting(false);
@@ -107,7 +107,7 @@ export default function ActivatePage({ params }: { params: { token: string } }) 
         <div className="text-center">
           <p className="mb-4">This account is already activated.</p>
           {info.gymSlug && (
-            <a href={`/g/${info.gymSlug}/login`} className="text-white underline">
+            <a href={`/${info.gymSlug}/login`} className="text-white underline">
               Go to login →
             </a>
           )}

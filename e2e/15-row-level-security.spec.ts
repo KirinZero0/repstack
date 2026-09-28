@@ -91,8 +91,8 @@ test("a gym's client can't change or create another gym's rows", async () => {
 
 test("the running app really connects as the restricted role", async ({ request, baseURL }) => {
   // Make the server open tenant-scoped connections, then look at who is connected.
-  await request.post(`${baseURL}/api/g/test-gym-a/login`, { data: { email: "owner-a@test.local", password: "owner-pass-123" } });
-  await request.get(`${baseURL}/g/test-gym-a/dashboard`);
+  await request.post(`${baseURL}/api/test-gym-a/login`, { data: { email: "owner-a@test.local", password: "owner-pass-123" } });
+  await request.get(`${baseURL}/test-gym-a/dashboard`);
 
   const rows = await prisma.$queryRaw<{ usename: string; n: bigint }[]>`
     SELECT usename, count(*)::bigint AS n FROM pg_stat_activity WHERE datname = current_database() GROUP BY usename`;

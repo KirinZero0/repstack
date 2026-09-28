@@ -70,7 +70,7 @@ async function addMembers(f: Awaited<ReturnType<typeof makeGym>>, n: number) {
 }
 
 const login = (request: APIRequestContext, baseURL: string, slug: string, who: { email: string; password: string }) =>
-  request.post(`${baseURL}/api/g/${slug}/login`, { data: who });
+  request.post(`${baseURL}/api/${slug}/login`, { data: who });
 
 async function loginOk(request: APIRequestContext, baseURL: string, slug: string, who: { email: string; password: string }) {
   const res = await login(request, baseURL, slug, who);
@@ -128,23 +128,23 @@ test("a gym suspended for non-payment lets only its owner in, to pay; paying swi
   // The owner gets in, but only to billing.
   const res = await loginOk(request, baseURL!, f.slug, f.owner);
   expect((await res.json()).billingOnly).toBe(true);
-  const page = await request.get(`${baseURL}/g/${f.slug}/billing`);
+  const page = await request.get(`${baseURL}/${f.slug}/billing`);
   expect(page.status()).toBe(200);
   expect(await page.text()).toContain("suspended because the subscription wasn");
-  const blocked = await request.post(`${baseURL}/api/g/${f.slug}/members`, {
+  const blocked = await request.post(`${baseURL}/api/${f.slug}/members`, {
     data: { fullName: "Nope Nope", email: `${uniq("nope")}@test.local`, phoneWhatsapp: "081233334444", planId: f.memberPlan.id },
   });
   expect(blocked.status()).toBe(403);
-  expect((await request.post(`${baseURL}/api/g/${f.slug}/subscription`, { data: { saasPlanId: plan.id } })).status()).toBe(403);
+  expect((await request.post(`${baseURL}/api/${f.slug}/subscription`, { data: { saasPlanId: plan.id } })).status()).toBe(403);
 
-  const payNow = await request.post(`${baseURL}/api/g/${f.slug}/billing/pay`);
+  const payNow = await request.post(`${baseURL}/api/${f.slug}/billing/pay`);
   expect(payNow.ok()).toBeTruthy();
   const { url } = await payNow.json();
   expect(url).toBeTruthy();
   const open = await prisma.platformPayment.findFirstOrThrow({ where: { gymId: f.gym.id, status: "PENDING" } });
 
   // Same invoice again, not a second one.
-  const again = await request.post(`${baseURL}/api/g/${f.slug}/billing/pay`);
+  const again = await request.post(`${baseURL}/api/${f.slug}/billing/pay`);
   expect((await again.json()).url).toBe(url);
   expect(await prisma.platformPayment.count({ where: { gymId: f.gym.id, status: "PENDING" } })).toBe(1);
 
@@ -160,7 +160,7 @@ test("a gym suspended for non-payment lets only its owner in, to pay; paying swi
   expect((await prisma.gym.findUniqueOrThrow({ where: { id: f.gym.id } })).nextBillingDate!.getTime()).toBe(active.nextBillingDate!.getTime());
 
   // And the owner is fully back in.
-  const members = await request.post(`${baseURL}/api/g/${f.slug}/members`, {
+  const members = await request.post(`${baseURL}/api/${f.slug}/members`, {
     data: { fullName: "Back In", email: `${uniq("back")}@test.local`, phoneWhatsapp: "081233335555", planId: f.memberPlan.id },
   });
   expect(members.status()).toBe(201);
@@ -191,14 +191,14 @@ test("changing plan: bigger plans are paid for first, smaller ones apply at once
   const f = await makeGym(small);
   const billingDate = f.gym.nextBillingDate!;
   await loginOk(request, baseURL!, f.slug, f.owner);
-  const change = (planId: string) => request.post(`${baseURL}/api/g/${f.slug}/subscription`, { data: { saasPlanId: planId } });
+  const change = (planId: string) => request.post(`${baseURL}/api/${f.slug}/subscription`, { data: { saasPlanId: planId } });
 
   // Bad targets.
   expect((await change(small.id)).status()).toBe(409);
   expect((await change(hidden.id)).status()).toBe(400);
   const staffCtx = await playwright.request.newContext();
   await loginOk(staffCtx, baseURL!, f.slug, f.staff);
-  expect((await staffCtx.post(`${baseURL}/api/g/${f.slug}/subscription`, { data: { saasPlanId: big.id } })).status()).toBe(403);
+  expect((await staffCtx.post(`${baseURL}/api/${f.slug}/subscription`, { data: { saasPlanId: big.id } })).status()).toBe(403);
   await staffCtx.dispose();
 
   // Upgrade: an invoice comes back, and nothing changes until it's paid.
@@ -259,8 +259,8 @@ test("lifetime accounts can't change plan or pay", async ({ request, baseURL }) 
   const other = await makePlan(uniq("LifeOther"), { price: 400000 });
   const f = await makeGym(plan, { isLifetime: true, nextBillingDate: null });
   await loginOk(request, baseURL!, f.slug, f.owner);
-  expect((await request.post(`${baseURL}/api/g/${f.slug}/subscription`, { data: { saasPlanId: other.id } })).status()).toBe(409);
-  expect((await request.post(`${baseURL}/api/g/${f.slug}/billing/pay`)).status()).toBe(409);
+  expect((await request.post(`${baseURL}/api/${f.slug}/subscription`, { data: { saasPlanId: other.id } })).status()).toBe(409);
+  expect((await request.post(`${baseURL}/api/${f.slug}/billing/pay`)).status()).toBe(409);
 });
 
 test("billing page shows usage and a pay button to owners, and is closed to staff and other gyms", async ({ request, baseURL, playwright }) => {
@@ -269,22 +269,22 @@ test("billing page shows usage and a pay button to owners, and is closed to staf
   await addMembers(f, 2);
   await loginOk(request, baseURL!, f.slug, f.owner);
 
-  const html = (await (await request.get(`${baseURL}/g/${f.slug}/billing`)).text()).replace(/<!-- -->/g, "");
+  const html = (await (await request.get(`${baseURL}/${f.slug}/billing`)).text()).replace(/<!-- -->/g, "");
   expect(html).toContain("2 of 20");
   expect(html).toContain("Renew early");
   expect(html).toContain("Change plan");
 
   const staffCtx = await playwright.request.newContext();
   await loginOk(staffCtx, baseURL!, f.slug, f.staff);
-  expect(await (await staffCtx.get(`${baseURL}/g/${f.slug}/billing`)).text()).toContain("Only the gym owner");
-  expect((await staffCtx.post(`${baseURL}/api/g/${f.slug}/billing/pay`)).status()).toBe(403);
+  expect(await (await staffCtx.get(`${baseURL}/${f.slug}/billing`)).text()).toContain("Only the gym owner");
+  expect((await staffCtx.post(`${baseURL}/api/${f.slug}/billing/pay`)).status()).toBe(403);
   await staffCtx.dispose();
 
   // Another gym's owner can't pay for or read this gym's billing.
   const other = await makeGym(plan);
   const otherCtx = await playwright.request.newContext();
   await loginOk(otherCtx, baseURL!, other.slug, other.owner);
-  expect((await otherCtx.post(`${baseURL}/api/g/${f.slug}/billing/pay`)).status()).toBe(401);
+  expect((await otherCtx.post(`${baseURL}/api/${f.slug}/billing/pay`)).status()).toBe(401);
   await otherCtx.dispose();
 });
 
@@ -293,19 +293,19 @@ test("owner can rename the gym and change its timezone; nobody else can", async 
   const f = await makeGym(plan);
   await loginOk(request, baseURL!, f.slug, f.owner);
 
-  const ok = await request.post(`${baseURL}/api/g/${f.slug}/settings`, { data: { name: "Renamed Gym", timezone: "Asia/Makassar" } });
+  const ok = await request.post(`${baseURL}/api/${f.slug}/settings`, { data: { name: "Renamed Gym", timezone: "Asia/Makassar" } });
   expect(ok.ok()).toBeTruthy();
   const gym = await prisma.gym.findUniqueOrThrow({ where: { id: f.gym.id } });
   expect(gym.name).toBe("Renamed Gym");
   expect(gym.timezone).toBe("Asia/Makassar");
   expect(gym.slug).toBe(f.slug);
 
-  expect((await request.post(`${baseURL}/api/g/${f.slug}/settings`, { data: { timezone: "Mars/Olympus" } })).status()).toBe(400);
-  expect((await request.post(`${baseURL}/api/g/${f.slug}/settings`, { data: { name: "x" } })).status()).toBe(400);
+  expect((await request.post(`${baseURL}/api/${f.slug}/settings`, { data: { timezone: "Mars/Olympus" } })).status()).toBe(400);
+  expect((await request.post(`${baseURL}/api/${f.slug}/settings`, { data: { name: "x" } })).status()).toBe(400);
 
   const staffCtx = await playwright.request.newContext();
   await loginOk(staffCtx, baseURL!, f.slug, f.staff);
-  expect((await staffCtx.post(`${baseURL}/api/g/${f.slug}/settings`, { data: { name: "Hijacked Gym" } })).status()).toBe(403);
+  expect((await staffCtx.post(`${baseURL}/api/${f.slug}/settings`, { data: { name: "Hijacked Gym" } })).status()).toBe(403);
   await staffCtx.dispose();
   expect((await prisma.gym.findUniqueOrThrow({ where: { id: f.gym.id } })).name).toBe("Renamed Gym");
 });

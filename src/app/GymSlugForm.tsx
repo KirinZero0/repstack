@@ -11,7 +11,7 @@ export default function GymSlugForm() {
     e.preventDefault();
     const clean = slug.trim().toLowerCase();
     if (!clean) return;
-    router.push(`/g/${clean}/login`);
+    router.push(`/${clean}/login`);
   }
 
   return (

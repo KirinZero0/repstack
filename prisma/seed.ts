@@ -127,15 +127,15 @@ async function main() {
   console.log(`  email: ${superadmin.email}`);
   console.log(`  password: ${superadminPassword}`);
   console.log(`  id: ${superadmin.id}`);
-  console.log("\nDemo gym (slug: demo) — staff login (/g/demo/login):");
+  console.log("\nDemo gym (slug: demo) — staff login (/demo/login):");
   console.log(`  email: ${demoOwner.email}`);
   console.log(`  password: ${demoOwnerPassword}`);
   console.log(`  gymId: ${demoGym.id}`);
-  console.log("\nDemo gym member login (/g/demo/member-login):");
+  console.log("\nDemo gym member login (/demo/member-login):");
   console.log(`  email: ${demoMember.email}`);
   console.log(`  password: ${demoMemberPassword}`);
   console.log(`  memberId: ${demoMember.id}`);
-  console.log("\nLifetime gym (slug: founding-partner) — staff login (/g/founding-partner/login):");
+  console.log("\nLifetime gym (slug: founding-partner) — staff login (/founding-partner/login):");
   console.log(`  email: ${lifetimeOwner.email}`);
   console.log(`  password: ${lifetimeOwnerPassword}`);
   console.log(`  gymId: ${lifetimeGym.id}`);

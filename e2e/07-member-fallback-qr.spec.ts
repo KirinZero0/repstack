@@ -9,9 +9,9 @@ test("owner-triggered fallback link lets a member view /my-qr without a session"
   const member = await prisma.member.findUniqueOrThrow({ where: { email: "active-member@test.local" } });
 
   await staffLoginUI(page, baseURL!, "test-gym-a", "owner-a@test.local", "owner-pass-123");
-  await page.waitForURL(`${baseURL}/g/test-gym-a/dashboard`);
+  await page.waitForURL(`${baseURL}/test-gym-a/dashboard`);
 
-  await page.goto(`${baseURL}/g/test-gym-a/members`);
+  await page.goto(`${baseURL}/test-gym-a/members`);
   const row = page.locator("tr", { hasText: "Active Member" });
   await row.getByRole("button", { name: "Resend QR link" }).click();
   await expect(row.getByRole("button", { name: "Sent" })).toBeVisible();

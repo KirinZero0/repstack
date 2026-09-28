@@ -24,14 +24,14 @@ async function newLapsedMember(gymSlug: string, tag: string) {
 }
 
 async function loginOwner(request: import("@playwright/test").APIRequestContext, baseURL: string, slug: string, email: string) {
-  const res = await request.post(`${baseURL}/api/g/${slug}/staff-login`, { data: { email, password: "owner-pass-123" } });
+  const res = await request.post(`${baseURL}/api/${slug}/staff-login`, { data: { email, password: "owner-pass-123" } });
   expect(res.ok()).toBeTruthy();
 }
 
 test("owner records a cash payment: member reactivated, receipt logged, double-submit blocked, then voided", async ({ request, baseURL }) => {
   const { plan, member } = await newLapsedMember("test-gym-a", "cash");
   await loginOwner(request, baseURL!, "test-gym-a", "owner-a@test.local");
-  const url = `${baseURL}/api/g/test-gym-a/members/${member.id}/payments`;
+  const url = `${baseURL}/api/test-gym-a/members/${member.id}/payments`;
 
   const rec = await request.post(url, { data: { planId: plan.id, amount: 200000, note: "Cash at front desk" } });
   expect(rec.status()).toBe(201);
@@ -79,17 +79,17 @@ test("manual payments respect tenant isolation and only manual entries can be vo
   await loginOwner(request, baseURL!, "test-gym-a", "owner-a@test.local");
 
   // Gym A's owner can't touch gym B's member, and can't use gym B's plan.
-  const foreignMember = await request.post(`${baseURL}/api/g/test-gym-a/members/${b.member.id}/payments`, { data: { planId: a.plan.id, amount: 100000 } });
+  const foreignMember = await request.post(`${baseURL}/api/test-gym-a/members/${b.member.id}/payments`, { data: { planId: a.plan.id, amount: 100000 } });
   expect(foreignMember.status()).toBe(404);
-  const foreignPlan = await request.post(`${baseURL}/api/g/test-gym-a/members/${a.member.id}/payments`, { data: { planId: b.plan.id, amount: 100000 } });
+  const foreignPlan = await request.post(`${baseURL}/api/test-gym-a/members/${a.member.id}/payments`, { data: { planId: b.plan.id, amount: 100000 } });
   expect(foreignPlan.status()).toBe(400);
   expect((await prisma.member.findUniqueOrThrow({ where: { id: b.member.id } })).status).toBe("EXPIRED");
 
   // Gym B's owner can't void a gym A payment via gym A's URL.
-  const rec = await request.post(`${baseURL}/api/g/test-gym-a/members/${a.member.id}/payments`, { data: { planId: a.plan.id, amount: 150000 } });
+  const rec = await request.post(`${baseURL}/api/test-gym-a/members/${a.member.id}/payments`, { data: { planId: a.plan.id, amount: 150000 } });
   const { paymentId } = await rec.json();
   await loginOwner(request, baseURL!, "test-gym-b", "owner-b@test.local");
-  const cross = await request.post(`${baseURL}/api/g/test-gym-a/members/${a.member.id}/payments/${paymentId}/void`);
+  const cross = await request.post(`${baseURL}/api/test-gym-a/members/${a.member.id}/payments/${paymentId}/void`);
   expect(cross.status()).toBe(401);
   expect((await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } })).status).toBe("PAID");
 
@@ -98,5 +98,5 @@ test("manual payments respect tenant isolation and only manual entries can be vo
   const online = await prisma.payment.create({
     data: { gymId: a.gym.id, memberId: a.member.id, planId: a.plan.id, provider: "XENDIT", amount: 250000, status: "PAID", paidAt: new Date() },
   });
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/members/${a.member.id}/payments/${online.id}/void`)).status()).toBe(409);
+  expect((await request.post(`${baseURL}/api/test-gym-a/members/${a.member.id}/payments/${online.id}/void`)).status()).toBe(409);
 });

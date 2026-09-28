@@ -10,14 +10,14 @@ const PROOF = path.join(__dirname, "fixtures", "test-photo.jpg");
 const SKIP_REASON = "public join page is disabled until there's a business bank account to point it at";
 
 async function setSignups(request: APIRequestContext, baseURL: string, slug: string, ownerEmail: string, on: boolean) {
-  const login = await request.post(`${baseURL}/api/g/${slug}/staff-login`, { data: { email: ownerEmail, password: "owner-pass-123" } });
+  const login = await request.post(`${baseURL}/api/${slug}/staff-login`, { data: { email: ownerEmail, password: "owner-pass-123" } });
   expect(login.ok()).toBeTruthy();
-  const res = await request.post(`${baseURL}/api/g/${slug}/settings`, { data: { acceptSignups: on } });
+  const res = await request.post(`${baseURL}/api/${slug}/settings`, { data: { acceptSignups: on } });
   expect(res.ok()).toBeTruthy();
 }
 
 async function loginOwner(request: APIRequestContext, baseURL: string, slug: string, email: string) {
-  const res = await request.post(`${baseURL}/api/g/${slug}/staff-login`, { data: { email, password: "owner-pass-123" } });
+  const res = await request.post(`${baseURL}/api/${slug}/staff-login`, { data: { email, password: "owner-pass-123" } });
   expect(res.ok()).toBeTruthy();
 }
 
@@ -51,7 +51,7 @@ function postJoin(
   if (withProof) {
     multipart.proof = { name: "proof.jpg", mimeType: "image/jpeg", buffer: fs.readFileSync(PROOF) };
   }
-  return request.post(`${baseURL}/api/g/${slug}/join`, { multipart, headers });
+  return request.post(`${baseURL}/api/${slug}/join`, { multipart, headers });
 }
 
 test("public sign-up is off by default, then staff approving a manual transfer request creates an active member who can log in", async ({
@@ -77,9 +77,9 @@ test("public sign-up is off by default, then staff approving a manual transfer r
 
   // Nothing exists until staff approves it, and they can't log in yet.
   expect(await prisma.member.findUnique({ where: { email: d.email } })).toBeNull();
-  const status = () => request.get(`${baseURL}/api/g/test-gym-a/join/${signupId}/status`).then((r) => r.json());
+  const status = () => request.get(`${baseURL}/api/test-gym-a/join/${signupId}/status`).then((r) => r.json());
   expect((await status()).status).toBe("PENDING_REVIEW");
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/member-login`, { data: { email: d.email, password: d.password } })).status()).toBe(401);
+  expect((await request.post(`${baseURL}/api/test-gym-a/member-login`, { data: { email: d.email, password: d.password } })).status()).toBe(401);
 
   const signupRow = await prisma.memberSignup.findUniqueOrThrow({ where: { id: signupId } });
   expect(signupRow.proofImageUrl).toBeTruthy();
@@ -95,7 +95,7 @@ test("public sign-up is off by default, then staff approving a manual transfer r
 
   // Owner reviews and approves.
   await loginOwner(request, baseURL!, "test-gym-a", "owner-a@test.local");
-  const approve = await request.post(`${baseURL}/api/g/test-gym-a/join/${signupId}/approve`);
+  const approve = await request.post(`${baseURL}/api/test-gym-a/join/${signupId}/approve`);
   expect(approve.ok()).toBeTruthy();
 
   const member = await prisma.member.findUniqueOrThrow({ where: { email: d.email } });
@@ -115,12 +115,12 @@ test("public sign-up is off by default, then staff approving a manual transfer r
 
   // Phone is stored encrypted, and they can log in with the password they chose.
   expect(member.phoneWhatsapp.startsWith("v1:")).toBe(true);
-  const login = await request.post(`${baseURL}/api/g/test-gym-a/member-login`, { data: { email: d.email, password: d.password } });
+  const login = await request.post(`${baseURL}/api/test-gym-a/member-login`, { data: { email: d.email, password: d.password } });
   expect(login.ok()).toBeTruthy();
 
   // Can't approve (or reject) an already-completed request.
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/join/${signupId}/approve`)).status()).toBe(409);
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/join/${signupId}/reject`)).status()).toBe(409);
+  expect((await request.post(`${baseURL}/api/test-gym-a/join/${signupId}/approve`)).status()).toBe(409);
+  expect((await request.post(`${baseURL}/api/test-gym-a/join/${signupId}/reject`)).status()).toBe(409);
 });
 
 test("staff rejects a request that can't be verified, and no member is created", async ({ request, baseURL }) => {
@@ -133,18 +133,18 @@ test("staff rejects a request that can't be verified, and no member is created",
   const { signupId } = await started.json();
 
   await loginOwner(request, baseURL!, "test-gym-a", "owner-a@test.local");
-  const reject = await request.post(`${baseURL}/api/g/test-gym-a/join/${signupId}/reject`);
+  const reject = await request.post(`${baseURL}/api/test-gym-a/join/${signupId}/reject`);
   expect(reject.ok()).toBeTruthy();
 
   expect((await prisma.memberSignup.findUniqueOrThrow({ where: { id: signupId } })).status).toBe("REJECTED");
   expect(await prisma.member.findUnique({ where: { email: d.email } })).toBeNull();
 
-  const status = await request.get(`${baseURL}/api/g/test-gym-a/join/${signupId}/status`).then((r) => r.json());
+  const status = await request.get(`${baseURL}/api/test-gym-a/join/${signupId}/status`).then((r) => r.json());
   expect(status.status).toBe("REJECTED");
 
   // Can't reject twice, and a rejected request can't later be approved.
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/join/${signupId}/reject`)).status()).toBe(409);
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/join/${signupId}/approve`)).status()).toBe(409);
+  expect((await request.post(`${baseURL}/api/test-gym-a/join/${signupId}/reject`)).status()).toBe(409);
+  expect((await request.post(`${baseURL}/api/test-gym-a/join/${signupId}/approve`)).status()).toBe(409);
 });
 
 test("approving, rejecting and viewing proof of a join request respect tenant isolation", async ({ request, baseURL }) => {
@@ -158,14 +158,14 @@ test("approving, rejecting and viewing proof of a join request respect tenant is
 
   // Gym B's owner can't approve, reject or view the proof for gym A's request.
   await loginOwner(request, baseURL!, "test-gym-b", "owner-b@test.local");
-  expect((await request.post(`${baseURL}/api/g/test-gym-b/join/${signupId}/approve`)).status()).toBe(409);
-  expect((await request.post(`${baseURL}/api/g/test-gym-b/join/${signupId}/reject`)).status()).toBe(409);
-  expect((await request.get(`${baseURL}/api/g/test-gym-b/join/${signupId}/proof`)).status()).toBe(404);
+  expect((await request.post(`${baseURL}/api/test-gym-b/join/${signupId}/approve`)).status()).toBe(409);
+  expect((await request.post(`${baseURL}/api/test-gym-b/join/${signupId}/reject`)).status()).toBe(409);
+  expect((await request.get(`${baseURL}/api/test-gym-b/join/${signupId}/proof`)).status()).toBe(404);
   expect((await prisma.memberSignup.findUniqueOrThrow({ where: { id: signupId } })).status).toBe("PENDING_REVIEW");
 
   // Gym A's own owner can.
   await loginOwner(request, baseURL!, "test-gym-a", "owner-a@test.local");
-  expect((await request.get(`${baseURL}/api/g/test-gym-a/join/${signupId}/proof`)).ok()).toBeTruthy();
+  expect((await request.get(`${baseURL}/api/test-gym-a/join/${signupId}/proof`)).ok()).toBeTruthy();
 });
 
 test("join rejects hidden/foreign plans, existing emails and closed gyms", async ({ request, baseURL }) => {
@@ -209,7 +209,7 @@ test("a request approved after its email was registered meanwhile is flagged, no
   });
 
   await loginOwner(request, baseURL!, "test-gym-a", "owner-a@test.local");
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/join/${signupId}/approve`)).status()).toBe(409);
+  expect((await request.post(`${baseURL}/api/test-gym-a/join/${signupId}/approve`)).status()).toBe(409);
   expect((await prisma.memberSignup.findUniqueOrThrow({ where: { id: signupId } })).status).toBe("CONFLICT");
   expect(await prisma.member.count({ where: { email: d.email } })).toBe(1);
 });

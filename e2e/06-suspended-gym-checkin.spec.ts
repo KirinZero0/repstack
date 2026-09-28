@@ -3,7 +3,7 @@ import { staffLoginUI, buildTokenForMember, prisma } from "./helpers";
 
 test("suspended gym blocks check-in even with an otherwise-valid QR", async ({ page, baseURL }) => {
   await staffLoginUI(page, baseURL!, "test-gym-a", "owner-a@test.local", "owner-pass-123");
-  await page.waitForURL(`${baseURL}/g/test-gym-a/dashboard`);
+  await page.waitForURL(`${baseURL}/test-gym-a/dashboard`);
 
   const member = await prisma.member.findUniqueOrThrow({ where: { email: "active-member@test.local" } });
   const token = await buildTokenForMember(member.id);

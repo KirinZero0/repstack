@@ -83,7 +83,7 @@ export function GymThemeForm({
   initial: "inherit" | "light" | "dark" | "system";
 }) {
   const [theme, setTheme] = useState(initial);
-  const { state, error, save } = useSave(`/api/g/${slug}/settings`);
+  const { state, error, save } = useSave(`/api/${slug}/settings`);
 
   return (
     <form
@@ -123,7 +123,7 @@ export function BankDetailsForm({
   const [bankName, setBankName] = useState(initial.bankName);
   const [bankAccountNumber, setBankAccountNumber] = useState(initial.bankAccountNumber);
   const [bankAccountHolder, setBankAccountHolder] = useState(initial.bankAccountHolder);
-  const { state, error, save } = useSave(`/api/g/${slug}/settings`);
+  const { state, error, save } = useSave(`/api/${slug}/settings`);
 
   return (
     <form
@@ -161,7 +161,7 @@ export function BankDetailsForm({
 
 export function JoinSettingsForm({ slug, initial, joinUrl }: { slug: string; initial: boolean; joinUrl: string }) {
   const [on, setOn] = useState(initial);
-  const { state, error, save } = useSave(`/api/g/${slug}/settings`);
+  const { state, error, save } = useSave(`/api/${slug}/settings`);
 
   return (
     <div className="space-y-4">
@@ -196,7 +196,7 @@ export function JoinSettingsForm({ slug, initial, joinUrl }: { slug: string; ini
             >
               Copy link
             </button>
-            <a href={`/g/${slug}/join-poster`} className="rounded-lg border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800">
+            <a href={`/${slug}/join-poster`} className="rounded-lg border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800">
               Print QR poster
             </a>
           </div>
@@ -208,7 +208,7 @@ export function JoinSettingsForm({ slug, initial, joinUrl }: { slug: string; ini
 
 export function OnlinePaymentsForm({ slug, initial, providerReady }: { slug: string; initial: boolean; providerReady: boolean }) {
   const [on, setOn] = useState(initial);
-  const { state, error, save } = useSave(`/api/g/${slug}/settings`);
+  const { state, error, save } = useSave(`/api/${slug}/settings`);
 
   return (
     <div className="space-y-4">
@@ -256,7 +256,7 @@ const TIMEZONES: { id: string; label: string }[] = [
 export function GymDetailsForm({ slug, initialName, initialTimezone }: { slug: string; initialName: string; initialTimezone: string }) {
   const [name, setName] = useState(initialName);
   const [timezone, setTimezone] = useState(initialTimezone);
-  const { state, error, save } = useSave(`/api/g/${slug}/settings`);
+  const { state, error, save } = useSave(`/api/${slug}/settings`);
   const options = TIMEZONES.some((t) => t.id === initialTimezone) ? TIMEZONES : [{ id: initialTimezone, label: initialTimezone }, ...TIMEZONES];
 
   return (

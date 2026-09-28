@@ -17,5 +17,5 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   }
   const result = await applyPasswordReset(params.token, parsed.data.password);
   if (!result) return NextResponse.json({ error: "This link is invalid, expired or already used." }, { status: 404 });
-  return NextResponse.json({ ok: true, loginUrl: `/g/${result.gymSlug}/login` });
+  return NextResponse.json({ ok: true, loginUrl: `/${result.gymSlug}/login` });
 }

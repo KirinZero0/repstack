@@ -5,7 +5,7 @@ import { buildQrToken } from "../src/lib/qr";
 test.describe("check-in rejections", () => {
   test("duplicate scan same day", async ({ page, baseURL }) => {
     await staffLoginUI(page, baseURL!, "test-gym-a", "owner-a@test.local", "owner-pass-123");
-    await page.waitForURL(`${baseURL}/g/test-gym-a/dashboard`);
+    await page.waitForURL(`${baseURL}/test-gym-a/dashboard`);
 
     const member = await prisma.member.findUniqueOrThrow({
       where: { email: "duplicate-scan-member@test.local" },
@@ -22,7 +22,7 @@ test.describe("check-in rejections", () => {
 
   test("expired member is rejected", async ({ page, baseURL }) => {
     await staffLoginUI(page, baseURL!, "test-gym-a", "owner-a@test.local", "owner-pass-123");
-    await page.waitForURL(`${baseURL}/g/test-gym-a/dashboard`);
+    await page.waitForURL(`${baseURL}/test-gym-a/dashboard`);
 
     const member = await prisma.member.findUniqueOrThrow({ where: { email: "expired-member@test.local" } });
     const token = await buildTokenForMember(member.id);
@@ -36,7 +36,7 @@ test.describe("check-in rejections", () => {
     baseURL,
   }) => {
     await staffLoginUI(page, baseURL!, "test-gym-a", "owner-a@test.local", "owner-pass-123");
-    await page.waitForURL(`${baseURL}/g/test-gym-a/dashboard`);
+    await page.waitForURL(`${baseURL}/test-gym-a/dashboard`);
 
     // Gym B's member, scanned by Gym A's staff session.
     const gymBMember = await prisma.member.findUniqueOrThrow({ where: { email: "gymb-member@test.local" } });

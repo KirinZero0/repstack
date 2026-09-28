@@ -21,15 +21,15 @@ interface Item {
 }
 
 const ITEMS: Item[] = [
-  { page: "dashboard", label: "Dashboard", href: (s) => `/g/${s}/dashboard` },
-  { page: "members", label: "Members", href: (s) => `/g/${s}/members` },
-  { page: "checkin-station", label: "Check-in poster", href: (s) => `/g/${s}/checkin-station` },
-  { page: "checkin", label: "Staff scanner", href: (s) => `/g/${s}/checkin` },
-  { page: "staff", label: "Staff", href: (s) => `/g/${s}/staff`, ownerOnly: true },
-  { page: "plans", label: "Plans", href: (s) => `/g/${s}/plans`, ownerOnly: true },
-  { page: "finance", label: "Finance", href: (s) => `/g/${s}/finance`, ownerOnly: true },
-  { page: "billing", label: "Billing", href: (s) => `/g/${s}/billing`, ownerOnly: true },
-  { page: "settings", label: "Settings", href: (s) => `/g/${s}/settings`, ownerOnly: true },
+  { page: "dashboard", label: "Dashboard", href: (s) => `/${s}/dashboard` },
+  { page: "members", label: "Members", href: (s) => `/${s}/members` },
+  { page: "checkin-station", label: "Check-in poster", href: (s) => `/${s}/checkin-station` },
+  { page: "checkin", label: "Staff scanner", href: (s) => `/${s}/checkin` },
+  { page: "staff", label: "Staff", href: (s) => `/${s}/staff`, ownerOnly: true },
+  { page: "plans", label: "Plans", href: (s) => `/${s}/plans`, ownerOnly: true },
+  { page: "finance", label: "Finance", href: (s) => `/${s}/finance`, ownerOnly: true },
+  { page: "billing", label: "Billing", href: (s) => `/${s}/billing`, ownerOnly: true },
+  { page: "settings", label: "Settings", href: (s) => `/${s}/settings`, ownerOnly: true },
 ];
 
 const linkCls = (active: boolean) =>
@@ -50,8 +50,8 @@ export default function GymNav({ slug, role, current, billingOnly = false }: Pro
     : ITEMS.filter((i) => role === "OWNER" || !i.ownerOnly);
 
   async function logout() {
-    await fetch(`/api/g/${slug}/staff-logout`, { method: "POST" });
-    router.push(`/g/${slug}/login`);
+    await fetch(`/api/${slug}/staff-logout`, { method: "POST" });
+    router.push(`/${slug}/login`);
     router.refresh();
   }
 

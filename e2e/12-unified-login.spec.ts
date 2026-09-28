@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test.describe("unified gym login (one form for staff and members)", () => {
   test("logs a staff account in as staff", async ({ request, baseURL }) => {
-    const res = await request.post(`${baseURL}/api/g/test-gym-a/login`, {
+    const res = await request.post(`${baseURL}/api/test-gym-a/login`, {
       data: { email: "owner-a@test.local", password: "owner-pass-123" },
     });
     expect(res.ok()).toBeTruthy();
@@ -12,7 +12,7 @@ test.describe("unified gym login (one form for staff and members)", () => {
   });
 
   test("logs a member account in as member", async ({ request, baseURL }) => {
-    const res = await request.post(`${baseURL}/api/g/test-gym-a/login`, {
+    const res = await request.post(`${baseURL}/api/test-gym-a/login`, {
       data: { email: "active-member@test.local", password: "member-pass-123" },
     });
     expect(res.ok()).toBeTruthy();
@@ -21,13 +21,13 @@ test.describe("unified gym login (one form for staff and members)", () => {
   });
 
   test("rejects wrong password, wrong gym, and unactivated members", async ({ request, baseURL }) => {
-    const wrongPassword = await request.post(`${baseURL}/api/g/test-gym-a/login`, {
+    const wrongPassword = await request.post(`${baseURL}/api/test-gym-a/login`, {
       data: { email: "owner-a@test.local", password: "not-the-password" },
     });
     expect(wrongPassword.status()).toBe(401);
 
     // owner-b belongs to gym B, not gym A.
-    const wrongGym = await request.post(`${baseURL}/api/g/test-gym-a/login`, {
+    const wrongGym = await request.post(`${baseURL}/api/test-gym-a/login`, {
       data: { email: "owner-b@test.local", password: "owner-pass-123" },
     });
     expect(wrongGym.status()).toBe(401);
@@ -45,12 +45,12 @@ test.describe("unified gym login (one form for staff and members)", () => {
     const gym = await prisma.gym.findUniqueOrThrow({ where: { slug: "test-gym-a" } });
     await request.post(`${baseURL}/api/superadmin/gyms/${gym.id}/suspend`);
 
-    const staffTry = await request.post(`${baseURL}/api/g/test-gym-a/login`, {
+    const staffTry = await request.post(`${baseURL}/api/test-gym-a/login`, {
       data: { email: "owner-a@test.local", password: "owner-pass-123" },
     });
     expect(staffTry.status()).toBe(403);
 
-    const memberTry = await request.post(`${baseURL}/api/g/test-gym-a/login`, {
+    const memberTry = await request.post(`${baseURL}/api/test-gym-a/login`, {
       data: { email: "active-member@test.local", password: "member-pass-123" },
     });
     expect(memberTry.status()).toBe(403);
@@ -59,7 +59,7 @@ test.describe("unified gym login (one form for staff and members)", () => {
   });
 
   test("old /member-login page redirects to the unified /login page", async ({ page, baseURL }) => {
-    await page.goto(`${baseURL}/g/test-gym-a/member-login`);
-    await page.waitForURL(`${baseURL}/g/test-gym-a/login`);
+    await page.goto(`${baseURL}/test-gym-a/member-login`);
+    await page.waitForURL(`${baseURL}/test-gym-a/login`);
   });
 });

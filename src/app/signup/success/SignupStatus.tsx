@@ -59,7 +59,7 @@ export default function SignupStatus({ signupId, mock }: { signupId: string; moc
         <p className="mt-3 max-w-md text-neutral-400">
           Your payment went through and your gym has been created. Log in with the email and password you just chose.
         </p>
-        <a href={`/g/${data.slug}/login`} className="mt-8 inline-block rounded-lg bg-plate-green px-6 py-3 text-sm font-semibold text-[#ffffff] hover:brightness-110">
+        <a href={`/${data.slug}/login`} className="mt-8 inline-block rounded-lg bg-plate-green px-6 py-3 text-sm font-semibold text-[#ffffff] hover:brightness-110">
           Log in to {data.gymName}
         </a>
         <p className="mt-4 text-sm text-neutral-500">Your login page: /g/{data.slug}/login</p>

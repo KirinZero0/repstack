@@ -27,5 +27,5 @@ test("superadmin creates a tenant, suspends it, reactivates it", async ({ page, 
   await expect(rowA2.getByText("ACTIVE")).toBeVisible();
 
   await staffLoginUI(page, baseURL!, "test-gym-a", "owner-a@test.local", "owner-pass-123");
-  await page.waitForURL(`${baseURL}/g/test-gym-a/dashboard`);
+  await page.waitForURL(`${baseURL}/test-gym-a/dashboard`);
 });

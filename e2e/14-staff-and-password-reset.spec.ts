@@ -10,7 +10,7 @@ let seq = 0;
 const uniq = (tag: string) => `${tag}-${Date.now()}-${seq++}`;
 
 async function login(request: APIRequestContext, baseURL: string, slug: string, email: string, password: string) {
-  return request.post(`${baseURL}/api/g/${slug}/login`, { data: { email, password } });
+  return request.post(`${baseURL}/api/${slug}/login`, { data: { email, password } });
 }
 
 async function loginOwnerA(request: APIRequestContext, baseURL: string) {
@@ -40,7 +40,7 @@ test("owner adds staff: invite link sets their password, they log in as STAFF, l
   await loginOwnerA(request, baseURL!);
 
   const email = `${uniq("staff")}@test.local`;
-  const created = await request.post(`${baseURL}/api/g/test-gym-a/staff`, { data: { name: "New Staffer", email } });
+  const created = await request.post(`${baseURL}/api/test-gym-a/staff`, { data: { name: "New Staffer", email } });
   expect(created.status()).toBe(201);
   const { staffId, inviteUrl } = await created.json();
   const token = tokenOf(inviteUrl);
@@ -54,7 +54,7 @@ test("owner adds staff: invite link sets their password, they log in as STAFF, l
   expect((await request.post(`${baseURL}/api/reset/${token}`, { data: { password: "short" } })).status()).toBe(400);
   const set = await request.post(`${baseURL}/api/reset/${token}`, { data: { password: "brand-new-pass-1" } });
   expect(set.ok()).toBeTruthy();
-  expect((await set.json()).loginUrl).toBe("/g/test-gym-a/login");
+  expect((await set.json()).loginUrl).toBe("/test-gym-a/login");
 
   // The link is single-use.
   expect((await request.post(`${baseURL}/api/reset/${token}`, { data: { password: "another-pass-123" } })).status()).toBe(404);
@@ -71,7 +71,7 @@ test("staff can do front-desk work but not owner-only work", async ({ request, b
   const gym = await resetGymAStaff();
   await loginOwnerA(request, baseURL!);
   const email = `${uniq("desk")}@test.local`;
-  const { inviteUrl } = await (await request.post(`${baseURL}/api/g/test-gym-a/staff`, { data: { name: "Desk", email } })).json();
+  const { inviteUrl } = await (await request.post(`${baseURL}/api/test-gym-a/staff`, { data: { name: "Desk", email } })).json();
   await request.post(`${baseURL}/api/reset/${tokenOf(inviteUrl)}`, { data: { password: "desk-password-1" } });
 
   const plan = await prisma.membershipPlan.findFirstOrThrow({ where: { gymId: gym.id, isActive: true } });
@@ -84,16 +84,16 @@ test("staff can do front-desk work but not owner-only work", async ({ request, b
   expect((await login(request, baseURL!, "test-gym-a", email, "desk-password-1")).ok()).toBeTruthy();
 
   // Allowed: record a payment for a member, and make them a password link.
-  const rec = await request.post(`${baseURL}/api/g/test-gym-a/members/${member.id}/payments`, { data: { planId: plan.id, amount: 150000 } });
+  const rec = await request.post(`${baseURL}/api/test-gym-a/members/${member.id}/payments`, { data: { planId: plan.id, amount: 150000 } });
   expect(rec.status()).toBe(201);
   const { paymentId } = await rec.json();
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/members/${member.id}/reset-link`)).ok()).toBeTruthy();
+  expect((await request.post(`${baseURL}/api/test-gym-a/members/${member.id}/reset-link`)).ok()).toBeTruthy();
 
   // Not allowed: void it, add staff, change plans/WhatsApp/settings, or make staff links.
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/members/${member.id}/payments/${paymentId}/void`)).status()).toBe(403);
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/staff`, { data: { name: "Nope", email: `${uniq("no")}@test.local` } })).status()).toBe(403);
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/plans`, { data: { name: "Sneaky", durationDays: 30, price: 1000 } })).status()).toBe(403);
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/settings`, { data: { acceptSignups: true } })).status()).toBe(403);
+  expect((await request.post(`${baseURL}/api/test-gym-a/members/${member.id}/payments/${paymentId}/void`)).status()).toBe(403);
+  expect((await request.post(`${baseURL}/api/test-gym-a/staff`, { data: { name: "Nope", email: `${uniq("no")}@test.local` } })).status()).toBe(403);
+  expect((await request.post(`${baseURL}/api/test-gym-a/plans`, { data: { name: "Sneaky", durationDays: 30, price: 1000 } })).status()).toBe(403);
+  expect((await request.post(`${baseURL}/api/test-gym-a/settings`, { data: { acceptSignups: true } })).status()).toBe(403);
 });
 
 test("staff limit follows the plan, and deactivating cuts access immediately", async ({ request, baseURL, playwright }) => {
@@ -106,17 +106,17 @@ test("staff limit follows the plan, and deactivating cuts access immediately", a
   const made: { id: string; email: string; token: string }[] = [];
   for (let i = 0; i < plan.maxStaff - 1; i++) {
     const email = `${uniq("cap")}@test.local`;
-    const res = await owner.post(`${baseURL}/api/g/test-gym-a/staff`, { data: { name: `Cap ${i}`, email } });
+    const res = await owner.post(`${baseURL}/api/test-gym-a/staff`, { data: { name: `Cap ${i}`, email } });
     expect(res.status()).toBe(201);
     const j = await res.json();
     await owner.post(`${baseURL}/api/reset/${tokenOf(j.inviteUrl)}`, { data: { password: "cap-password-123" } });
     made.push({ id: j.staffId, email, token: "" });
     if (i === 0) {
       // Someone can't reuse an email that's taken (checked while there's still room on the plan).
-      expect((await owner.post(`${baseURL}/api/g/test-gym-a/staff`, { data: { name: "Dupe", email } })).status()).toBe(409);
+      expect((await owner.post(`${baseURL}/api/test-gym-a/staff`, { data: { name: "Dupe", email } })).status()).toBe(409);
     }
   }
-  const over = await owner.post(`${baseURL}/api/g/test-gym-a/staff`, { data: { name: "Over", email: `${uniq("over")}@test.local` } });
+  const over = await owner.post(`${baseURL}/api/test-gym-a/staff`, { data: { name: "Over", email: `${uniq("over")}@test.local` } });
   expect(over.status()).toBe(403);
   expect((await over.json()).error).toContain(String(plan.maxStaff));
 
@@ -128,21 +128,21 @@ test("staff limit follows the plan, and deactivating cuts access immediately", a
 
   // Owners can't be deactivated; other gyms' owners can't touch this gym's staff.
   const ownerRow = await prisma.staffUser.findUniqueOrThrow({ where: { email: "owner-a@test.local" } });
-  expect((await owner.patch(`${baseURL}/api/g/test-gym-a/staff/${ownerRow.id}`, { data: { isActive: false } })).status()).toBe(409);
+  expect((await owner.patch(`${baseURL}/api/test-gym-a/staff/${ownerRow.id}`, { data: { isActive: false } })).status()).toBe(409);
   const bCtx = await playwright.request.newContext();
   await login(bCtx, baseURL!, "test-gym-b", "owner-b@test.local", "owner-pass-123");
-  expect((await bCtx.patch(`${baseURL}/api/g/test-gym-a/staff/${made[0].id}`, { data: { isActive: false } })).status()).toBe(401);
+  expect((await bCtx.patch(`${baseURL}/api/test-gym-a/staff/${made[0].id}`, { data: { isActive: false } })).status()).toBe(401);
 
   // Deactivate: their existing session stops working on the very next request, and they can't log in again.
-  expect((await owner.patch(`${baseURL}/api/g/test-gym-a/staff/${made[0].id}`, { data: { isActive: false } })).ok()).toBeTruthy();
+  expect((await owner.patch(`${baseURL}/api/test-gym-a/staff/${made[0].id}`, { data: { isActive: false } })).ok()).toBeTruthy();
   expect((await scan()).status()).toBe(401);
   const freshCtx = await playwright.request.newContext();
   expect((await login(freshCtx, baseURL!, "test-gym-a", made[0].email, "cap-password-123")).status()).toBe(401);
   await freshCtx.dispose();
 
   // That freed a slot, so adding works again; reactivating is refused while full.
-  expect((await owner.post(`${baseURL}/api/g/test-gym-a/staff`, { data: { name: "Fits", email: `${uniq("fits")}@test.local` } })).status()).toBe(201);
-  expect((await owner.patch(`${baseURL}/api/g/test-gym-a/staff/${made[0].id}`, { data: { isActive: true } })).status()).toBe(403);
+  expect((await owner.post(`${baseURL}/api/test-gym-a/staff`, { data: { name: "Fits", email: `${uniq("fits")}@test.local` } })).status()).toBe(201);
+  expect((await owner.patch(`${baseURL}/api/test-gym-a/staff/${made[0].id}`, { data: { isActive: true } })).status()).toBe(403);
 
   await staffCtx.dispose();
   await bCtx.dispose();
@@ -152,10 +152,10 @@ test("forgot password: same answer for every email, link sent only to the number
   const gym = await resetGymAStaff();
   await loginOwnerA(request, baseURL!);
   const email = `${uniq("forgot")}@test.local`;
-  const { staffId, inviteUrl } = await (await request.post(`${baseURL}/api/g/test-gym-a/staff`, { data: { name: "Forgetful", email, phone: "081277776666" } })).json();
+  const { staffId, inviteUrl } = await (await request.post(`${baseURL}/api/test-gym-a/staff`, { data: { name: "Forgetful", email, phone: "081277776666" } })).json();
   await request.post(`${baseURL}/api/reset/${tokenOf(inviteUrl)}`, { data: { password: "old-password-123" } });
 
-  const anon = (ip: string, e: string) => request.post(`${baseURL}/api/g/test-gym-a/forgot`, { data: { email: e }, headers: { "x-forwarded-for": ip } });
+  const anon = (ip: string, e: string) => request.post(`${baseURL}/api/test-gym-a/forgot`, { data: { email: e }, headers: { "x-forwarded-for": ip } });
 
   // Existing and non-existing emails look identical.
   const real = await anon("10.20.0.1", email);
@@ -207,7 +207,7 @@ test("members can reset their password too; expired and unknown links are refuse
     data: { gymId: gym.id, planId: plan.id, fullName: "Member Reset", email, phoneWhatsapp: encrypt(phone), phoneWhatsappLookup: hmacLookup(phone), passwordHash: await bcrypt.hash("member-old-pass-1", 10), status: "ACTIVE", membershipExpiry: new Date(Date.now() + 10 * DAY) },
   });
 
-  const res = await request.post(`${baseURL}/api/g/test-gym-a/forgot`, { data: { email }, headers: { "x-forwarded-for": "10.30.0.1" } });
+  const res = await request.post(`${baseURL}/api/test-gym-a/forgot`, { data: { email }, headers: { "x-forwarded-for": "10.30.0.1" } });
   expect(res.status()).toBe(200);
   const row = await prisma.passwordReset.findFirstOrThrow({ where: { subjectId: member.id } });
   expect(row.kind).toBe("member");
@@ -231,13 +231,13 @@ test("owner/staff can make a member password link; another gym's member is off l
   const gym = await resetGymAStaff();
   await loginOwnerA(request, baseURL!);
   const own = await prisma.member.findFirstOrThrow({ where: { gymId: gym.id } });
-  const link = await request.post(`${baseURL}/api/g/test-gym-a/members/${own.id}/reset-link`);
+  const link = await request.post(`${baseURL}/api/test-gym-a/members/${own.id}/reset-link`);
   expect(link.ok()).toBeTruthy();
   expect((await link.json()).url).toContain("/reset/");
 
   const gymB = await prisma.gym.findUniqueOrThrow({ where: { slug: "test-gym-b" } });
   const foreign = await prisma.member.findFirstOrThrow({ where: { gymId: gymB.id } });
-  expect((await request.post(`${baseURL}/api/g/test-gym-a/members/${foreign.id}/reset-link`)).status()).toBe(404);
+  expect((await request.post(`${baseURL}/api/test-gym-a/members/${foreign.id}/reset-link`)).status()).toBe(404);
 
   // Superadmin: a fresh gym with its own owner, so shared fixtures keep their passwords.
   const slug = uniq("resetgym");

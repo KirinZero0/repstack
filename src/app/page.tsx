@@ -198,7 +198,7 @@ export default async function Home() {
             <div>
               <h2 className="text-3xl font-semibold sm:text-4xl">Already on Repstack?</h2>
               <p className="mt-4 max-w-sm text-neutral-400">
-                Enter your gym&apos;s short name (the part after /g/ in your link) to log in as staff or as a member.
+                Enter your gym&apos;s short name (the part right after repstack.com/ in your link) to log in as staff or as a member.
               </p>
             </div>
             <div className="max-w-sm">

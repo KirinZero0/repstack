@@ -8,27 +8,27 @@ async function login(request: import("@playwright/test").APIRequestContext, base
 
 test("owner creates a plan, member pays for it, webhook applies it once", async ({ request, baseURL }) => {
   // Owner of gym A creates a custom plan.
-  await login(request, baseURL!, "/api/g/test-gym-a/staff-login", "owner-a@test.local", "owner-pass-123");
-  const created = await request.post(`${baseURL}/api/g/test-gym-a/plans`, {
+  await login(request, baseURL!, "/api/test-gym-a/staff-login", "owner-a@test.local", "owner-pass-123");
+  const created = await request.post(`${baseURL}/api/test-gym-a/plans`, {
     data: { name: "Quarterly", durationDays: 90, price: 600000 },
   });
   expect(created.status()).toBe(201);
   const { planId } = await created.json();
 
   // Validation rejects nonsense.
-  const bad = await request.post(`${baseURL}/api/g/test-gym-a/plans`, { data: { name: "x", durationDays: 0, price: 5 } });
+  const bad = await request.post(`${baseURL}/api/test-gym-a/plans`, { data: { name: "x", durationDays: 0, price: 5 } });
   expect(bad.status()).toBe(400);
 
   // Gym B's owner cannot edit gym A's plan (tenant isolation).
-  await login(request, baseURL!, "/api/g/test-gym-b/staff-login", "owner-b@test.local", "owner-pass-123");
-  const cross = await request.patch(`${baseURL}/api/g/test-gym-a/plans/${planId}`, { data: { price: 1000 } });
+  await login(request, baseURL!, "/api/test-gym-b/staff-login", "owner-b@test.local", "owner-pass-123");
+  const cross = await request.patch(`${baseURL}/api/test-gym-a/plans/${planId}`, { data: { price: 1000 } });
   expect(cross.status()).toBe(401); // session belongs to another gym
   const stillThere = await prisma.membershipPlan.findUniqueOrThrow({ where: { id: planId } });
   expect(Number(stillThere.price)).toBe(600000);
 
   // A gym-A member pays for the new plan.
   const member = await prisma.member.findUniqueOrThrow({ where: { email: "active-member@test.local" } });
-  await login(request, baseURL!, "/api/g/test-gym-a/member-login", "active-member@test.local", "member-pass-123");
+  await login(request, baseURL!, "/api/test-gym-a/member-login", "active-member@test.local", "member-pass-123");
   const pay = await request.post(`${baseURL}/api/pay`, { data: { planId } });
   expect(pay.ok()).toBeTruthy();
   const { invoiceUrl } = await pay.json();
@@ -58,13 +58,13 @@ test("owner creates a plan, member pays for it, webhook applies it once", async 
 });
 
 test("hidden plans can't be bought", async ({ request, baseURL }) => {
-  await login(request, baseURL!, "/api/g/test-gym-a/staff-login", "owner-a@test.local", "owner-pass-123");
-  const created = await request.post(`${baseURL}/api/g/test-gym-a/plans`, {
+  await login(request, baseURL!, "/api/test-gym-a/staff-login", "owner-a@test.local", "owner-pass-123");
+  const created = await request.post(`${baseURL}/api/test-gym-a/plans`, {
     data: { name: "Hidden", durationDays: 30, price: 100000, isActive: false },
   });
   const { planId } = await created.json();
 
-  await login(request, baseURL!, "/api/g/test-gym-a/member-login", "active-member@test.local", "member-pass-123");
+  await login(request, baseURL!, "/api/test-gym-a/member-login", "active-member@test.local", "member-pass-123");
   const pay = await request.post(`${baseURL}/api/pay`, { data: { planId } });
   expect(pay.status()).toBe(400);
 });

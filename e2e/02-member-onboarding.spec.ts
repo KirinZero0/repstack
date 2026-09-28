@@ -4,9 +4,9 @@ import { staffLoginUI, prisma } from "./helpers";
 
 test("owner adds a member, member activates, member can log in", async ({ page, baseURL }) => {
   await staffLoginUI(page, baseURL!, "test-gym-a", "owner-a@test.local", "owner-pass-123");
-  await page.waitForURL(`${baseURL}/g/test-gym-a/dashboard`);
+  await page.waitForURL(`${baseURL}/test-gym-a/dashboard`);
 
-  await page.goto(`${baseURL}/g/test-gym-a/members`);
+  await page.goto(`${baseURL}/test-gym-a/members`);
   await page.getByRole("button", { name: "+ Add member" }).click();
 
   const newEmail = `onboard-${Date.now()}@test.local`;
@@ -48,7 +48,7 @@ test("owner adds a member, member activates, member can log in", async ({ page, 
   await page.getByLabel(/I agree to the/).check();
   await page.getByRole("button", { name: "Activate account" }).click();
 
-  await page.waitForURL(`${baseURL}/g/test-gym-a/login`, { timeout: 5000 });
+  await page.waitForURL(`${baseURL}/test-gym-a/login`, { timeout: 5000 });
 
   await page.locator("#email").fill(newEmail);
   await page.locator("#password").fill("newpassword123");

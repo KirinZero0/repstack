@@ -25,7 +25,7 @@ test("self-serve signup: gym only exists after payment, then the owner can log i
 
   // Nothing exists yet, and the owner can't log in.
   expect(await prisma.gym.findUnique({ where: { slug: details.slug } })).toBeNull();
-  const early = await request.post(`${baseURL}/api/g/${details.slug}/staff-login`, {
+  const early = await request.post(`${baseURL}/api/${details.slug}/staff-login`, {
     data: { email: details.ownerEmail, password: details.password },
   });
   expect(early.status()).toBe(404);
@@ -56,7 +56,7 @@ test("self-serve signup: gym only exists after payment, then the owner can log i
   expect((await (await request.get(`${baseURL}/api/signup/${signupId}/status`)).json()).status).toBe("COMPLETED");
 
   // The owner logs in with the password they chose.
-  const login = await request.post(`${baseURL}/api/g/${details.slug}/staff-login`, {
+  const login = await request.post(`${baseURL}/api/${details.slug}/staff-login`, {
     data: { email: details.ownerEmail, password: details.password },
   });
   expect(login.ok()).toBeTruthy();

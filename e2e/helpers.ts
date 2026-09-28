@@ -14,7 +14,7 @@ export async function superadminLoginUI(page: Page, baseURL: string) {
 }
 
 export async function staffLoginUI(page: Page, baseURL: string, slug: string, email: string, password: string) {
-  await page.goto(`${baseURL}/g/${slug}/login`);
+  await page.goto(`${baseURL}/${slug}/login`);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
@@ -28,7 +28,7 @@ export async function staffLoginAPI(
   email: string,
   password: string,
 ) {
-  const res = await request.post(`${baseURL}/api/g/${slug}/staff-login`, {
+  const res = await request.post(`${baseURL}/api/${slug}/staff-login`, {
     data: { email, password },
   });
   if (!res.ok()) throw new Error(`staff login failed: ${res.status()} ${await res.text()}`);

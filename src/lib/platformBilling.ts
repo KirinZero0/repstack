@@ -67,10 +67,10 @@ export async function openPlatformInvoice(
       amount: Number(plan.price),
       description: `${plan.name}: ${gym.name} ${purpose === "renewal" ? "subscription renewal" : "plan change"}`,
       currency: plan.currency,
-      successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/billing`,
+      successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/${gym.slug}/billing`,
     });
     // In dev mock mode there's no provider page, so use our own test checkout on the billing page.
-    const url = isMockMode() ? `/g/${gym.slug}/billing?mock-invoice=${payment.id}` : invoice.url;
+    const url = isMockMode() ? `/${gym.slug}/billing?mock-invoice=${payment.id}` : invoice.url;
     await prisma.platformPayment.update({ where: { id: payment.id }, data: { externalInvoiceId: invoice.id, invoiceUrl: url } });
     return { paymentId: payment.id, url, created: true };
   } catch (err) {

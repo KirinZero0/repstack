@@ -37,11 +37,11 @@ test("a gym over its plan's monthly WhatsApp allowance is not sent to, and logge
 });
 
 test("gym WhatsApp settings routes are gone; the owner settings page shows usage instead", async ({ request, baseURL }) => {
-  const login = await request.post(`${baseURL}/api/g/test-gym-a/staff-login`, { data: { email: "owner-a@test.local", password: "owner-pass-123" } });
+  const login = await request.post(`${baseURL}/api/test-gym-a/staff-login`, { data: { email: "owner-a@test.local", password: "owner-pass-123" } });
   expect(login.ok()).toBeTruthy();
-  const res = await request.post(`${baseURL}/api/g/test-gym-a/whatsapp`, { data: { provider: "fonnte", senderNumber: "0812", apiKey: "x", isActive: true } });
+  const res = await request.post(`${baseURL}/api/test-gym-a/whatsapp`, { data: { provider: "fonnte", senderNumber: "0812", apiKey: "x", isActive: true } });
   expect(res.status()).toBe(404);
-  const page = await request.get(`${baseURL}/g/test-gym-a/settings`);
+  const page = await request.get(`${baseURL}/test-gym-a/settings`);
   expect(page.ok()).toBeTruthy();
   expect(await page.text()).toContain("messages used this month");
 });

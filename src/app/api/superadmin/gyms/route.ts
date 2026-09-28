@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireSuperadminSession, SessionError } from "@/lib/session";
 import { createGymSchema } from "@/lib/validation/superadmin";
+import { RESERVED_SLUGS } from "@/lib/signup";
 import { writeAuditLog } from "@/lib/audit";
 import { sendPlatformWhatsapp } from "@/lib/whatsapp";
 
@@ -23,6 +24,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const data = parsed.data;
+
+  // The gym's slug is the first path segment (repstack.com/slug), same depth as every static page —
+  // a reserved name would make that gym's own pages permanently unreachable at that address.
+  if (RESERVED_SLUGS.has(data.slug)) {
+    return NextResponse.json({ error: "That web address is reserved. Choose another slug." }, { status: 409 });
+  }
 
   const existingSlug = await prisma.gym.findUnique({ where: { slug: data.slug } });
   if (existingSlug) {
@@ -78,7 +85,7 @@ export async function POST(req: NextRequest) {
   });
 
   if (data.ownerPhone) {
-    const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/login`;
+    const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL}/${gym.slug}/login`;
     await sendPlatformWhatsapp({
       to: data.ownerPhone,
       message: `Welcome to Repstack, ${data.ownerName}! Your gym "${data.gymName}" is set up. Log in at ${loginUrl} with email ${data.ownerEmail} and the temporary password you were given.`,

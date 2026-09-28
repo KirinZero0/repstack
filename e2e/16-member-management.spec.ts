@@ -47,18 +47,18 @@ async function makeMember(f: Fixture, over: { status?: "ACTIVE" | "EXPIRED" | "C
 }
 
 async function login(request: APIRequestContext, baseURL: string, slug: string, who: { email: string; password: string }) {
-  const res = await request.post(`${baseURL}/api/g/${slug}/login`, { data: who });
+  const res = await request.post(`${baseURL}/api/${slug}/login`, { data: who });
   expect(res.ok(), `login ${who.email}`).toBeTruthy();
 }
 
 const patch = (request: APIRequestContext, baseURL: string, slug: string, memberId: string, body: object) =>
-  request.patch(`${baseURL}/api/g/${slug}/members/${memberId}`, { data: body });
+  request.patch(`${baseURL}/api/${slug}/members/${memberId}`, { data: body });
 
 test("the plan's member limit stops owners adding members and public joins, and cancelling frees a seat", async ({ request, baseURL }) => {
   const f = await makeGym(2);
   await login(request, baseURL!, f.slug, f.owner);
   const add = (n: number) =>
-    request.post(`${baseURL}/api/g/${f.slug}/members`, {
+    request.post(`${baseURL}/api/${f.slug}/members`, {
       data: { fullName: `Limit ${n}`, email: `${uniq("lim")}@test.local`, phoneWhatsapp: `0819${Date.now().toString().slice(-7)}${n}`, planId: f.planA.id },
     });
 
@@ -69,12 +69,12 @@ test("the plan's member limit stops owners adding members and public joins, and 
   expect((await third.json()).error).toContain("allows 2 members");
 
   // The members page tells the owner where they stand.
-  const membersHtml = (await (await request.get(`${baseURL}/g/${f.slug}/members`)).text()).replace(/<!-- -->/g, "");
+  const membersHtml = (await (await request.get(`${baseURL}/${f.slug}/members`)).text()).replace(/<!-- -->/g, "");
   expect(membersHtml).toContain("2 of 2 members");
 
   // A full gym doesn't take public sign-ups either, and doesn't reveal its numbers.
-  await request.post(`${baseURL}/api/g/${f.slug}/settings`, { data: { acceptSignups: true } });
-  const join = await request.post(`${baseURL}/api/g/${f.slug}/join`, {
+  await request.post(`${baseURL}/api/${f.slug}/settings`, { data: { acceptSignups: true } });
+  const join = await request.post(`${baseURL}/api/${f.slug}/join`, {
     headers: { "x-forwarded-for": "10.9.0.1" },
     data: { planId: f.planA.id, fullName: "Public Joiner", email: `${uniq("pub")}@test.local`, phone: "081277776666", password: "long-enough-1", acceptTerms: true },
   });
@@ -142,7 +142,7 @@ test("a frozen member stays frozen when a payment lands, and gets the time on un
   await login(request, baseURL!, f.slug, f.owner);
   await patch(request, baseURL!, f.slug, member.id, { action: "freeze" });
 
-  const paid = await request.post(`${baseURL}/api/g/${f.slug}/members/${member.id}/payments`, { data: { planId: f.planA.id, amount: 250000 } });
+  const paid = await request.post(`${baseURL}/api/${f.slug}/members/${member.id}/payments`, { data: { planId: f.planA.id, amount: 250000 } });
   expect(paid.status()).toBe(201);
   const row = await prisma.member.findUniqueOrThrow({ where: { id: member.id } });
   expect(row.status).toBe("FROZEN");
@@ -180,13 +180,13 @@ test("erasing a member removes their personal data but keeps the payment history
   await login(staffCtx, baseURL!, f.slug, f.staff);
   await login(request, baseURL!, f.slug, f.owner);
 
-  await request.post(`${baseURL}/api/g/${f.slug}/members/${member.id}/payments`, { data: { planId: f.planA.id, amount: 250000 } });
+  await request.post(`${baseURL}/api/${f.slug}/members/${member.id}/payments`, { data: { planId: f.planA.id, amount: 250000 } });
   const { tokenHash } = generateMagicToken();
   await prisma.magicLink.create({ data: { memberId: member.id, tokenHash, expiresAt: new Date(Date.now() + DAY) } });
   const paymentsBefore = await prisma.payment.count({ where: { memberId: member.id } });
 
   const erase = (ctx: APIRequestContext, slug: string, confirmName: string) =>
-    ctx.post(`${baseURL}/api/g/${slug}/members/${member.id}/erase`, { data: { confirmName } });
+    ctx.post(`${baseURL}/api/${slug}/members/${member.id}/erase`, { data: { confirmName } });
 
   expect((await erase(staffCtx, f.slug, "Erase Me Please")).status()).toBe(403);
   expect((await erase(request, f.slug, "Someone Else")).status()).toBe(400);
@@ -212,15 +212,15 @@ test("erasing a member removes their personal data but keeps the payment history
   expect(await prisma.payment.count({ where: { memberId: member.id } })).toBe(paymentsBefore);
 
   // Their old login is gone, and the email can be used again.
-  const relog = await request.post(`${baseURL}/api/g/${f.slug}/login`, { data: { email: oldEmail, password: "member-pass-123" } });
+  const relog = await request.post(`${baseURL}/api/${f.slug}/login`, { data: { email: oldEmail, password: "member-pass-123" } });
   expect(relog.status()).toBe(401);
-  const reuse = await request.post(`${baseURL}/api/g/${f.slug}/members`, {
+  const reuse = await request.post(`${baseURL}/api/${f.slug}/members`, {
     data: { fullName: "Comes Back", email: oldEmail, phoneWhatsapp: "081211110000", planId: f.planA.id },
   });
   expect(reuse.status()).toBe(201);
 
   // The erased row is hidden from the list, and can't be edited.
-  expect(await (await request.get(`${baseURL}/g/${f.slug}/members`)).text()).not.toContain("Erased member");
+  expect(await (await request.get(`${baseURL}/${f.slug}/members`)).text()).not.toContain("Erased member");
   expect((await patch(request, baseURL!, f.slug, member.id, { action: "edit", fullName: "Zombie" })).status()).toBe(409);
   expect((await erase(request, f.slug, "Erased member")).status()).toBe(409);
   await staffCtx.dispose();
@@ -244,7 +244,7 @@ test("a member can delete their own account with their password", async ({ reque
 
   // The session is gone and the credentials no longer work.
   expect((await request.post(`${baseURL}/api/my/erase`, { data: { password: "member-pass-123" } })).status()).toBe(401);
-  expect((await request.post(`${baseURL}/api/g/${f.slug}/login`, { data: { email: member.email, password: "member-pass-123" } })).status()).toBe(401);
+  expect((await request.post(`${baseURL}/api/${f.slug}/login`, { data: { email: member.email, password: "member-pass-123" } })).status()).toBe(401);
 });
 
 test("terms must be accepted to sign up, join and activate, and the time is recorded", async ({ request, baseURL }) => {

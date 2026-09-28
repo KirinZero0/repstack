@@ -83,7 +83,7 @@ export async function completeMemberSignup(signupId: string, paidAt: Date) {
 
   await sendGymWhatsapp(signup.gymId, {
     to: decrypt(signup.phoneWhatsapp),
-    message: `Welcome to ${signup.gym.name}, ${signup.fullName}! Your ${signup.plan.name} membership is active until ${expiry.toLocaleDateString("id-ID", { timeZone: signup.gym.timezone })}. Log in with ${signup.email} at ${process.env.NEXT_PUBLIC_APP_URL}/g/${signup.gym.slug}/login to see your check-in QR.`,
+    message: `Welcome to ${signup.gym.name}, ${signup.fullName}! Your ${signup.plan.name} membership is active until ${expiry.toLocaleDateString("id-ID", { timeZone: signup.gym.timezone })}. Log in with ${signup.email} at ${process.env.NEXT_PUBLIC_APP_URL}/${signup.gym.slug}/login to see your check-in QR.`,
     type: "member_welcome",
     memberId: member.id,
   }).catch((err) => console.error("Member welcome message failed", err));
@@ -146,7 +146,7 @@ export async function approveMemberSignup(gym: { id: string; name: string; slug:
 
   await sendGymWhatsapp(gym.id, {
     to: decrypt(created.signup.phoneWhatsapp),
-    message: `Welcome to ${gym.name}, ${created.signup.fullName}! Your membership is active until ${created.expiry.toLocaleDateString("id-ID", { timeZone: gym.timezone })}. Log in with ${created.signup.email} at ${process.env.NEXT_PUBLIC_APP_URL}/g/${gym.slug}/login to see your check-in QR.`,
+    message: `Welcome to ${gym.name}, ${created.signup.fullName}! Your membership is active until ${created.expiry.toLocaleDateString("id-ID", { timeZone: gym.timezone })}. Log in with ${created.signup.email} at ${process.env.NEXT_PUBLIC_APP_URL}/${gym.slug}/login to see your check-in QR.`,
     type: "member_welcome",
     memberId: created.member.id,
   }).catch((err) => console.error("Member welcome message failed", err));

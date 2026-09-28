@@ -13,10 +13,10 @@ out. Mock mode (`PAYMENTS_MOCK=1`, dev/test only) bypasses this switch entirely 
 
 Turning it back on is a one-line env change in Vercel — set `PAYMENTS_ENABLED=1` — no code change needed.
 
-The public join page (`/g/[slug]/join`) doesn't use this switch at all: it never used an online gateway in
+The public join page (`/[slug]/join`) doesn't use this switch at all: it never used an online gateway in
 the first place. A prospective member transfers their fee straight to the gym's own bank account (set in gym
 settings) and submits a request, optionally with a proof-of-transfer image, that staff reviews and approves
-on `/g/[slug]/members` ("Pending requests"). No member money passes through the platform's own
+on `/[slug]/members` ("Pending requests"). No member money passes through the platform's own
 payment-provider account this way — see "Who receives the money" below for why that matters.
 
 ## Providers
