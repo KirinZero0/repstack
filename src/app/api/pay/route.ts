@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { payMembershipSchema } from "@/lib/validation/tenant";
-import { createInvoice, getInvoiceState, isMockMode, onlinePaymentsEnabled, paymentProviderEnum } from "@/lib/gateway";
+import { createInvoice, getInvoiceState, isMockMode, memberPaymentsEnabled, paymentProviderEnum } from "@/lib/gateway";
 
 /** A member starts (or resumes) paying for a membership plan; returns the hosted invoice URL. */
 export async function POST(req: NextRequest) {
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "That plan isn't available" }, { status: 400 });
   }
 
-  if (!onlinePaymentsEnabled() && !isMockMode()) {
+  if (!memberPaymentsEnabled(gym.settings) && !isMockMode()) {
     return NextResponse.json({ error: "Online payments are currently turned off. Please pay at the gym." }, { status: 403 });
   }
 

@@ -40,6 +40,7 @@ export const gymSettingsSchema = z
   .object({
     theme: z.enum(["inherit", "light", "dark", "system"]).optional(),
     acceptSignups: z.boolean().optional(),
+    paymentsEnabled: z.boolean().optional(),
     name: z.string().trim().min(2).max(80).optional(),
     timezone: z.string().trim().max(60).refine(isValidTimezone, "Unknown timezone").optional(),
     bankName: z.string().trim().max(60).optional(),

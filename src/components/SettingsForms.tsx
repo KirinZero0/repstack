@@ -206,6 +206,42 @@ export function JoinSettingsForm({ slug, initial, joinUrl }: { slug: string; ini
   );
 }
 
+export function OnlinePaymentsForm({ slug, initial, providerReady }: { slug: string; initial: boolean; providerReady: boolean }) {
+  const [on, setOn] = useState(initial);
+  const { state, error, save } = useSave(`/api/g/${slug}/settings`);
+
+  return (
+    <div className="space-y-4">
+      <label className="flex items-start gap-3 text-sm text-neutral-300">
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(e) => {
+            setOn(e.target.checked);
+            save({ paymentsEnabled: e.target.checked });
+          }}
+          className="mt-0.5 h-4 w-4"
+        />
+        <span>
+          Let members pay online
+          <span className="mt-1 block text-neutral-500">
+            Members can renew or pay for a plan themselves from their dashboard, by card, e-wallet or bank
+            transfer through our payment provider. Off by default — members pay at the front desk or by
+            direct bank transfer until you turn this on.
+          </span>
+        </span>
+      </label>
+      {!providerReady && (
+        <p className="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2 text-xs text-amber-400">
+          Online payments aren&apos;t set up on Repstack yet, so this won&apos;t take effect until they are.
+        </p>
+      )}
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {state === "saved" && <p className="text-sm text-emerald-400">Saved</p>}
+    </div>
+  );
+}
+
 const TIMEZONES: { id: string; label: string }[] = [
   { id: "Asia/Jakarta", label: "WIB, Jakarta (UTC+7)" },
   { id: "Asia/Makassar", label: "WITA, Makassar (UTC+8)" },

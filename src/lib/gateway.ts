@@ -32,10 +32,26 @@ function providerOf(recorded?: string | null): ProviderName {
 
 /**
  * Every online payment (member billing, gym subscriptions, gym self-signup) is off by default.
- * Set PAYMENTS_ENABLED=1 in Vercel to turn it back on; mock mode (dev/test) is unaffected.
+ * Set PAYMENTS_ENABLED=1 in Vercel to turn it back on; mock mode (dev/test) is unaffected. This
+ * is the platform-wide switch — whether Repstack's payment provider is wired up and ready at all.
  */
 export function onlinePaymentsEnabled(): boolean {
   return process.env.PAYMENTS_ENABLED === "1";
+}
+
+/**
+ * Per-gym: whether THIS gym's members can pay online, stored on Gym.settings ("paymentsEnabled"),
+ * set by the owner in Settings — same pattern as acceptSignups. Off by default, since a gym needs
+ * to have somewhere for that money to reconcile against before turning it on. Doesn't affect the
+ * gym's own subscription to Repstack, which is a platform-level concern, not the gym's choice.
+ */
+export function gymPaymentsEnabled(gymSettings: unknown): boolean {
+  return (gymSettings as { paymentsEnabled?: unknown } | null)?.paymentsEnabled === true;
+}
+
+/** Member billing needs both switches on: the platform provider is ready, and this gym opted in. */
+export function memberPaymentsEnabled(gymSettings: unknown): boolean {
+  return onlinePaymentsEnabled() && gymPaymentsEnabled(gymSettings);
 }
 
 export class PaymentsDisabledError extends Error {

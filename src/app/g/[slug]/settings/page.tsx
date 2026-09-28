@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymThemeFromSettings } from "@/lib/theme";
 import { Card } from "@/components/charts";
-import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm } from "@/components/SettingsForms";
+import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm, OnlinePaymentsForm } from "@/components/SettingsForms";
 import { gymAcceptsSignups, JOIN_PAGE_ENABLED } from "@/lib/memberSignup";
+import { gymPaymentsEnabled, onlinePaymentsEnabled } from "@/lib/gateway";
+import GymNav from "@/components/GymNav";
 
 export const dynamic = "force-dynamic";
 
@@ -36,14 +38,12 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
       <div className="mx-auto max-w-xl">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">Settings</h1>
             <p className="text-sm text-neutral-400">{gym.name}</p>
           </div>
-          <a href={`/g/${params.slug}/dashboard`} className="text-sm text-neutral-300 hover:text-white">
-            ← Dashboard
-          </a>
+          <GymNav slug={params.slug} role={session.role} current="settings" />
         </div>
 
         <div className="mb-6">
@@ -95,6 +95,12 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
                 bankAccountHolder: gym.bankAccountHolder ?? "",
               }}
             />
+          </Card>
+        </div>
+
+        <div className="mb-6">
+          <Card title="Online payments">
+            <OnlinePaymentsForm slug={params.slug} initial={gymPaymentsEnabled(gym.settings)} providerReady={onlinePaymentsEnabled()} />
           </Card>
         </div>
 

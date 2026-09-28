@@ -27,6 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     else next.theme = parsed.data.theme;
   }
   if (parsed.data.acceptSignups !== undefined) next.acceptSignups = parsed.data.acceptSignups;
+  if (parsed.data.paymentsEnabled !== undefined) next.paymentsEnabled = parsed.data.paymentsEnabled;
 
   await db.gym.update({
     where: { id: gym.id },
