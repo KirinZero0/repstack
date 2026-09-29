@@ -28,7 +28,7 @@ test("a gym slug can't be reserved words that now collide with a top-level page"
   // "g" itself is reserved too, but it's shorter than the slug format allows, so it's rejected by
   // format validation before the reserved-word check ever runs — old /g/... links are covered by
   // the middleware redirect regardless, not by this check.
-  for (const slug of ["privacy", "terms", "reset", "api", "signup"]) {
+  for (const slug of ["privacy", "terms", "reset", "api", "signup", "login", "forgot"]) {
     const res = await request.post(`${baseURL}/api/signup`, {
       data: {
         saasPlanId: plan.id,
@@ -44,6 +44,24 @@ test("a gym slug can't be reserved words that now collide with a top-level page"
     expect(res.status(), slug).toBe(409);
     expect((await res.json()).field, slug).toBe("slug");
   }
+});
+
+test("superadmin can't create a gym with a reserved slug either", async ({ request, baseURL }) => {
+  await request.post(`${baseURL}/api/superadmin/login`, { data: { email: "superadmin@test.local", password: "superadmin-pass-123" } });
+  const plan = await prisma.saasPlan.findFirstOrThrow({ where: { isActive: true } });
+  const res = await request.post(`${baseURL}/api/superadmin/gyms`, {
+    data: {
+      gymName: "Nope",
+      slug: "privacy",
+      saasPlanId: plan.id,
+      isLifetime: false,
+      ownerName: "Nope",
+      ownerEmail: `nope-${Date.now()}@test.local`,
+      ownerTempPassword: "long-enough-1",
+    },
+  });
+  expect(res.status()).toBe(409);
+  expect(await prisma.gym.findUnique({ where: { slug: "privacy" } })).toBeNull();
 });
 
 test("the real gym pages resolve at the shorter address", async ({ request, baseURL }) => {

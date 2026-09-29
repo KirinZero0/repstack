@@ -2,7 +2,6 @@ import BrandMark from "@/components/BrandMark";
 import HeroLedger from "@/components/landing/HeroLedger";
 import Pricing, { type Tier } from "@/components/landing/Pricing";
 import { prisma } from "@/lib/prisma";
-import GymSlugForm from "./GymSlugForm";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +98,7 @@ export default async function Home() {
             <a href="/demo" className="hidden hover:text-white sm:inline">Demo</a>
             <a href="#pricing" className="hover:text-white">Pricing</a>
             <a href="#faq" className="hidden hover:text-white sm:inline">FAQ</a>
-            <a href="#login" className="rounded-full bg-white px-4 py-1.5 font-medium text-neutral-950 hover:bg-neutral-200">
+            <a href="/login" className="rounded-full bg-white px-4 py-1.5 font-medium text-neutral-950 hover:bg-neutral-200">
               Log in
             </a>
           </nav>
@@ -198,11 +197,16 @@ export default async function Home() {
             <div>
               <h2 className="text-3xl font-semibold sm:text-4xl">Already on Repstack?</h2>
               <p className="mt-4 max-w-sm text-neutral-400">
-                Enter your gym&apos;s short name (the part right after repstack.com/ in your link) to log in as staff or as a member.
+                One login for staff and members, at any gym. Just your email and password — nothing else to remember.
               </p>
             </div>
             <div className="max-w-sm">
-              <GymSlugForm />
+              <a
+                href="/login"
+                className="block w-full rounded-lg bg-white py-2.5 text-center text-sm font-semibold text-neutral-950 hover:bg-neutral-200"
+              >
+                Log in
+              </a>
             </div>
           </div>
         </section>

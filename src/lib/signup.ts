@@ -12,7 +12,7 @@ export const SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
  * at that name). "g" stays reserved for the old /g/[slug]/... links, which now redirect (middleware.ts).
  */
 export const RESERVED_SLUGS = new Set([
-  "api", "g", "demo", "signup", "superadmin", "activate", "my", "my-qr", "check-in", "login",
+  "api", "g", "demo", "signup", "superadmin", "activate", "my", "my-qr", "check-in", "login", "forgot",
   "privacy", "terms", "reset",
   "admin", "app", "www", "iron-ledger", "ironledger", "repstack", "support", "billing", "pricing", "static",
 ]);
