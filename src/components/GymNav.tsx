@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export type GymNavPage = "dashboard" | "members" | "checkin-station" | "checkin" | "staff" | "plans" | "finance" | "billing" | "settings";
+export type GymNavPage = "dashboard" | "members" | "classes" | "checkin-station" | "checkin" | "staff" | "plans" | "finance" | "billing" | "settings";
 
 interface Props {
   slug: string;
@@ -23,6 +23,8 @@ interface Item {
 const ITEMS: Item[] = [
   { page: "dashboard", label: "Dashboard", href: (s) => `/${s}/dashboard` },
   { page: "members", label: "Members", href: (s) => `/${s}/members` },
+  // Staff see the roster and confirm front-desk payments; only the owner gets the set-up controls on the page itself.
+  { page: "classes", label: "Classes", href: (s) => `/${s}/classes` },
   { page: "checkin-station", label: "Check-in poster", href: (s) => `/${s}/checkin-station` },
   { page: "checkin", label: "Staff scanner", href: (s) => `/${s}/checkin` },
   { page: "staff", label: "Staff", href: (s) => `/${s}/staff`, ownerOnly: true },

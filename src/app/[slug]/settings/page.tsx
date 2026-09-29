@@ -2,9 +2,11 @@ import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymThemeFromSettings } from "@/lib/theme";
 import { Card } from "@/components/charts";
-import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm, OnlinePaymentsForm } from "@/components/SettingsForms";
+import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm, OnlinePaymentsForm, GymProfileForm } from "@/components/SettingsForms";
+import GymPhotosManager from "@/components/GymPhotosManager";
 import { gymAcceptsSignups, JOIN_PAGE_ENABLED } from "@/lib/memberSignup";
 import { gymPaymentsEnabled, onlinePaymentsEnabled } from "@/lib/gateway";
+import { MAX_GYM_PHOTOS } from "@/lib/validation/tenant";
 import GymNav from "@/components/GymNav";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +51,22 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
         <div className="mb-6">
           <Card title="Gym details">
             <GymDetailsForm slug={params.slug} initialName={gym.name} initialTimezone={gym.timezone} />
+          </Card>
+        </div>
+
+        <div className="mb-6">
+          <Card title="Public page">
+            <GymProfileForm
+              slug={params.slug}
+              initial={{ description: gym.description ?? "", address: gym.address ?? "" }}
+              publicUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/${params.slug}`}
+            />
+          </Card>
+        </div>
+
+        <div className="mb-6">
+          <Card title="Gym photos">
+            <GymPhotosManager slug={params.slug} photos={gym.photoUrls} max={MAX_GYM_PHOTOS} />
           </Card>
         </div>
 

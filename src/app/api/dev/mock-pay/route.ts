@@ -26,10 +26,17 @@ export async function POST(req: NextRequest) {
   }
 
   const payment = paymentId ? await prisma.payment.findUnique({ where: { id: paymentId } }) : null;
-  if (!payment || payment.memberId !== session.memberId) {
-    return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+  if (payment && payment.memberId === session.memberId) {
+    await processPaymentEvent({ id: `mock_evt_${payment.id}`, external_id: payment.id, status: "PAID", paid_at: new Date().toISOString() });
+    return NextResponse.json({ ok: true });
   }
 
-  await processPaymentEvent({ id: `mock_evt_${payment.id}`, external_id: payment.id, status: "PAID", paid_at: new Date().toISOString() });
-  return NextResponse.json({ ok: true });
+  // A member paying for a class seat.
+  const classPayment = paymentId ? await prisma.classPayment.findUnique({ where: { id: paymentId }, include: { registration: true } }) : null;
+  if (classPayment && classPayment.registration.memberId === session.memberId) {
+    await processPaymentEvent({ id: `mock_evt_${classPayment.id}`, external_id: classPayment.id, status: "PAID", paid_at: new Date().toISOString() });
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ error: "Payment not found" }, { status: 404 });
 }

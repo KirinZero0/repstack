@@ -6,9 +6,10 @@ import { extendedExpiry } from "./membership";
 
 export { extendedExpiry };
 import { completeMemberSignup } from "./memberSignup";
+import { sendClassConfirmation } from "./classes";
 
-/** Applies a payment event to a member or platform payment. Idempotent. Returns which kind it matched, or null. */
-export async function processPaymentEvent(event: XenditWebhookEvent): Promise<"member" | "platform" | "signup" | "join" | null> {
+/** Applies a payment event to a member, platform, signup, join or class payment. Idempotent. Returns which kind it matched, or null. */
+export async function processPaymentEvent(event: XenditWebhookEvent): Promise<"member" | "platform" | "signup" | "join" | "class" | null> {
   const memberPayment = await prisma.payment.findUnique({
     where: { id: event.external_id },
     include: { plan: true },
@@ -49,7 +50,36 @@ export async function processPaymentEvent(event: XenditWebhookEvent): Promise<"m
     return "join";
   }
 
+  const classPayment = await prisma.classPayment.findUnique({ where: { id: event.external_id } });
+  if (classPayment) {
+    await handleClassPayment(classPayment, event);
+    return "class";
+  }
+
   return null;
+}
+
+async function handleClassPayment(payment: Awaited<ReturnType<typeof prisma.classPayment.findUniqueOrThrow>>, event: XenditWebhookEvent) {
+  // Idempotency: a second delivery of the same event finds the payment already PAID/EXPIRED and does nothing.
+  if (payment.status !== "PENDING") return;
+
+  if (event.status === "PAID") {
+    await prisma.$transaction([
+      prisma.classPayment.update({
+        where: { id: payment.id },
+        data: { status: "PAID", paidAt: event.paid_at ? new Date(event.paid_at) : new Date() },
+      }),
+      // The seat was reserved at registration time, so a late payment keeps it — no second capacity check.
+      prisma.classRegistration.update({ where: { id: payment.registrationId }, data: { status: "CONFIRMED" } }),
+    ]);
+    await sendClassConfirmation(payment.registrationId);
+  } else if (event.status === "EXPIRED") {
+    // The invoice lapsed: free the seat. The member can book again, which starts a fresh invoice.
+    await prisma.$transaction([
+      prisma.classPayment.update({ where: { id: payment.id }, data: { status: "EXPIRED" } }),
+      prisma.classRegistration.updateMany({ where: { id: payment.registrationId, status: "PENDING_PAYMENT" }, data: { status: "CANCELLED" } }),
+    ]);
+  }
 }
 
 async function handleMemberPayment(

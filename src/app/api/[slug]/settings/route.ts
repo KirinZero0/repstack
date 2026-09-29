@@ -38,6 +38,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       ...(parsed.data.bankName !== undefined ? { bankName: parsed.data.bankName || null } : {}),
       ...(parsed.data.bankAccountNumber !== undefined ? { bankAccountNumber: parsed.data.bankAccountNumber || null } : {}),
       ...(parsed.data.bankAccountHolder !== undefined ? { bankAccountHolder: parsed.data.bankAccountHolder || null } : {}),
+      ...(parsed.data.description !== undefined ? { description: parsed.data.description || null } : {}),
+      ...(parsed.data.address !== undefined ? { address: parsed.data.address || null } : {}),
     },
   });
   return NextResponse.json({ ok: true });

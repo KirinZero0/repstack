@@ -46,8 +46,17 @@ export const gymSettingsSchema = z
     bankName: z.string().trim().max(60).optional(),
     bankAccountNumber: z.string().trim().max(40).optional(),
     bankAccountHolder: z.string().trim().max(80).optional(),
+    /** Public profile page (/[slug]). Empty string clears the field. */
+    description: z.string().trim().max(1000).optional(),
+    address: z.string().trim().max(200).optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), "Nothing to update");
+
+/** Owner removes one gym photo by its stored URL. */
+export const removeGymPhotoSchema = z.object({ url: z.string().url().max(500) });
+
+/** How many photos a gym's public profile can hold. Enforced server-side. */
+export const MAX_GYM_PHOTOS = 8;
 
 const planFields = {
   name: z.string().trim().min(2).max(60),
@@ -129,3 +138,41 @@ export const createStaffSchema = z.object({
 });
 
 export const staffActiveSchema = z.object({ isActive: z.boolean() });
+
+// ─── Classes ────────────────────────────────────────────────
+
+const optionalText = (max: number) => z.string().trim().max(max).optional().or(z.literal("").transform(() => undefined));
+
+const classFields = {
+  name: z.string().trim().min(2).max(80),
+  description: optionalText(1000),
+  instructor: optionalText(80),
+  /** Whole rupiah. 0 = free (registration confirms straight away, no payment). */
+  price: z.number().int().min(0).max(100_000_000),
+  /** Seats per session; null/omitted = unlimited. */
+  capacity: z.number().int().min(1).max(1000).nullable().optional(),
+  durationMinutes: z.number().int().min(5).max(600),
+  isActive: z.boolean(),
+};
+export const createClassSchema = z.object({ ...classFields, isActive: classFields.isActive.default(true) });
+export const updateClassSchema = z.object(classFields).partial().refine((v) => Object.keys(v).length > 0, "Nothing to update");
+
+const LOCAL_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+/** Schedules one session, or the same slot weekly `repeatWeeks` times (one row each — no recurrence rule). */
+export const createClassSessionSchema = z.object({
+  /** Wall-clock time in the gym's timezone, "YYYY-MM-DDTHH:mm" (a datetime-local input). */
+  startsAt: z.string().regex(LOCAL_DATETIME, "Pick a date and time"),
+  capacity: z.number().int().min(1).max(1000).nullable().optional(),
+  repeatWeeks: z.number().int().min(1).max(52).default(1),
+});
+
+export const classSessionActionSchema = z.object({ action: z.enum(["cancel"]) });
+
+/** Staff confirms a member's registration by recording what they paid at the front desk. */
+export const confirmClassRegistrationSchema = z.object({
+  amount: z.number().int().min(0).max(100_000_000),
+  note: z.string().trim().max(200).optional(),
+});
+
+export const registerForClassSchema = z.object({ sessionId: z.string().uuid() });

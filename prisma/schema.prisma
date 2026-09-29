@@ -60,18 +60,25 @@ model Gym {
   bankName           String? // shown on the public join page for manual bank-transfer requests
   bankAccountNumber  String?
   bankAccountHolder  String?
+  description        String? // public profile page (/[slug])
+  address            String?
+  photoUrls          String[]           @default([]) // Vercel Blob public URLs, display order = array order
   createdAt          DateTime           @default(now())
 
-  staff            StaffUser[]
-  members          Member[]
-  plans            MembershipPlan[]
-  platformPayments PlatformPayment[]
-  whatsappConfig   WhatsappSenderConfig?
-  auditLogs        AuditLog[]
-  checkins         CheckIn[]
-  payments         Payment[]
-  notifications    NotificationLog[]
-  memberSignups    MemberSignup[]
+  staff              StaffUser[]
+  members            Member[]
+  plans              MembershipPlan[]
+  platformPayments   PlatformPayment[]
+  whatsappConfig     WhatsappSenderConfig?
+  auditLogs          AuditLog[]
+  checkins           CheckIn[]
+  payments           Payment[]
+  notifications      NotificationLog[]
+  memberSignups      MemberSignup[]
+  classes            GymClass[]
+  classSessions      ClassSession[]
+  classRegistrations ClassRegistration[]
+  classPayments      ClassPayment[]
 
   @@index([subscriptionStatus])
 }
@@ -122,8 +129,9 @@ model StaffUser {
   isActive     Boolean  @default(true) // deactivated staff can't log in and lose access immediately
   createdAt    DateTime @default(now())
 
-  checkins         CheckIn[]
-  recordedPayments Payment[]
+  checkins              CheckIn[]
+  recordedPayments      Payment[]
+  recordedClassPayments ClassPayment[]
 
   @@index([gymId])
 }
@@ -175,10 +183,11 @@ model Member {
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
-  checkins      CheckIn[]
-  payments      Payment[]
-  notifications NotificationLog[]
-  magicLinks    MagicLink[]
+  checkins           CheckIn[]
+  payments           Payment[]
+  notifications      NotificationLog[]
+  magicLinks         MagicLink[]
+  classRegistrations ClassRegistration[]
 
   @@index([gymId, status])
   @@index([membershipExpiry])
@@ -355,6 +364,99 @@ model MemberSignup {
   @@index([gymId, createdAt])
   @@index([email])
   @@index([ipHash, createdAt])
+}
+
+// ─── Classes ────────────────────────────────────────────────
+// A gym sets up class types (GymClass) with a price, schedules individual sessions of them
+// (ClassSession — one row per occurrence, no recurrence engine), and members register for a
+// session (ClassRegistration) and pay for it (ClassPayment). ClassPayment mirrors Payment rather
+// than reusing it: Payment.planId is required and tied to memberships, and the membership webhook
+// code depends on that shape.
+
+model GymClass {
+  id              String   @id @default(uuid())
+  gymId           String
+  gym             Gym      @relation(fields: [gymId], references: [id])
+  name            String
+  description     String?
+  instructor      String? // free text for v1, no separate Instructor model yet
+  price           Decimal
+  currency        String   @default("IDR")
+  capacity        Int? // null = unlimited
+  durationMinutes Int
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  sessions ClassSession[]
+
+  @@index([gymId])
+}
+
+enum ClassSessionStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+model ClassSession {
+  id        String             @id @default(uuid())
+  gymId     String
+  gym       Gym                @relation(fields: [gymId], references: [id])
+  classId   String
+  class     GymClass           @relation(fields: [classId], references: [id])
+  startsAt  DateTime
+  capacity  Int? // overrides GymClass.capacity for this session if set
+  status    ClassSessionStatus @default(SCHEDULED)
+  createdAt DateTime           @default(now())
+
+  registrations ClassRegistration[]
+
+  @@index([gymId, startsAt])
+}
+
+enum ClassRegistrationStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CANCELLED
+}
+
+model ClassRegistration {
+  id        String                  @id @default(uuid())
+  gymId     String
+  gym       Gym                     @relation(fields: [gymId], references: [id])
+  sessionId String
+  session   ClassSession            @relation(fields: [sessionId], references: [id])
+  memberId  String
+  member    Member                  @relation(fields: [memberId], references: [id])
+  status    ClassRegistrationStatus @default(PENDING_PAYMENT)
+  createdAt DateTime                @default(now())
+
+  payment ClassPayment?
+
+  @@unique([sessionId, memberId]) // one registration per member per session
+  @@index([gymId])
+  @@index([memberId])
+}
+
+model ClassPayment {
+  id                String            @id @default(uuid())
+  gymId             String
+  gym               Gym               @relation(fields: [gymId], references: [id])
+  registrationId    String            @unique
+  registration      ClassRegistration @relation(fields: [registrationId], references: [id])
+  provider          PaymentProvider // XENDIT | MIDTRANS | CASH
+  externalInvoiceId String?           @unique
+  invoiceUrl        String?
+  amount            Decimal
+  currency          String            @default("IDR")
+  status            PaymentStatus     @default(PENDING)
+  createdAt         DateTime          @default(now())
+  paidAt            DateTime?
+  note              String? // free text for manual payments
+  recordedById      String? // staff who recorded a manual (CASH) payment
+  recordedBy        StaffUser?        @relation(fields: [recordedById], references: [id])
+
+  @@index([gymId])
 }
 
 // ─── Password reset / staff invite ──────────────────────────

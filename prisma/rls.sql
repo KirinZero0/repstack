@@ -12,8 +12,9 @@ GRANT USAGE ON SCHEMA public TO {{ROLE}};
 
 -- The only tables gym-scoped code touches. Everything else (Superadmin, AuditLog, GymSignup,
 -- MagicLink, PasswordReset, AppConfig) is deliberately not granted at all. MemberSignup holds the
--- manual join/bank-transfer requests staff review on /g/[slug]/members and act on via approve/reject.
-GRANT SELECT, INSERT, UPDATE, DELETE ON "Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup" TO {{ROLE}};
+-- manual join/bank-transfer requests staff review on /[slug]/members and act on via approve/reject.
+-- GymClass, ClassSession, ClassRegistration and ClassPayment are the classes feature (/[slug]/classes, /my/classes).
+GRANT SELECT, INSERT, UPDATE, DELETE ON "Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup", "GymClass", "ClassSession", "ClassRegistration", "ClassPayment" TO {{ROLE}};
 -- The plan catalog is not tenant data; gyms read their own plan's limits.
 GRANT SELECT ON "SaasPlan" TO {{ROLE}};
 
@@ -56,3 +57,19 @@ CREATE POLICY tenant_isolation ON "PlatformPayment" USING ("gymId" = current_set
 ALTER TABLE "MemberSignup" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON "MemberSignup";
 CREATE POLICY tenant_isolation ON "MemberSignup" USING ("gymId" = current_setting('app.current_gym_id', true)) WITH CHECK ("gymId" = current_setting('app.current_gym_id', true));
+
+ALTER TABLE "GymClass" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "GymClass";
+CREATE POLICY tenant_isolation ON "GymClass" USING ("gymId" = current_setting('app.current_gym_id', true)) WITH CHECK ("gymId" = current_setting('app.current_gym_id', true));
+
+ALTER TABLE "ClassSession" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "ClassSession";
+CREATE POLICY tenant_isolation ON "ClassSession" USING ("gymId" = current_setting('app.current_gym_id', true)) WITH CHECK ("gymId" = current_setting('app.current_gym_id', true));
+
+ALTER TABLE "ClassRegistration" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "ClassRegistration";
+CREATE POLICY tenant_isolation ON "ClassRegistration" USING ("gymId" = current_setting('app.current_gym_id', true)) WITH CHECK ("gymId" = current_setting('app.current_gym_id', true));
+
+ALTER TABLE "ClassPayment" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "ClassPayment";
+CREATE POLICY tenant_isolation ON "ClassPayment" USING ("gymId" = current_setting('app.current_gym_id', true)) WITH CHECK ("gymId" = current_setting('app.current_gym_id', true));

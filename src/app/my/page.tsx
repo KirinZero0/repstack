@@ -50,6 +50,14 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
   const mockPayment = mockId
     ? await db.payment.findFirst({ where: { id: mockId, memberId: member.id, status: "PENDING" }, include: { plan: true } })
     : null;
+  // The mock "hosted page" for a class seat lands here too; it goes back to the classes page afterwards.
+  const mockClassPayment =
+    mockId && !mockPayment
+      ? await db.classPayment.findFirst({
+          where: { id: mockId, status: "PENDING", registration: { memberId: member.id } },
+          include: { registration: { include: { session: { include: { class: true } } } } },
+        })
+      : null;
 
   const daysLeft = member.membershipExpiry
     ? Math.ceil((member.membershipExpiry.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
@@ -66,6 +74,7 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
             <p className="text-sm text-neutral-400">{member.gym.name}</p>
           </div>
           <nav className="flex items-center gap-4 text-sm">
+            <a href="/my/classes" className="text-neutral-300 hover:text-white">Classes</a>
             <a href="/my-qr" className="text-neutral-300 hover:text-white">My QR</a>
             <MemberLogout slug={member.gym.slug} />
           </nav>
@@ -73,6 +82,14 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
 
         {mockPayment && (
           <MockCheckout paymentId={mockPayment.id} amount={rp(Number(mockPayment.amount))} planName={mockPayment.plan.name} />
+        )}
+        {mockClassPayment && (
+          <MockCheckout
+            paymentId={mockClassPayment.id}
+            amount={rp(Number(mockClassPayment.amount))}
+            planName={`${mockClassPayment.registration.session.class.name} class`}
+            returnTo="/my/classes"
+          />
         )}
 
         <a

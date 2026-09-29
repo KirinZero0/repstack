@@ -54,6 +54,15 @@ export function memberPaymentsEnabled(gymSettings: unknown): boolean {
   return onlinePaymentsEnabled() && gymPaymentsEnabled(gymSettings);
 }
 
+/**
+ * Like memberPaymentsEnabled, but mock mode (dev/test) stands in for the platform provider only —
+ * the gym's own opt-in still applies. Class bookings use this, so a gym that hasn't turned online
+ * payments on gets the "pay at the front desk" flow in development and tests as well as in production.
+ */
+export function memberPaymentsAvailable(gymSettings: unknown): boolean {
+  return gymPaymentsEnabled(gymSettings) && (onlinePaymentsEnabled() || isMockMode());
+}
+
 export class PaymentsDisabledError extends Error {
   constructor() {
     super("Online payments are currently turned off");

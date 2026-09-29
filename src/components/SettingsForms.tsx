@@ -242,6 +242,58 @@ export function OnlinePaymentsForm({ slug, initial, providerReady }: { slug: str
   );
 }
 
+export function GymProfileForm({
+  slug,
+  initial,
+  publicUrl,
+}: {
+  slug: string;
+  initial: { description: string; address: string };
+  publicUrl: string;
+}) {
+  const [description, setDescription] = useState(initial.description);
+  const [address, setAddress] = useState(initial.address);
+  const { state, error, save } = useSave(`/api/${slug}/settings`);
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        save({ description, address });
+      }}
+      className="space-y-4"
+    >
+      <p className="text-sm text-neutral-400">
+        Shown on your public page at{" "}
+        <a href={`/${slug}`} className="break-all text-white underline underline-offset-2">{publicUrl}</a>. Anyone can see it, so keep it to what you&apos;d put on a poster.
+      </p>
+      <div>
+        <label htmlFor="gymDescription" className="mb-1 block text-sm text-neutral-300">About the gym</label>
+        <textarea
+          id="gymDescription"
+          maxLength={1000}
+          rows={4}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Opening hours, what you offer, who it's for…"
+          className={selectCls}
+        />
+      </div>
+      <div>
+        <label htmlFor="gymAddress" className="mb-1 block text-sm text-neutral-300">Address</label>
+        <input id="gymAddress" maxLength={200} value={address} onChange={(e) => setAddress(e.target.value)} className={selectCls} />
+      </div>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      <div className="flex items-center gap-3">
+        <button type="submit" disabled={state === "saving"} className={btnCls}>
+          {state === "saving" ? "Saving…" : "Save"}
+        </button>
+        {state === "saved" && <span className="text-sm text-emerald-400">Saved</span>}
+      </div>
+    </form>
+  );
+}
+
 const TIMEZONES: { id: string; label: string }[] = [
   { id: "Asia/Jakarta", label: "WIB, Jakarta (UTC+7)" },
   { id: "Asia/Makassar", label: "WITA, Makassar (UTC+8)" },
