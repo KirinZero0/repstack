@@ -8,9 +8,13 @@ import type { NextRequest } from "next/server";
  * and body, so a POST to an old API URL still works, not just GET page links.
  */
 export function middleware(req: NextRequest) {
-  const { pathname, search } = req.nextUrl;
-  const rest = pathname.replace(/^(\/api)?\/g\//, "$1/");
-  const url = new URL(`${rest}${search}`, req.url);
+  const rest = req.nextUrl.pathname.replace(/^(\/api)?\/g\//, "$1/");
+  // Build the target from a clone and only set pathname, never re-parse the string as a URL — a
+  // path like "/g//evil.com/x" would strip down to "//evil.com/x", which new URL() (or a template
+  // string handed to it) reads as protocol-relative and redirects off-site. Setting .pathname can't
+  // do that: it's always taken as a path on this same origin, whatever it starts with.
+  const url = req.nextUrl.clone();
+  url.pathname = rest;
   return NextResponse.redirect(url, 308);
 }
 

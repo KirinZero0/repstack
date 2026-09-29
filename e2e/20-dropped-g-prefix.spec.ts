@@ -23,6 +23,16 @@ test("an old /g/[slug]/... link redirects permanently to /[slug]/...", async ({ 
   expect(apiRedirect.url()).toBe(`${baseURL}/api/test-gym-a/staff-login`);
 });
 
+test("the redirect can't be tricked into sending someone off-site (open redirect)", async ({ request, baseURL }) => {
+  // "/g//evil.com/x" strips down to "//evil.com/x" — read naively that's protocol-relative and
+  // would resolve to https://evil.com/x. The Location must always stay on this origin.
+  const res = await request.get(`${baseURL}/g//evil.com/x`, { maxRedirects: 0 });
+  expect(res.status()).toBe(308);
+  const location = new URL(res.headers()["location"], baseURL);
+  expect(location.origin).toBe(new URL(baseURL!).origin);
+  expect(location.host).not.toContain("evil.com");
+});
+
 test("a gym slug can't be reserved words that now collide with a top-level page", async ({ request, baseURL }) => {
   const plan = await prisma.saasPlan.findFirstOrThrow({ where: { isActive: true } });
   // "g" itself is reserved too, but it's shorter than the slug format allows, so it's rejected by
