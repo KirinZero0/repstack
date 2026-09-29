@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
+import { putPrivateFile } from "@/lib/blob";
 import { joinSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
 import { countMemberSeats } from "@/lib/limits";
@@ -105,8 +105,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (proof instanceof File && proof.size > 0) {
     // Proof is optional — never let a Blob failure block the request itself.
     try {
-      const blob = await put(`join-proofs/${gym.id}-${Date.now()}`, proof, { access: "private", contentType: proof.type });
-      proofImageUrl = blob.url;
+      proofImageUrl = await putPrivateFile(`join-proofs/${gym.id}-${Date.now()}`, proof, proof.type);
     } catch (err) {
       console.error("Proof image upload failed, continuing without it", err);
     }

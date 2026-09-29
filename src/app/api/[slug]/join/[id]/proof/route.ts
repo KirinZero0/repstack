@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { get } from "@vercel/blob";
 import { requireTenantSession, SessionError } from "@/lib/session";
+import { getPrivateFile } from "@/lib/blob";
 
 /** Staff views the proof-of-transfer image for a pending manual join request. Private blob, tenant-scoped. */
 export async function GET(_req: NextRequest, { params }: { params: { slug: string; id: string } }) {
@@ -20,10 +20,10 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const result = await get(signup.proofImageUrl, { access: "private" }).catch(() => null);
-  if (!result || !result.stream) return NextResponse.json({ error: "Image unavailable" }, { status: 502 });
+  const result = await getPrivateFile(signup.proofImageUrl);
+  if (!result) return NextResponse.json({ error: "Image unavailable" }, { status: 502 });
 
   return new NextResponse(result.stream, {
-    headers: { "Content-Type": result.blob.contentType, "Cache-Control": "private, max-age=60" },
+    headers: { "Content-Type": result.contentType, "Cache-Control": "private, max-age=60" },
   });
 }

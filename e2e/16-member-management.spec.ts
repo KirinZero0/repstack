@@ -76,7 +76,14 @@ test("the plan's member limit stops owners adding members and public joins, and 
   await request.post(`${baseURL}/api/${f.slug}/settings`, { data: { acceptSignups: true } });
   const join = await request.post(`${baseURL}/api/${f.slug}/join`, {
     headers: { "x-forwarded-for": "10.9.0.1" },
-    data: { planId: f.planA.id, fullName: "Public Joiner", email: `${uniq("pub")}@test.local`, phone: "081277776666", password: "long-enough-1", acceptTerms: true },
+    multipart: {
+      planId: f.planA.id,
+      fullName: "Public Joiner",
+      email: `${uniq("pub")}@test.local`,
+      phone: "081277776666",
+      password: "long-enough-1",
+      acceptTerms: "true",
+    },
   });
   expect(join.status()).toBe(403);
   expect((await join.json()).error).not.toMatch(/\d/);

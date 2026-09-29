@@ -4,7 +4,7 @@ import { gymThemeFromSettings } from "@/lib/theme";
 import { Card } from "@/components/charts";
 import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm, OnlinePaymentsForm, GymProfileForm } from "@/components/SettingsForms";
 import GymPhotosManager from "@/components/GymPhotosManager";
-import { gymAcceptsSignups, JOIN_PAGE_ENABLED } from "@/lib/memberSignup";
+import { gymAcceptsSignups } from "@/lib/memberSignup";
 import { gymPaymentsEnabled, onlinePaymentsEnabled } from "@/lib/gateway";
 import { MAX_GYM_PHOTOS } from "@/lib/validation/tenant";
 import GymNav from "@/components/GymNav";
@@ -124,17 +124,11 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
 
         <div className="mb-6">
           <Card title="Online sign-up">
-            {JOIN_PAGE_ENABLED ? (
-              <JoinSettingsForm
-                slug={params.slug}
-                initial={gymAcceptsSignups(gym.settings)}
-                joinUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/${params.slug}/join`}
-              />
-            ) : (
-              <p className="text-sm text-neutral-400">
-                Temporarily unavailable. New members are added by staff on the Members page for now.
-              </p>
-            )}
+            <JoinSettingsForm
+              slug={params.slug}
+              initial={gymAcceptsSignups(gym.settings)}
+              joinUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/${params.slug}/join`}
+            />
           </Card>
         </div>
 
