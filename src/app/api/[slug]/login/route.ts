@@ -4,6 +4,7 @@ import { setSessionCookie } from "@/lib/session";
 import { staffLoginSchema } from "@/lib/validation/tenant";
 import { compareOrDummy } from "@/lib/passwordTiming";
 import { suspendedForNonPayment } from "@/lib/suspension";
+import { checkLoginThrottle } from "@/lib/loginThrottle";
 
 /**
  * One login form for both staff and members of a gym. Looks up both tables and runs a
@@ -14,6 +15,10 @@ import { suspendedForNonPayment } from "@/lib/suspension";
  * each table has its own unique constraint), staff takes precedence.
  */
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
+  if (!(await checkLoginThrottle(req))) {
+    return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
+  }
+
   const parsed = staffLoginSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });

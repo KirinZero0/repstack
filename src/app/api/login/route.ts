@@ -4,6 +4,7 @@ import { setSessionCookie } from "@/lib/session";
 import { staffLoginSchema } from "@/lib/validation/tenant";
 import { compareOrDummy } from "@/lib/passwordTiming";
 import { suspendedForNonPayment } from "@/lib/suspension";
+import { checkLoginThrottle } from "@/lib/loginThrottle";
 
 /**
  * One login for the whole platform: no gym address to remember or type. Email is unique across
@@ -14,6 +15,10 @@ import { suspendedForNonPayment } from "@/lib/suspension";
  * supported yet), staff takes precedence, same as the per-gym login.
  */
 export async function POST(req: NextRequest) {
+  if (!(await checkLoginThrottle(req))) {
+    return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
+  }
+
   const parsed = staffLoginSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });

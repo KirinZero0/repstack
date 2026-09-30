@@ -3,8 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { setSessionCookie } from "@/lib/session";
 import { staffLoginSchema } from "@/lib/validation/tenant";
 import { compareOrDummy } from "@/lib/passwordTiming";
+import { checkLoginThrottle } from "@/lib/loginThrottle";
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
+  if (!(await checkLoginThrottle(req))) {
+    return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 });
+  }
+
   const body = await req.json().catch(() => null);
   const parsed = staffLoginSchema.safeParse(body);
   if (!parsed.success) {

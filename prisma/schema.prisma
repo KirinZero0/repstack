@@ -477,3 +477,12 @@ model PasswordReset {
   @@index([subjectId, createdAt])
   @@index([ipHash, createdAt])
 }
+
+/// One row per POST to any login route, success or failure — throttles brute force by IP.
+model LoginAttempt {
+  id        String   @id @default(uuid())
+  ipHash    String
+  createdAt DateTime @default(now())
+
+  @@index([ipHash, createdAt])
+}

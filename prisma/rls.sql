@@ -11,7 +11,7 @@ REVOKE ALL ON ALL TABLES IN SCHEMA public FROM {{ROLE}};
 GRANT USAGE ON SCHEMA public TO {{ROLE}};
 
 -- The only tables gym-scoped code touches. Everything else (Superadmin, AuditLog, GymSignup,
--- MagicLink, PasswordReset, AppConfig) is deliberately not granted at all. MemberSignup holds the
+-- MagicLink, PasswordReset, AppConfig, LoginAttempt) is deliberately not granted at all. MemberSignup holds the
 -- manual join/bank-transfer requests staff review on /[slug]/members and act on via approve/reject.
 -- GymClass, ClassSession, ClassRegistration and ClassPayment are the classes feature (/[slug]/classes, /my/classes).
 GRANT SELECT, INSERT, UPDATE, DELETE ON "Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup", "GymClass", "ClassSession", "ClassRegistration", "ClassPayment" TO {{ROLE}};
