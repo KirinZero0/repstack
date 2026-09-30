@@ -5,7 +5,6 @@ import { countMemberSeats } from "@/lib/limits";
 import GymNav from "@/components/GymNav";
 import AddMemberForm from "./AddMemberForm";
 import ResendFallbackButton from "./ResendFallbackButton";
-import PendingRequests from "./PendingRequests";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +17,7 @@ export default async function MembersPage({ params }: { params: { slug: string }
     throw err;
   }
 
-  const [members, plans, saasPlan, seats, pending] = await Promise.all([
+  const [members, plans, saasPlan, seats, pendingCount] = await Promise.all([
     db.member.findMany({
       where: { gymId: gym.id, anonymizedAt: null },
       include: { plan: true },
@@ -27,23 +26,8 @@ export default async function MembersPage({ params }: { params: { slug: string }
     db.membershipPlan.findMany({ where: { gymId: gym.id, isActive: true } }),
     db.saasPlan.findUnique({ where: { id: gym.saasPlanId } }),
     countMemberSeats(db, gym.id),
-    db.memberSignup.findMany({
-      where: { gymId: gym.id, status: "PENDING_REVIEW" },
-      include: { plan: true },
-      orderBy: { createdAt: "asc" },
-    }),
+    db.memberSignup.count({ where: { gymId: gym.id, status: "PENDING_REVIEW" } }),
   ]);
-
-  const pendingRows = pending.map((p) => ({
-    id: p.id,
-    fullName: p.fullName,
-    email: maskEmail(p.email),
-    phone: maskPhone(decrypt(p.phoneWhatsapp)),
-    plan: p.plan.name,
-    amount: p.amount.toString(),
-    createdAt: p.createdAt.toISOString(),
-    hasProof: Boolean(p.proofImageUrl),
-  }));
 
   const rows = members.map((m) => ({
     id: m.id,
@@ -74,7 +58,17 @@ export default async function MembersPage({ params }: { params: { slug: string }
           <GymNav slug={params.slug} role={session.role} current="members" />
         </div>
 
-        <PendingRequests slug={params.slug} requests={pendingRows} />
+        {pendingCount > 0 && (
+          <a
+            href={`/${params.slug}/members/requests`}
+            className="mb-6 flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm hover:bg-amber-500/20"
+          >
+            <span>
+              <strong>{pendingCount}</strong> pending join request{pendingCount === 1 ? "" : "s"} waiting for review
+            </span>
+            <span className="text-amber-400">Review →</span>
+          </a>
+        )}
 
         <div className="mb-6">
           <AddMemberForm
