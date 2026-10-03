@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { decrypt } from "./crypto";
 
 export type GatewayProvider = "fonnte" | "wablas";
 
@@ -81,29 +82,58 @@ export async function gymWhatsappUsage(gymId: string): Promise<number> {
 }
 
 /**
- * Sends a WhatsApp message on behalf of a gym. Everything goes out from the platform's own
- * number (gyms don't need a gateway account), prefixed with the gym's name, and counts against the
- * gym plan's monthly WhatsApp allowance.
+ * The gym's own gateway account, if its owner connected one in Settings. "broken" means a token is
+ * saved but can't be read (e.g. the encryption key changed): that must fail loudly, never quietly
+ * fall back to sending from the platform's number.
+ */
+async function gymGateway(gymId: string): Promise<{ provider: GatewayProvider; apiKey: string } | "broken" | null> {
+  const config = await prisma.whatsappSenderConfig.findUnique({ where: { gymId } });
+  if (!config || !config.isActive) return null;
+  try {
+    return { provider: config.gatewayProvider as GatewayProvider, apiKey: decrypt(config.apiKeyEncrypted) };
+  } catch {
+    console.error(`[whatsapp] gym ${gymId} has a saved token that could not be decrypted`);
+    return "broken";
+  }
+}
+
+/**
+ * Sends a WhatsApp message on behalf of a gym. A gym that connected its own Fonnte token sends from
+ * its own number: no gym-name prefix needed and no plan allowance, since the gym pays its own
+ * gateway. Every other gym goes out from the platform's shared number, prefixed with the gym's name
+ * and counted against the plan's monthly WhatsApp allowance.
  */
 export async function sendGymWhatsapp(
   gymId: string,
   opts: { to: string; message: string; type: string; memberId: string },
 ): Promise<SendResult> {
   const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, saasPlan: { select: { maxWhatsappPerMonth: true } } } });
-  const gateway = platformGateway();
+  const own = gym ? await gymGateway(gymId) : null;
 
   let result: SendResult;
   let status: "SENT" | "FAILED" | "SKIPPED" | "LIMIT";
-  if (!gym || !gateway) {
+  if (!gym) {
     result = skippedSend(opts.to, opts.message);
     status = "SKIPPED";
-  } else if ((await gymWhatsappUsage(gymId)) >= gym.saasPlan.maxWhatsappPerMonth) {
-    console.log(`[whatsapp:limit] gym ${gymId} reached its monthly allowance, not sending to ${opts.to}`);
-    result = { ok: false, skipped: true, error: "Monthly WhatsApp limit reached", providerResponse: { limit: true } };
-    status = "LIMIT";
-  } else {
-    result = await sendWithGateway(gateway.provider, gateway.apiKey, opts.to, `*${gym.name}*\n${opts.message}`);
+  } else if (own === "broken") {
+    result = { ok: false, error: "The saved WhatsApp token could not be read. Re-enter it in Settings." };
+    status = "FAILED";
+  } else if (own) {
+    result = await sendWithGateway(own.provider, own.apiKey, opts.to, opts.message);
     status = result.ok ? "SENT" : "FAILED";
+  } else {
+    const gateway = platformGateway();
+    if (!gateway) {
+      result = skippedSend(opts.to, opts.message);
+      status = "SKIPPED";
+    } else if ((await gymWhatsappUsage(gymId)) >= gym.saasPlan.maxWhatsappPerMonth) {
+      console.log(`[whatsapp:limit] gym ${gymId} reached its monthly allowance, not sending to ${opts.to}`);
+      result = { ok: false, skipped: true, error: "Monthly WhatsApp limit reached", providerResponse: { limit: true } };
+      status = "LIMIT";
+    } else {
+      result = await sendWithGateway(gateway.provider, gateway.apiKey, opts.to, `*${gym.name}*\n${opts.message}`);
+      status = result.ok ? "SENT" : "FAILED";
+    }
   }
 
   await prisma.notificationLog.create({

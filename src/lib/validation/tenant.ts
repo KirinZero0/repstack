@@ -41,6 +41,8 @@ export const gymSettingsSchema = z
     theme: z.enum(["inherit", "light", "dark", "system"]).optional(),
     acceptSignups: z.boolean().optional(),
     paymentsEnabled: z.boolean().optional(),
+    notifyWhatsapp: z.boolean().optional(),
+    notifyEmail: z.boolean().optional(),
     name: z.string().trim().min(2).max(80).optional(),
     timezone: z.string().trim().max(60).refine(isValidTimezone, "Unknown timezone").optional(),
     bankName: z.string().trim().max(60).optional(),
@@ -138,6 +140,22 @@ export const createStaffSchema = z.object({
 });
 
 export const staffActiveSchema = z.object({ isActive: z.boolean() });
+
+// ─── WhatsApp (a gym's own Fonnte device) ───────────────────
+
+const phoneField = z
+  .string()
+  .trim()
+  .min(6)
+  .max(30)
+  .regex(/^\+?[\d\s-]+$/, "Use digits only, for example 0812 3456 7890");
+
+export const whatsappConfigSchema = z.object({
+  token: z.string().trim().min(8, "That token looks too short").max(200),
+  senderNumber: phoneField,
+});
+
+export const whatsappTestSchema = z.object({ phone: phoneField });
 
 // ─── Classes ────────────────────────────────────────────────
 

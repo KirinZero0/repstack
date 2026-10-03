@@ -343,3 +343,184 @@ export function GymDetailsForm({ slug, initialName, initialTimezone }: { slug: s
     </form>
   );
 }
+
+/**
+ * A gym's own Fonnte token. It is write-only: the server never sends it back, so the field is always
+ * empty and "connected" just means one is saved.
+ */
+export function WhatsAppForm({ slug, connectedNumber }: { slug: string; connectedNumber: string | null }) {
+  const router = useRouter();
+  const [token, setToken] = useState("");
+  const [number, setNumber] = useState(connectedNumber ?? "");
+  const [testPhone, setTestPhone] = useState("");
+  const [busy, setBusy] = useState<"save" | "test" | "remove" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  async function call(kind: "save" | "test" | "remove", url: string, init: RequestInit, done: string) {
+    setBusy(kind);
+    setError(null);
+    setNote(null);
+    try {
+      const res = await fetch(url, init);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof body.error === "string" ? body.error : "Something went wrong");
+        return false;
+      }
+      setNote(done);
+      return true;
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    const ok = await call(
+      "save",
+      `/api/${slug}/whatsapp`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, senderNumber: number }) },
+      "Saved. Messages to your members now go out from your own number.",
+    );
+    if (ok) {
+      setToken("");
+      router.refresh();
+    }
+  }
+
+  async function sendTest(e: React.FormEvent) {
+    e.preventDefault();
+    await call(
+      "test",
+      `/api/${slug}/whatsapp/test`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: testPhone }) },
+      "Test message sent. Check that phone.",
+    );
+  }
+
+  async function remove() {
+    if (!window.confirm("Disconnect your WhatsApp number? Messages will go out from Repstack's shared number again.")) return;
+    const ok = await call("remove", `/api/${slug}/whatsapp`, { method: "DELETE" }, "Disconnected.");
+    if (ok) {
+      setNumber("");
+      router.refresh();
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-neutral-400">
+        {connectedNumber ? (
+          <>
+            <span className="font-medium text-emerald-400">Connected</span> — messages to your members are sent from{" "}
+            <span className="text-neutral-200">{connectedNumber}</span>.
+          </>
+        ) : (
+          "Not connected. Messages go out from Repstack's shared number, with your gym's name on each one, and count against your plan's monthly allowance."
+        )}
+      </p>
+
+      <form onSubmit={save} className="space-y-4">
+        <p className="text-sm text-neutral-400">
+          Get a token from your Fonnte account (one token per WhatsApp number). It is stored encrypted and can&apos;t be viewed again after saving.
+        </p>
+        <div>
+          <label htmlFor="waNumber" className="mb-1 block text-sm text-neutral-300">WhatsApp number linked to the token</label>
+          <input id="waNumber" inputMode="tel" maxLength={30} value={number} onChange={(e) => setNumber(e.target.value)} placeholder="0812 3456 7890" className={selectCls} />
+        </div>
+        <div>
+          <label htmlFor="waToken" className="mb-1 block text-sm text-neutral-300">{connectedNumber ? "New Fonnte token (replaces the saved one)" : "Fonnte token"}</label>
+          <input id="waToken" type="password" autoComplete="off" maxLength={200} value={token} onChange={(e) => setToken(e.target.value)} className={selectCls} />
+        </div>
+        <button type="submit" disabled={busy !== null || !token || !number} className={btnCls}>
+          {busy === "save" ? "Saving…" : connectedNumber ? "Replace token" : "Connect"}
+        </button>
+      </form>
+
+      {connectedNumber && (
+        <div className="space-y-4 border-t border-neutral-800 pt-5">
+          <form onSubmit={sendTest} className="space-y-2">
+            <label htmlFor="waTest" className="block text-sm text-neutral-300">Send a test message to</label>
+            <div className="flex flex-wrap gap-2">
+              <input id="waTest" inputMode="tel" maxLength={30} value={testPhone} onChange={(e) => setTestPhone(e.target.value)} placeholder="Your own number" className={`${selectCls} max-w-xs`} />
+              <button type="submit" disabled={busy !== null || !testPhone} className={btnCls}>
+                {busy === "test" ? "Sending…" : "Send test"}
+              </button>
+            </div>
+          </form>
+          <button type="button" onClick={remove} disabled={busy !== null} className="text-sm text-red-400 underline underline-offset-2 hover:text-red-300 disabled:opacity-50">
+            Disconnect this number
+          </button>
+        </div>
+      )}
+
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {note && !error && <p className="text-sm text-emerald-400">{note}</p>}
+    </div>
+  );
+}
+
+/** Which channels the gym uses to reach members. Each switch saves as soon as it's flipped. */
+export function NotificationsForm({
+  slug,
+  initialWhatsapp,
+  initialEmail,
+  emailReady,
+}: {
+  slug: string;
+  initialWhatsapp: boolean;
+  initialEmail: boolean;
+  emailReady: boolean;
+}) {
+  const [whatsapp, setWhatsapp] = useState(initialWhatsapp);
+  const [email, setEmail] = useState(initialEmail);
+  const { state, error, save } = useSave(`/api/${slug}/settings`);
+
+  return (
+    <div className="space-y-4">
+      <label className="flex items-start gap-3 text-sm text-neutral-300">
+        <input
+          type="checkbox"
+          checked={whatsapp}
+          onChange={(e) => {
+            setWhatsapp(e.target.checked);
+            save({ notifyWhatsapp: e.target.checked });
+          }}
+          className="mt-0.5 h-4 w-4"
+        />
+        <span>
+          Send members WhatsApp messages
+          <span className="mt-1 block text-neutral-500">Activation links, payment receipts, expiry reminders and class updates.</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-3 text-sm text-neutral-300">
+        <input
+          type="checkbox"
+          checked={email}
+          onChange={(e) => {
+            setEmail(e.target.checked);
+            save({ notifyEmail: e.target.checked });
+          }}
+          className="mt-0.5 h-4 w-4"
+        />
+        <span>
+          Send members emails
+          <span className="mt-1 block text-neutral-500">The same messages, sent to each member&apos;s email address. Turn on both to reach them either way.</span>
+        </span>
+      </label>
+      {email && !emailReady && (
+        <p className="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2 text-xs text-amber-400">
+          Email isn&apos;t set up on Repstack yet, so this won&apos;t take effect until it is.
+        </p>
+      )}
+      {!whatsapp && !email && (
+        <p className="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2 text-xs text-amber-400">
+          Both are off, so members won&apos;t get activation or password-reset links. You&apos;d have to share those yourself.
+        </p>
+      )}
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {state === "saved" && <p className="text-sm text-emerald-400">Saved</p>}
+    </div>
+  );
+}

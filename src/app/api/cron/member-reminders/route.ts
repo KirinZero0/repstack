@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
-import { sendGymWhatsapp } from "@/lib/whatsapp";
+import { notifyMember } from "@/lib/notify";
 import { decrypt } from "@/lib/crypto";
 
 const REMINDER_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   let remindersSent = 0;
   for (const member of expiringSoon) {
-    await sendGymWhatsapp(member.gymId, {
+    await notifyMember(member.gymId, {
       to: decrypt(member.phoneWhatsapp),
       message: `Hi ${member.fullName}, your gym membership expires on ${member.membershipExpiry?.toLocaleDateString(
         "id-ID",
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 
   for (const member of expired) {
     await prisma.member.update({ where: { id: member.id }, data: { status: "EXPIRED" } });
-    await sendGymWhatsapp(member.gymId, {
+    await notifyMember(member.gymId, {
       to: decrypt(member.phoneWhatsapp),
       message: `Hi ${member.fullName}, your gym membership has expired. Renew to regain access.`,
       type: "expired_notice",

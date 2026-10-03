@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { prisma, tenantTransaction } from "./prisma";
 import { decrypt } from "./crypto";
 import { extendedExpiry } from "./membership";
-import { sendGymWhatsapp } from "./whatsapp";
+import { notifyMember } from "./notify";
 import { paymentProviderEnum } from "./gateway";
 
 export const MEMBER_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
@@ -74,7 +74,7 @@ export async function completeMemberSignup(signupId: string, paidAt: Date) {
     return member;
   });
 
-  await sendGymWhatsapp(signup.gymId, {
+  await notifyMember(signup.gymId, {
     to: decrypt(signup.phoneWhatsapp),
     message: `Welcome to ${signup.gym.name}, ${signup.fullName}! Your ${signup.plan.name} membership is active until ${expiry.toLocaleDateString("id-ID", { timeZone: signup.gym.timezone })}. Log in with ${signup.email} at ${process.env.NEXT_PUBLIC_APP_URL}/${signup.gym.slug}/login to see your check-in QR.`,
     type: "member_welcome",
@@ -137,7 +137,7 @@ export async function approveMemberSignup(gym: { id: string; name: string; slug:
 
   if (!created) return null;
 
-  await sendGymWhatsapp(gym.id, {
+  await notifyMember(gym.id, {
     to: decrypt(created.signup.phoneWhatsapp),
     message: `Welcome to ${gym.name}, ${created.signup.fullName}! Your membership is active until ${created.expiry.toLocaleDateString("id-ID", { timeZone: gym.timezone })}. Log in with ${created.signup.email} at ${process.env.NEXT_PUBLIC_APP_URL}/${gym.slug}/login to see your check-in QR.`,
     type: "member_welcome",

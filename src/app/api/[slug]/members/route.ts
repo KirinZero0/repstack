@@ -4,7 +4,7 @@ import { addMemberSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
 import { createMagicLink } from "@/lib/magicLink";
 import { extendedExpiry } from "@/lib/membership";
-import { sendGymWhatsapp } from "@/lib/whatsapp";
+import { notifyMember } from "@/lib/notify";
 import { countMemberSeats, memberLimitMessage } from "@/lib/limits";
 
 const ACTIVATION_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   });
   const activationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/activate/${token}`;
 
-  await sendGymWhatsapp(gym.id, {
+  await notifyMember(gym.id, {
     to: data.phoneWhatsapp,
     message: [
       `Hi ${data.fullName}! You've been added to ${gym.name}.`,

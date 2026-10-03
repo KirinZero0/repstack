@@ -3,7 +3,8 @@ import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
 import { decrypt } from "./crypto";
 import { generateMagicToken, hashMagicToken } from "./magicLink";
-import { sendGymWhatsapp, sendPlatformWhatsapp } from "./whatsapp";
+import { sendPlatformWhatsapp } from "./whatsapp";
+import { notifyMember } from "./notify";
 
 export const RESET_TTL_MS = 60 * 60 * 1000; // self-service "forgot password" links
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // staff invites created by an owner
@@ -117,7 +118,7 @@ export async function deliverResetLink(target: {
     if (target.kind === "staff") {
       if (target.staffPhone) await sendPlatformWhatsapp({ to: target.staffPhone, message });
     } else if (target.member) {
-      await sendGymWhatsapp(target.member.gymId, {
+      await notifyMember(target.member.gymId, {
         to: decrypt(target.member.encryptedPhone),
         message,
         type: "password_reset",

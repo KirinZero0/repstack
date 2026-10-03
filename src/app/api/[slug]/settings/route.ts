@@ -28,6 +28,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
   if (parsed.data.acceptSignups !== undefined) next.acceptSignups = parsed.data.acceptSignups;
   if (parsed.data.paymentsEnabled !== undefined) next.paymentsEnabled = parsed.data.paymentsEnabled;
+  if (parsed.data.notifyWhatsapp !== undefined) next.notifyWhatsapp = parsed.data.notifyWhatsapp;
+  if (parsed.data.notifyEmail !== undefined) next.notifyEmail = parsed.data.notifyEmail;
 
   await db.gym.update({
     where: { id: gym.id },

@@ -2,9 +2,11 @@ import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymThemeFromSettings } from "@/lib/theme";
 import { Card } from "@/components/charts";
-import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm, OnlinePaymentsForm, GymProfileForm } from "@/components/SettingsForms";
+import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm, OnlinePaymentsForm, GymProfileForm, WhatsAppForm, NotificationsForm } from "@/components/SettingsForms";
 import GymPhotosManager from "@/components/GymPhotosManager";
 import { gymAcceptsSignups } from "@/lib/memberSignup";
+import { notificationChannels } from "@/lib/notify";
+import { emailConfigured } from "@/lib/email";
 import { gymPaymentsEnabled, onlinePaymentsEnabled } from "@/lib/gateway";
 import { MAX_GYM_PHOTOS } from "@/lib/validation/tenant";
 import GymNav from "@/components/GymNav";
@@ -30,9 +32,11 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
     );
   }
 
+  const channels = notificationChannels(gym.settings);
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const [plan, used, recent] = await Promise.all([
+  const [plan, waConfig, used, recent] = await Promise.all([
     db.saasPlan.findUnique({ where: { id: gym.saasPlanId } }),
+    db.whatsappSenderConfig.findUnique({ where: { gymId: gym.id }, select: { senderNumber: true, isActive: true } }),
     db.notificationLog.count({ where: { gymId: gym.id, channel: "whatsapp", status: "SENT", sentAt: { gte: monthStart } } }),
     db.notificationLog.findMany({ where: { gymId: gym.id }, orderBy: { sentAt: "desc" }, take: 5 }),
   ]);
@@ -71,12 +75,24 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
         </div>
 
         <div className="mb-6">
+          <Card title="Notifications">
+            <NotificationsForm
+              slug={params.slug}
+              initialWhatsapp={channels.whatsapp}
+              initialEmail={channels.email}
+              emailReady={emailConfigured()}
+            />
+          </Card>
+        </div>
+
+        <div className="mb-6">
           <Card title="WhatsApp messages">
             <p className="mb-4 text-sm text-neutral-400">
-              Activation links, payment receipts and expiry reminders are sent to your members by Repstack, with your gym&apos;s name on each message. Nothing to set up.
+              Activation links, payment receipts and expiry reminders go to your members over WhatsApp.
             </p>
-            {plan && (
-              <p className="text-sm text-neutral-300">
+            <WhatsAppForm slug={params.slug} connectedNumber={waConfig?.isActive ? waConfig.senderNumber : null} />
+            {plan && !waConfig?.isActive && (
+              <p className="mt-6 border-t border-neutral-800 pt-4 text-sm text-neutral-300">
                 <span className="font-semibold tabular-nums">{used.toLocaleString("id-ID")}</span> of{" "}
                 <span className="tabular-nums">{plan.maxWhatsappPerMonth.toLocaleString("id-ID")}</span> messages used this month.
                 {used >= plan.maxWhatsappPerMonth && <span className="ml-1 text-amber-400">Limit reached: further messages aren&apos;t sent until next month or an upgrade.</span>}
@@ -88,10 +104,13 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
                 <ul className="space-y-1 text-sm">
                   {recent.map((n) => (
                     <li key={n.id} className="flex flex-wrap justify-between gap-x-4">
-                      <span className="text-neutral-300">{n.type.replace(/_/g, " ")}</span>
+                      <span className="text-neutral-300">
+                        {n.type.replace(/_/g, " ")}
+                        <span className="ml-2 text-xs text-neutral-500">{n.channel === "email" ? "email" : "WhatsApp"}</span>
+                      </span>
                       <span className="flex gap-3">
                         <span className={STATUS_TONE[n.status] ?? "text-neutral-400"}>
-                          {n.status === "SKIPPED" ? "Not sent (WhatsApp unavailable)" : n.status === "LIMIT" ? "Not sent (monthly limit reached)" : n.status.toLowerCase()}
+                          {n.status === "SKIPPED" ? `Not sent (${n.channel === "email" ? "email" : "WhatsApp"} unavailable)` : n.status === "LIMIT" ? "Not sent (monthly limit reached)" : n.status.toLowerCase()}
                         </span>
                         <span className="text-neutral-500">{n.sentAt.toLocaleString("id-ID")}</span>
                       </span>

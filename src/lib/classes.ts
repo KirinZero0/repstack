@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { decrypt } from "./crypto";
-import { sendGymWhatsapp } from "./whatsapp";
+import { notifyMember } from "./notify";
 import { expireInvoice } from "./gateway";
 
 /** Registrations that hold a seat: confirmed ones, plus pending ones so a seat can't be sold twice mid-payment. */
@@ -41,7 +41,7 @@ export async function sendClassConfirmation(registrationId: string): Promise<voi
     });
     if (!reg || reg.member.anonymizedAt) return;
     const { session } = reg;
-    await sendGymWhatsapp(reg.gymId, {
+    await notifyMember(reg.gymId, {
       to: decrypt(reg.member.phoneWhatsapp),
       message: `Hi ${reg.member.fullName}, you're booked for ${session.class.name} at ${session.gym.name} on ${whenLabel(session.startsAt, session.gym.timezone)}${session.class.instructor ? ` with ${session.class.instructor}` : ""}. See you there!`,
       type: "class_confirmation",
@@ -62,7 +62,7 @@ export async function sendClassCancellations(sessionId: string): Promise<void> {
     if (!session) return;
     for (const reg of session.registrations) {
       if (reg.member.anonymizedAt) continue;
-      await sendGymWhatsapp(session.gymId, {
+      await notifyMember(session.gymId, {
         to: decrypt(reg.member.phoneWhatsapp),
         message: `Hi ${reg.member.fullName}, ${session.class.name} at ${session.gym.name} on ${whenLabel(session.startsAt, session.gym.timezone)} has been cancelled. ${reg.payment?.status === "PAID" ? "Please talk to the front desk about your payment." : "Sorry for the inconvenience."}`,
         type: "class_cancelled",

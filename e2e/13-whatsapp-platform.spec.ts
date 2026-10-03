@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { prisma } from "./helpers";
 import { sendGymWhatsapp } from "../src/lib/whatsapp";
 
-/** Gyms don't bring their own gateway: messages go out from the platform account, capped per plan. */
+/** A gym that hasn't connected its own Fonnte token sends from the platform account, capped per plan (own-token sending is covered in 25-gym-whatsapp). */
 test("gym messages send from the platform account and are logged SENT", async () => {
   const gym = await prisma.gym.findUniqueOrThrow({ where: { slug: "test-gym-a" } });
   const member = await prisma.member.findFirstOrThrow({ where: { gymId: gym.id } });
@@ -36,12 +36,12 @@ test("a gym over its plan's monthly WhatsApp allowance is not sent to, and logge
   expect(statuses).toEqual(["SENT", "SENT", "LIMIT"]);
 });
 
-test("gym WhatsApp settings routes are gone; the owner settings page shows usage instead", async ({ request, baseURL }) => {
+test("a gym that hasn't connected its own number sees its shared-number usage and a Connect option", async ({ request, baseURL }) => {
   const login = await request.post(`${baseURL}/api/test-gym-a/staff-login`, { data: { email: "owner-a@test.local", password: "owner-pass-123" } });
   expect(login.ok()).toBeTruthy();
-  const res = await request.post(`${baseURL}/api/test-gym-a/whatsapp`, { data: { provider: "fonnte", senderNumber: "0812", apiKey: "x", isActive: true } });
-  expect(res.status()).toBe(404);
   const page = await request.get(`${baseURL}/test-gym-a/settings`);
   expect(page.ok()).toBeTruthy();
-  expect(await page.text()).toContain("messages used this month");
+  const html = await page.text();
+  expect(html).toContain("messages used this month");
+  expect(html).toContain("Not connected");
 });

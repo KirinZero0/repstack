@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { createMagicLink } from "@/lib/magicLink";
-import { sendGymWhatsapp } from "@/lib/whatsapp";
+import { notifyMember } from "@/lib/notify";
 import { decrypt } from "@/lib/crypto";
 
 const FALLBACK_LINK_TTL_MS = 24 * 60 * 60 * 1000;
@@ -33,7 +33,7 @@ export async function POST(
   });
   const fallbackUrl = `${process.env.NEXT_PUBLIC_APP_URL}/my-qr?token=${token}`;
 
-  await sendGymWhatsapp(gym.id, {
+  await notifyMember(gym.id, {
     to: decrypt(member.phoneWhatsapp),
     message: `Hi ${member.fullName}, here's your gym QR code link (no login needed, valid 24h): ${fallbackUrl}`,
     type: "qr_fallback",

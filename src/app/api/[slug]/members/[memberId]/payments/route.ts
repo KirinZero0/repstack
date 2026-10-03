@@ -5,7 +5,7 @@ import { recordPaymentSchema } from "@/lib/validation/tenant";
 import { extendedExpiry } from "@/lib/payments";
 import { dayKeyInTimezone } from "@/lib/date";
 import { decrypt } from "@/lib/crypto";
-import { sendGymWhatsapp } from "@/lib/whatsapp";
+import { notifyMember } from "@/lib/notify";
 
 /** Owner or staff records money a member paid in person (cash, bank transfer) and activates them. */
 export async function POST(req: NextRequest, { params }: { params: { slug: string; memberId: string } }) {
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return created;
   });
 
-  await sendGymWhatsapp(gym.id, {
+  await notifyMember(gym.id, {
     to: decrypt(member.phoneWhatsapp),
     message: `Hi ${member.fullName}, we received your payment of Rp ${d.amount.toLocaleString("id-ID")} for ${plan.name} at ${gym.name}. Your membership is active until ${newExpiry.toLocaleDateString("id-ID", { timeZone: gym.timezone })}. Thank you!`,
     type: "payment_receipt",
