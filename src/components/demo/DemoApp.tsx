@@ -7,14 +7,17 @@ import Tour, { type TourStep } from "./Tour";
 import {
   INITIAL_MEMBERS,
   INITIAL_PLANS,
+  INITIAL_REQUESTS,
   RECENT_PAYMENTS,
   REVENUE_BY_PLAN,
   REVENUE_MONTHS,
   type DemoMember,
   type DemoPlan,
+  type DemoRequest,
 } from "./data";
 
-type Tab = "dashboard" | "members" | "plans" | "finance" | "poster";
+// "requests" is a sub-page of Members (reached from its banner), so it has no tab in the nav.
+type Tab = "dashboard" | "members" | "requests" | "plans" | "finance" | "poster";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
@@ -52,8 +55,14 @@ const STEPS: TourStep[] = [
   },
   {
     title: "Your member list",
-    body: "Phone numbers and emails are masked here, and encrypted in the database. Statuses update themselves: paying activates a member, and passing the end date marks them expired.",
+    body: "Everyone in one table, with their plan and how many days are left. Statuses update themselves: paying activates a member, and passing the end date marks them expired.",
     target: "member-table",
+    tab: "members",
+  },
+  {
+    title: "Find anyone in a second",
+    body: "Type a name or a phone number and the list narrows as you type. Try \"budi\". Contact details are stored encrypted, and only you and your staff can see them.",
+    target: "member-search",
     tab: "members",
   },
   {
@@ -74,7 +83,7 @@ const STEPS: TourStep[] = [
   },
   {
     title: "They get everything on WhatsApp",
-    body: "Saving sends the new member an activation link plus a payment invoice. Once they pay, their membership switches on. You never handle cash or chase transfers.",
+    body: "Saving sends the new member a link to set their password and get their check-in QR. If you've turned on online payments it also carries an invoice. Either way, their membership switches on once you record or receive the payment.",
     target: "whatsapp",
     tab: "members",
   },
@@ -98,6 +107,34 @@ const STEPS: TourStep[] = [
     title: "Their membership is back on",
     body: "Andi is active again and his new dates are set. He gets a WhatsApp receipt, the payment shows in your revenue as recorded manually with your name on it, and an owner can void it if you typed something wrong.",
     target: "paid-row",
+    tab: "members",
+  },
+  {
+    title: "People can also join on their own",
+    body: "Your gym has its own sign-up page. Someone picks a plan, transfers the fee to your bank account and uploads the transfer receipt. Their request waits here for you, so nobody becomes a member until you've checked the money.",
+    target: "pending-banner",
+    action: "Click Review",
+    advanceOnClick: true,
+    tab: "members",
+  },
+  {
+    title: "Check the transfer",
+    body: "Each request shows the plan, the amount and the receipt they uploaded. Compare it with your bank app before you approve.",
+    target: "request-card",
+    tab: "requests",
+  },
+  {
+    title: "Approve in one tap",
+    body: "Approving creates the member, records the payment and starts their membership. If the money never arrived, Reject instead and nothing is created.",
+    target: "approve-btn",
+    action: "Click Approve",
+    advanceOnClick: true,
+    tab: "requests",
+  },
+  {
+    title: "They're in",
+    body: "Rizky is now an active member with the login he chose. He gets a WhatsApp welcome message and can open his check-in QR straight away. You didn't have to type anything.",
+    target: "approved-row",
     tab: "members",
   },
   {
@@ -126,7 +163,7 @@ const STEPS: TourStep[] = [
   },
   {
     title: "It's on sale straight away",
-    body: "Your new plan shows up in the list, members can buy it from their own payment page, and you can pick it when you add a member. Prices can be edited later; changes only affect new invoices.",
+    body: "Your new plan shows up in the list, people can pick it on your sign-up page, and you can choose it when you add a member. Prices can be edited later; changes only affect new payments.",
     target: "new-plan-row",
     tab: "plans",
   },
@@ -150,7 +187,7 @@ const STEPS: TourStep[] = [
   },
   {
     title: "That's the owner side",
-    body: "Members get their own app with a big Check in button, attendance streaks and a Renew button that pays online. Ready to run your own gym on Repstack?",
+    body: "Members log in to see their check-in QR and book classes. Ready to run your own gym on Repstack?",
     tab: "dashboard",
     final: true,
   },
@@ -203,6 +240,9 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
   const [newPlanId, setNewPlanId] = useState<string | null>(null);
   const [planForm, setPlanForm] = useState({ name: "Student month", days: "30", price: "180000" });
   const [form, setForm] = useState({ name: "Nadia Rahma", phone: "0812 5550 0142", plan: "Monthly" });
+  const [query, setQuery] = useState("");
+  const [requests, setRequests] = useState<DemoRequest[]>(INITIAL_REQUESTS);
+  const [approvedName, setApprovedName] = useState<string | null>(null);
 
   const onTab = useCallback((t: string) => {
     setTab(t as Tab);
@@ -213,12 +253,31 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
   const expiring = members.filter((m) => m.status === "ACTIVE" && m.expiresInDays !== null && m.expiresInDays <= 7 && m.expiresInDays >= 0);
   const active = members.filter((m) => m.status === "ACTIVE").length;
 
+  const q = query.trim().toLowerCase();
+  const qDigits = q.replace(/\D/g, "");
+  const shownMembers = q
+    ? members.filter((m) => m.name.toLowerCase().includes(q) || (qDigits.length > 0 && m.phone.replace(/\D/g, "").includes(qDigits)))
+    : members;
+
+  function approveRequest(r: DemoRequest) {
+    setRequests((rs) => rs.filter((x) => x.id !== r.id));
+    setMembers((ms) => [
+      { name: r.name, email: r.email, phone: r.phone, plan: r.plan, status: "ACTIVE", expiresInDays: r.plan === "Quarterly" ? 90 : 30 },
+      ...ms,
+    ]);
+    setApprovedName(r.name);
+  }
+
+  function rejectRequest(r: DemoRequest) {
+    setRequests((rs) => rs.filter((x) => x.id !== r.id));
+  }
+
   function addMember(e: React.FormEvent) {
     e.preventDefault();
     const m: DemoMember = {
       name: form.name || "New member",
-      email: "n•••@mail.com",
-      phone: `+62•••••${form.phone.replace(/\D/g, "").slice(-4) || "0000"}`,
+      email: `${(form.name || "new.member").toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "")}@mail.com`,
+      phone: form.phone || "0812 0000 0000",
       plan: form.plan,
       status: "PENDING_PAYMENT",
       expiresInDays: null,
@@ -259,6 +318,9 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
     setPayForm({ amount: "250000", note: "Cash at front desk" });
     setNewPlanId(null);
     setPlanForm({ name: "Student month", days: "30", price: "180000" });
+    setQuery("");
+    setRequests(INITIAL_REQUESTS);
+    setApprovedName(null);
     setTourKey((k) => k + 1);
     setTourOn(true);
   }
@@ -286,9 +348,11 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
                 key={t.id}
                 data-tour={`nav-${t.id}`}
                 onClick={() => setTab(t.id)}
-                aria-current={tab === t.id ? "page" : undefined}
+                aria-current={(tab === "requests" ? "members" : tab) === t.id ? "page" : undefined}
                 className={`rounded-lg px-3 py-1.5 transition-colors ${
-                  tab === t.id ? "bg-neutral-800 text-white" : "text-neutral-400 hover:bg-neutral-900 hover:text-white"
+                  (tab === "requests" ? "members" : tab) === t.id
+                    ? "bg-neutral-800 text-white"
+                    : "text-neutral-400 hover:bg-neutral-900 hover:text-white"
                 }`}
               >
                 {t.label}
@@ -351,6 +415,19 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
                 + Add member
               </button>
             </div>
+
+            {requests.length > 0 && (
+              <button
+                data-tour="pending-banner"
+                onClick={() => setTab("requests")}
+                className="mb-6 flex w-full items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left text-sm hover:bg-amber-500/20"
+              >
+                <span>
+                  <strong>{requests.length}</strong> pending join request{requests.length === 1 ? "" : "s"} waiting for review
+                </span>
+                <span className="text-amber-400">Review →</span>
+              </button>
+            )}
 
             {showForm && (
               <form data-tour="add-form" onSubmit={addMember} className="mb-6 grid gap-3 rounded-xl border border-neutral-800 bg-neutral-900 p-5 sm:grid-cols-[1.2fr_1fr_1fr_auto]">
@@ -422,6 +499,23 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
               </p>
             )}
 
+            <div className="mb-4 flex items-center gap-3">
+              <input
+                data-tour="member-search"
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by name or phone number"
+                aria-label="Search members"
+                className="w-full max-w-md rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm text-white placeholder:text-neutral-500 outline-none focus:border-plate-blue"
+              />
+              {q && (
+                <span className="whitespace-nowrap text-sm text-neutral-400">
+                  {shownMembers.length} of {members.length}
+                </span>
+              )}
+            </div>
+
             <div data-tour="member-table" className="overflow-x-auto rounded-xl border border-neutral-800">
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="bg-neutral-900 text-neutral-400">
@@ -436,11 +530,15 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map((m) => (
-                    <tr key={m.name} data-tour={m.name === paidName ? "paid-row" : undefined} className="border-t border-neutral-800">
+                  {shownMembers.map((m) => (
+                    <tr
+                      key={m.name}
+                      data-tour={m.name === paidName ? "paid-row" : m.name === approvedName ? "approved-row" : undefined}
+                      className="border-t border-neutral-800"
+                    >
                       <td className="px-4 py-3 font-medium">{m.name}</td>
                       <td className="px-4 py-3 text-neutral-400">{m.email}</td>
-                      <td className="px-4 py-3 text-neutral-400">{m.phone}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-neutral-300">{m.phone}</td>
                       <td className="px-4 py-3">{m.plan}</td>
                       <td className="px-4 py-3">
                         <StatusPill status={m.status} />
@@ -457,9 +555,81 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
                       </td>
                     </tr>
                   ))}
+                  {shownMembers.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-neutral-500">
+                        No members match &ldquo;{query.trim()}&rdquo;.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {tab === "requests" && (
+          <div>
+            <button onClick={() => setTab("members")} className="text-sm text-neutral-400 hover:text-white">
+              ← Members
+            </button>
+            <h1 className="mt-2 text-2xl font-semibold">Pending requests</h1>
+            <p className="mb-8 text-sm text-neutral-400">
+              People who submitted a bank-transfer join request. Confirm the payment before approving.
+            </p>
+            {requests.length === 0 ? (
+              <p className="rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-8 text-center text-neutral-500">
+                No pending requests.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {requests.map((r, i) => (
+                  <div
+                    key={r.id}
+                    data-tour={i === 0 ? "request-card" : undefined}
+                    className="rounded-xl border border-amber-500/30 bg-neutral-900 p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="flex gap-4">
+                        <div
+                          aria-label="Transfer receipt"
+                          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-neutral-700 bg-neutral-950 text-center text-[10px] leading-tight text-neutral-500"
+                        >
+                          Transfer
+                          <br />
+                          receipt
+                        </div>
+                        <div>
+                          <p className="font-medium">{r.name}</p>
+                          <p className="text-sm text-neutral-400">
+                            {r.plan} · {rp(r.amount)}
+                          </p>
+                          <p className="mt-1 text-xs text-neutral-500">
+                            {r.email} · {r.phone}
+                          </p>
+                          <p className="text-xs text-neutral-600">Submitted {r.submitted}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          data-tour={i === 0 ? "approve-btn" : undefined}
+                          onClick={() => approveRequest(r)}
+                          className="whitespace-nowrap rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-[#ffffff] hover:bg-emerald-500"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => rejectRequest(r)}
+                          className="whitespace-nowrap rounded-md border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

@@ -18,6 +18,16 @@ export interface DemoPlan {
   members: number;
 }
 
+export interface DemoRequest {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  plan: string;
+  amount: number;
+  submitted: string;
+}
+
 export const INITIAL_PLANS: DemoPlan[] = [
   { id: "p1", name: "Monthly", days: 30, price: 250000, onSale: true, members: 5 },
   { id: "p2", name: "Quarterly", days: 90, price: 650000, onSale: true, members: 2 },
@@ -26,14 +36,19 @@ export const INITIAL_PLANS: DemoPlan[] = [
 ];
 
 export const INITIAL_MEMBERS: DemoMember[] = [
-  { name: "Sari Dewi", email: "s•••@mail.com", phone: "+62•••••4412", plan: "Annual", status: "ACTIVE", expiresInDays: 210 },
-  { name: "Budi Santoso", email: "b•••••@mail.com", phone: "+62•••••9087", plan: "Monthly", status: "ACTIVE", expiresInDays: 12 },
-  { name: "Rina Putri", email: "r••••@mail.com", phone: "+62•••••3351", plan: "Monthly", status: "ACTIVE", expiresInDays: 3 },
-  { name: "Dimas Pratama", email: "d••••@mail.com", phone: "+62•••••7720", plan: "Quarterly", status: "ACTIVE", expiresInDays: 51 },
-  { name: "Andi Wijaya", email: "a••••@mail.com", phone: "+62•••••1198", plan: "Monthly", status: "EXPIRED", expiresInDays: -6 },
-  { name: "Maya Lestari", email: "m••••@mail.com", phone: "+62•••••6604", plan: "Quarterly", status: "ACTIVE", expiresInDays: 5 },
-  { name: "Eko Nugroho", email: "e•••@mail.com", phone: "+62•••••2275", plan: "Monthly", status: "FROZEN", expiresInDays: 20 },
-  { name: "Lala Kusuma", email: "l•••@mail.com", phone: "+62•••••8836", plan: "Monthly", status: "PENDING_PAYMENT", expiresInDays: null },
+  { name: "Sari Dewi", email: "sari.dewi@mail.com", phone: "0812 3400 4412", plan: "Annual", status: "ACTIVE", expiresInDays: 210 },
+  { name: "Budi Santoso", email: "budi.santoso@mail.com", phone: "0813 5500 9087", plan: "Monthly", status: "ACTIVE", expiresInDays: 12 },
+  { name: "Rina Putri", email: "rina.putri@mail.com", phone: "0857 2200 3351", plan: "Monthly", status: "ACTIVE", expiresInDays: 3 },
+  { name: "Dimas Pratama", email: "dimas.pratama@mail.com", phone: "0812 7700 7720", plan: "Quarterly", status: "ACTIVE", expiresInDays: 51 },
+  { name: "Andi Wijaya", email: "andi.wijaya@mail.com", phone: "0821 1100 1198", plan: "Monthly", status: "EXPIRED", expiresInDays: -6 },
+  { name: "Maya Lestari", email: "maya.lestari@mail.com", phone: "0815 6600 6604", plan: "Quarterly", status: "ACTIVE", expiresInDays: 5 },
+  { name: "Eko Nugroho", email: "eko.nugroho@mail.com", phone: "0838 4400 2275", plan: "Monthly", status: "FROZEN", expiresInDays: 20 },
+  { name: "Lala Kusuma", email: "lala.kusuma@mail.com", phone: "0819 8800 8836", plan: "Monthly", status: "PENDING_PAYMENT", expiresInDays: null },
+];
+
+export const INITIAL_REQUESTS: DemoRequest[] = [
+  { id: "r1", name: "Rizky Maulana", email: "rizky.maulana@mail.com", phone: "0813 5555 0101", plan: "Monthly", amount: 250000, submitted: "2 hours ago" },
+  { id: "r2", name: "Putri Anggraini", email: "putri.anggraini@mail.com", phone: "0813 5555 0102", plan: "Quarterly", amount: 650000, submitted: "yesterday" },
 ];
 
 export const REVENUE_MONTHS = [

@@ -191,13 +191,14 @@ export default function Tour({
             </button>
           </div>
         ) : (
-          <div className="mt-5 flex items-center justify-between">
-            <div className="flex gap-1.5" aria-hidden="true">
-              {steps.map((_, i) => (
-                <span key={i} className={`h-1.5 w-1.5 rounded-full ${i === index ? "bg-plate-yellow" : i < index ? "bg-neutral-500" : "bg-neutral-700"}`} />
-              ))}
+          <div className="mt-5 flex items-center gap-4">
+            <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-neutral-700" aria-hidden="true">
+              <div
+                className="h-full rounded-full bg-plate-yellow transition-[width] duration-300"
+                style={{ width: `${((index + 1) / steps.length) * 100}%` }}
+              />
             </div>
-            <div className="flex gap-2">
+            <div className="flex shrink-0 gap-2">
               {index > 0 && (
                 <button onClick={back} className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800">
                   Back
