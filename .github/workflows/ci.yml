@@ -38,6 +38,10 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      # .env.test is git-ignored, so CI builds it from the tracked example (throwaway values only).
+      - name: Create test env
+        run: cp .env.test.example .env.test
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
