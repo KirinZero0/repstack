@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "-p", "3050", "-H", "0.0.0.0"],
       "port": 3050
+    },
+    {
+      "name": "dev-https",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "-p", "3051", "-H", "0.0.0.0", "--experimental-https"],
+      "port": 3051
     }
   ]
 }
