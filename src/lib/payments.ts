@@ -125,6 +125,19 @@ async function handlePlatformPayment(
 ) {
   if (payment.status !== "PENDING") return;
 
+  // A setup fee is a one-time charge: settle the record and leave the subscription alone.
+  if (payment.kind === "SETUP") {
+    if (event.status === "PAID") {
+      await prisma.platformPayment.update({
+        where: { id: payment.id },
+        data: { status: "PAID", paidAt: event.paid_at ? new Date(event.paid_at) : new Date() },
+      });
+    } else if (event.status === "EXPIRED") {
+      await prisma.platformPayment.update({ where: { id: payment.id }, data: { status: "EXPIRED" } });
+    }
+    return;
+  }
+
   if (event.status === "PAID") {
     const gym = await prisma.gym.findUnique({ where: { id: payment.gymId } });
     if (!gym) return;

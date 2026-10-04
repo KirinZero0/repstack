@@ -207,7 +207,7 @@ export default async function BillingPage({
               {payments.map((p) => (
                 <tr key={p.id} className="border-t border-neutral-800">
                   <td className="px-4 py-3">{p.createdAt.toLocaleDateString("id-ID")}</td>
-                  <td className="px-4 py-3 text-neutral-300">{p.saasPlan.name}</td>
+                  <td className="px-4 py-3 text-neutral-300">{p.kind === "SETUP" ? "Setup fee" : p.saasPlan.name}</td>
                   <td className="px-4 py-3">Rp {Number(p.amount).toLocaleString("id-ID")}</td>
                   <td className={`px-4 py-3 ${STATUS_TONE[p.status] ?? ""}`}>{p.status}</td>
                   <td className="px-4 py-3 text-right">

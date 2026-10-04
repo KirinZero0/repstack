@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "PlatformPayment" ADD COLUMN     "kind" TEXT NOT NULL DEFAULT 'SUBSCRIPTION';
