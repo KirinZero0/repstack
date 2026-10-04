@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { addMemberSchema } from "@/lib/validation/tenant";
-import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
-import { createMagicLink } from "@/lib/magicLink";
 import { extendedExpiry } from "@/lib/membership";
-import { notifyMember } from "@/lib/notify";
 import { countMemberSeats, memberLimitMessage } from "@/lib/limits";
-
-const ACTIVATION_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+import { createMember, isUniqueViolation } from "@/lib/members";
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   let session, gym, db;
@@ -55,50 +51,21 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   // No payment gateway is wired up yet: adding a member here is staff saying "this person paid",
   // so they're created active straight away, with a matching CASH payment for the records.
-  const member = await db.member.create({
-    data: {
-      gymId: gym.id,
-      planId: plan.id,
-      fullName: data.fullName,
-      email: data.email,
-      phoneWhatsapp: encrypt(data.phoneWhatsapp),
-      phoneWhatsappLookup: hmacLookup(normalizePhone(data.phoneWhatsapp)),
-      status: "ACTIVE",
-      membershipExpiry,
-    },
-  });
+  let created;
+  try {
+    created = await createMember(
+      db,
+      gym,
+      { fullName: data.fullName, email: data.email, phoneWhatsapp: data.phoneWhatsapp, planId: plan.id, membershipExpiry, status: "ACTIVE" },
+      { recordPayment: { recordedById: session.staffUserId, amount: plan.price, currency: plan.currency }, notify: true },
+    );
+  } catch (err) {
+    // The tenant-scoped lookup above can't see another gym's member with this email; the unique index can.
+    if (isUniqueViolation(err)) {
+      return NextResponse.json({ error: "Unable to add member with this email" }, { status: 409 });
+    }
+    throw err;
+  }
 
-  await db.payment.create({
-    data: {
-      gymId: gym.id,
-      memberId: member.id,
-      planId: plan.id,
-      provider: "CASH",
-      amount: plan.price,
-      currency: plan.currency,
-      status: "PAID",
-      paidAt: now,
-      recordedById: session.staffUserId,
-    },
-  });
-
-  const { token } = await createMagicLink({
-    memberId: member.id,
-    purpose: "activate",
-    expiresInMs: ACTIVATION_LINK_TTL_MS,
-  });
-  const activationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/activate/${token}`;
-
-  await notifyMember(gym.id, {
-    to: data.phoneWhatsapp,
-    message: [
-      `Hi ${data.fullName}! You've been added to ${gym.name}.`,
-      `Your membership is active until ${membershipExpiry.toLocaleDateString("id-ID", { timeZone: gym.timezone })}.`,
-      `Set your password and see your check-in QR here: ${activationUrl}`,
-    ].join("\n"),
-    type: "member_activation",
-    memberId: member.id,
-  });
-
-  return NextResponse.json({ memberId: member.id, membershipExpiry: membershipExpiry.toISOString() }, { status: 201 });
+  return NextResponse.json({ memberId: created.memberId, membershipExpiry: membershipExpiry.toISOString() }, { status: 201 });
 }
