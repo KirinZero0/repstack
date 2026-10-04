@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
-import { onlinePaymentsEnabled } from "@/lib/gateway";
+import { isMockMode, onlinePaymentsEnabled } from "@/lib/gateway";
 import { openPlatformInvoice } from "@/lib/platformBilling";
 import { withSuspensionReason } from "@/lib/suspension";
 import { sendPlatformWhatsapp } from "@/lib/whatsapp";
@@ -14,8 +14,9 @@ export async function GET(req: NextRequest) {
   }
 
   // Online payments are off: don't create renewal invoices nobody can pay, and don't suspend
-  // gyms for non-payment when they have no way to pay their way out.
-  if (!onlinePaymentsEnabled()) {
+  // gyms for non-payment when they have no way to pay their way out. Mock mode (dev/test) keeps
+  // working, the same as every other invoice path in src/lib/gateway.ts.
+  if (!onlinePaymentsEnabled() && !isMockMode()) {
     return NextResponse.json({ invoicesCreated: 0, gymsSuspended: 0, paymentsDisabled: true });
   }
 
