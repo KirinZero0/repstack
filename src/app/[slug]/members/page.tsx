@@ -4,6 +4,7 @@ import { decrypt } from "@/lib/crypto";
 import { countMemberSeats } from "@/lib/limits";
 import GymNav from "@/components/GymNav";
 import AddMemberForm from "./AddMemberForm";
+import ImportMembersForm from "./ImportMembersForm";
 import MembersTable from "./MembersTable";
 
 export const dynamic = "force-dynamic";
@@ -70,11 +71,25 @@ export default async function MembersPage({ params }: { params: { slug: string }
           </a>
         )}
 
-        <div className="mb-6">
+        <div className="mb-6 flex flex-wrap items-start gap-3">
           <AddMemberForm
             slug={params.slug}
             plans={plans.map((p) => ({ id: p.id, name: p.name, price: p.price.toString() }))}
           />
+          {session.role === "OWNER" && (
+            <>
+              <a
+                href={`/api/${params.slug}/members/export`}
+                download
+                className="rounded-md border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
+              >
+                Export CSV
+              </a>
+              <div className="basis-full">
+                <ImportMembersForm slug={params.slug} plans={plans.map((p) => ({ id: p.id, name: p.name }))} />
+              </div>
+            </>
+          )}
         </div>
 
         <MembersTable slug={params.slug} isOwner={session.role === "OWNER"} rows={rows} />
