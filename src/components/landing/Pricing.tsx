@@ -51,7 +51,7 @@ export default function Pricing({ tiers }: { tiers: Tier[] }) {
         </div>
       )}
 
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {tiers.map((t, i) => {
           const showYearly = yearly && t.annual !== null;
           const color = PLATES[i % PLATES.length];
