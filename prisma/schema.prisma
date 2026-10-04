@@ -89,7 +89,8 @@ model PlatformPayment {
   gym               Gym           @relation(fields: [gymId], references: [id])
   saasPlanId        String
   saasPlan          SaasPlan      @relation(fields: [saasPlanId], references: [id])
-  provider          String // "xendit" | "midtrans"
+  provider          String // "xendit" | "midtrans" | "manual" (setup fees settled outside the app)
+  kind              String        @default("SUBSCRIPTION") // "SUBSCRIPTION" | "SETUP" — a setup fee is one-time and never moves nextBillingDate
   externalInvoiceId String?       @unique
   invoiceUrl        String?       // Xendit hosted payment page, so the owner can pay from the billing page
   amount            Decimal

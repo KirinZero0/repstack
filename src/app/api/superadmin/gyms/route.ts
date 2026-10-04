@@ -74,6 +74,22 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // The setup fee is settled outside the app (bank transfer, cash), so it's recorded here rather than
+    // invoiced. It's a separate kind of platform payment: it never extends the subscription.
+    if (data.setupFee > 0) {
+      await tx.platformPayment.create({
+        data: {
+          gymId: gym.id,
+          saasPlanId: plan.id,
+          provider: "manual",
+          kind: "SETUP",
+          amount: data.setupFee,
+          status: data.setupFeePaid ? "PAID" : "PENDING",
+          paidAt: data.setupFeePaid ? new Date() : null,
+        },
+      });
+    }
+
     return { gym, owner };
   });
 
@@ -81,7 +97,14 @@ export async function POST(req: NextRequest) {
     superadminId: session.superadminId,
     gymId: gym.id,
     action: "GYM_CREATED",
-    metadata: { gymName: gym.name, slug: gym.slug, ownerEmail: owner.email, isLifetime: gym.isLifetime },
+    metadata: {
+      gymName: gym.name,
+      slug: gym.slug,
+      ownerEmail: owner.email,
+      isLifetime: gym.isLifetime,
+      setupFee: data.setupFee,
+      setupFeePaid: data.setupFee > 0 ? data.setupFeePaid : null,
+    },
   });
 
   if (data.ownerPhone) {

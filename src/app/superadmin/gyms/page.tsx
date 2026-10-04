@@ -21,7 +21,12 @@ export default async function SuperadminGymsPage() {
 
   const [gyms, saasPlans] = await Promise.all([
     prisma.gym.findMany({
-      include: { saasPlan: true, _count: { select: { members: true } } },
+      include: {
+        saasPlan: true,
+        _count: { select: { members: true } },
+        // A gym has at most one setup fee; the status is what matters here.
+        platformPayments: { where: { kind: "SETUP" }, orderBy: { createdAt: "desc" }, take: 1 },
+      },
       orderBy: { createdAt: "desc" },
     }),
     prisma.saasPlan.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
@@ -35,6 +40,9 @@ export default async function SuperadminGymsPage() {
   const lifetimeRevenue = gyms
     .filter((g) => g.isLifetime)
     .reduce((sum, g) => sum + Number(g.saasPlan.price), 0);
+  const setupFees = gyms.map((g) => g.platformPayments[0]).filter((p): p is NonNullable<typeof p> => Boolean(p));
+  const setupFeesCollected = setupFees.filter((p) => p.status === "PAID").reduce((sum, p) => sum + Number(p.amount), 0);
+  const setupFeesDue = setupFees.filter((p) => p.status === "PENDING").reduce((sum, p) => sum + Number(p.amount), 0);
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
@@ -47,6 +55,9 @@ export default async function SuperadminGymsPage() {
               {" · "}
               Lifetime one-time revenue:{" "}
               <span className="text-white">Rp {lifetimeRevenue.toLocaleString("id-ID")}</span>
+              {" · "}
+              Setup fees: <span className="text-white">Rp {setupFeesCollected.toLocaleString("id-ID")}</span>
+              {setupFeesDue > 0 && <span className="text-amber-400"> (Rp {setupFeesDue.toLocaleString("id-ID")} unpaid)</span>}
             </p>
           </div>
           <nav className="flex items-center gap-4 text-sm">
@@ -77,28 +88,42 @@ export default async function SuperadminGymsPage() {
                 <th className="px-4 py-3">Members</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Lifetime</th>
+                <th className="px-4 py-3">Setup fee</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
-              {gyms.map((gym) => (
-                <tr key={gym.id} className="border-t border-neutral-800">
-                  <td className="px-4 py-3">{gym.name}</td>
-                  <td className="px-4 py-3 text-neutral-400">{gym.slug}</td>
-                  <td className="px-4 py-3">{gym.saasPlan.name}</td>
-                  <td className="px-4 py-3">{gym._count.members}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={gym.subscriptionStatus} />
-                  </td>
-                  <td className="px-4 py-3">{gym.isLifetime ? "Yes" : "—"}</td>
-                  <td className="px-4 py-3">
-                    <GymActions gymId={gym.id} status={gym.subscriptionStatus} />
-                  </td>
-                </tr>
-              ))}
+              {gyms.map((gym) => {
+                const setupFee = gym.platformPayments[0];
+                return (
+                  <tr key={gym.id} className="border-t border-neutral-800">
+                    <td className="px-4 py-3">{gym.name}</td>
+                    <td className="px-4 py-3 text-neutral-400">{gym.slug}</td>
+                    <td className="px-4 py-3">{gym.saasPlan.name}</td>
+                    <td className="px-4 py-3">{gym._count.members}</td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={gym.subscriptionStatus} />
+                    </td>
+                    <td className="px-4 py-3">{gym.isLifetime ? "Yes" : "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      {!setupFee ? (
+                        "—"
+                      ) : (
+                        <span className={setupFee.status === "PAID" ? "text-neutral-300" : "text-amber-400"}>
+                          Rp {Number(setupFee.amount).toLocaleString("id-ID")}
+                          <span className="ml-1 text-xs">{setupFee.status === "PAID" ? "paid" : "unpaid"}</span>
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <GymActions gymId={gym.id} status={gym.subscriptionStatus} setupFeeDue={setupFee?.status === "PENDING"} />
+                    </td>
+                  </tr>
+                );
+              })}
               {gyms.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-neutral-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-neutral-500">
                     No gyms yet.
                   </td>
                 </tr>

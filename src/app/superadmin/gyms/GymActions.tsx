@@ -6,9 +6,12 @@ import { useRouter } from "next/navigation";
 export default function GymActions({
   gymId,
   status,
+  setupFeeDue = false,
 }: {
   gymId: string;
   status: string;
+  /** True when the gym has an unpaid setup fee on record. */
+  setupFeeDue?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -16,7 +19,7 @@ export default function GymActions({
   const [link, setLink] = useState<{ url: string; ownerEmail: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  function callAction(action: "suspend" | "reactivate") {
+  function callAction(action: "suspend" | "reactivate" | "setup-fee-paid") {
     setError(null);
     startTransition(async () => {
       const res = await fetch(`/api/superadmin/gyms/${gymId}/${action}`, { method: "POST" });
@@ -46,6 +49,15 @@ export default function GymActions({
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex items-center gap-2">
+        {setupFeeDue && (
+          <button
+            onClick={() => callAction("setup-fee-paid")}
+            disabled={isPending}
+            className="whitespace-nowrap rounded-md border border-amber-700 px-3 py-1 text-sm text-amber-400 hover:bg-amber-950 disabled:opacity-50"
+          >
+            Setup fee paid
+          </button>
+        )}
         <button
           onClick={ownerLink}
           disabled={isPending}

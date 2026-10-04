@@ -15,16 +15,19 @@ export default function CreateGymForm({ saasPlans }: { saasPlans: SaasPlanOption
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
+  const emptyForm = {
     gymName: "",
     slug: "",
     saasPlanId: saasPlans[0]?.id ?? "",
     isLifetime: false,
+    setupFee: "",
+    setupFeePaid: false,
     ownerName: "",
     ownerEmail: "",
     ownerPhone: "",
     ownerTempPassword: "",
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -35,10 +38,11 @@ export default function CreateGymForm({ saasPlans }: { saasPlans: SaasPlanOption
     setError(null);
     setLoading(true);
     try {
+      const setupFee = form.setupFee.trim() === "" ? 0 : Number(form.setupFee);
       const res = await fetch("/api/superadmin/gyms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, setupFee, setupFeePaid: setupFee > 0 && form.setupFeePaid }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -46,16 +50,7 @@ export default function CreateGymForm({ saasPlans }: { saasPlans: SaasPlanOption
         return;
       }
       setOpen(false);
-      setForm({
-        gymName: "",
-        slug: "",
-        saasPlanId: saasPlans[0]?.id ?? "",
-        isLifetime: false,
-        ownerName: "",
-        ownerEmail: "",
-        ownerPhone: "",
-        ownerTempPassword: "",
-      });
+      setForm(emptyForm);
       router.refresh();
     } finally {
       setLoading(false);
@@ -116,6 +111,27 @@ export default function CreateGymForm({ saasPlans }: { saasPlans: SaasPlanOption
           checked={form.isLifetime}
           onChange={(e) => update("isLifetime", e.target.checked)}
           className="h-5 w-5"
+        />
+      </Field>
+      <Field label="Setup fee, Rp (optional, one-time)">
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          step={1000}
+          placeholder="0"
+          value={form.setupFee}
+          onChange={(e) => update("setupFee", e.target.value)}
+          className="input"
+        />
+      </Field>
+      <Field label="Setup fee already paid">
+        <input
+          type="checkbox"
+          checked={form.setupFeePaid}
+          disabled={form.setupFee.trim() === "" || Number(form.setupFee) <= 0}
+          onChange={(e) => update("setupFeePaid", e.target.checked)}
+          className="h-5 w-5 disabled:opacity-40"
         />
       </Field>
       <Field label="Owner name">

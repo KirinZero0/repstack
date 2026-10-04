@@ -44,10 +44,11 @@ export default async function SuperadminDashboardPage() {
           />
         </div>
 
-        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard label="Gym tenants" value={String(f.totalGyms)} />
           <StatCard label="Active members (all gyms)" value={String(f.activeMembers)} />
           <StatCard label="Lifetime deals (one-time)" value={rp(f.lifetimeRevenue)} sub="not part of MRR" />
+          <StatCard label="Setup fees (one-time)" value={rp(f.setupFeesCollected)} sub={`${f.setupFeesCount} paid · not part of MRR`} />
         </div>
 
         <div className="mb-6">

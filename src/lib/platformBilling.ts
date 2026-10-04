@@ -25,8 +25,9 @@ interface BillablePlan {
 
 /** Stops every unpaid subscription invoice of a gym, here and at the provider, so they can't be paid later. */
 export async function retirePendingPlatformInvoices(gymId: string, exceptId?: string): Promise<void> {
+  // Only subscription invoices: an unpaid setup fee is owed regardless of what happens to the plan.
   const pending = await prisma.platformPayment.findMany({
-    where: { gymId, status: "PENDING", ...(exceptId ? { id: { not: exceptId } } : {}) },
+    where: { gymId, kind: "SUBSCRIPTION", status: "PENDING", ...(exceptId ? { id: { not: exceptId } } : {}) },
   });
   for (const p of pending) {
     // Mark it first: the provider's "expired" callback for it is then ignored instead of flagging the gym past due.

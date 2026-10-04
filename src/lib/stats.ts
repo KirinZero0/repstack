@@ -88,12 +88,18 @@ export async function getPlatformFinance(timezone = "Asia/Jakarta") {
   const months = lastMonthKeys(12, timezone);
   const since = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
 
-  const [gyms, memberCount, paid, pendingAgg] = await Promise.all([
+  const [gyms, memberCount, paid, pendingAgg, setupAgg] = await Promise.all([
     prisma.gym.findMany({ include: { saasPlan: true, _count: { select: { members: true } } } }),
     prisma.member.count({ where: { status: "ACTIVE" } }),
-    prisma.platformPayment.findMany({ where: { status: "PAID", paidAt: { gte: since } } }),
+    // Subscription money only: setup fees are one-time and reported on their own below.
+    prisma.platformPayment.findMany({ where: { kind: "SUBSCRIPTION", status: "PAID", paidAt: { gte: since } } }),
     prisma.platformPayment.aggregate({
       where: { status: "PENDING" },
+      _sum: { amount: true },
+      _count: true,
+    }),
+    prisma.platformPayment.aggregate({
+      where: { kind: "SETUP", status: "PAID" },
       _sum: { amount: true },
       _count: true,
     }),
@@ -132,6 +138,8 @@ export async function getPlatformFinance(timezone = "Asia/Jakarta") {
     collectedYear: monthly.reduce((s, m) => s + m.value, 0),
     pendingAmount: Number(pendingAgg._sum.amount ?? 0),
     pendingCount: pendingAgg._count,
+    setupFeesCollected: Number(setupAgg._sum.amount ?? 0),
+    setupFeesCount: setupAgg._count,
     statusCounts: Array.from(statusCounts.entries()).map(([status, count]) => ({ status, count })),
     gymsByMembers,
   };
