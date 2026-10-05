@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { StatusPill, rp } from "@/components/charts";
 import { isMockMode, memberPaymentsEnabled } from "@/lib/gateway";
 import PayButton from "./PayButton";
+import TransferRenewalForm from "./TransferRenewalForm";
 
 export const dynamic = "force-dynamic";
 
@@ -33,10 +34,21 @@ export default async function PayPage() {
     );
   }
 
-  const plans = await db.membershipPlan.findMany({
-    where: { gymId: member.gymId, isActive: true },
-    orderBy: { price: "asc" },
-  });
+  const [plans, pendingRenewal] = await Promise.all([
+    db.membershipPlan.findMany({
+      where: { gymId: member.gymId, isActive: true },
+      orderBy: { price: "asc" },
+    }),
+    db.memberSignup.findFirst({
+      where: { gymId: member.gymId, memberId: member.id, kind: "RENEWAL", status: "PENDING_REVIEW" },
+      include: { plan: { select: { name: true } } },
+    }),
+  ]);
+  const bank =
+    member.gym.bankAccountNumber
+      ? { bankName: member.gym.bankName ?? "Bank", accountNumber: member.gym.bankAccountNumber, accountHolder: member.gym.bankAccountHolder ?? member.gym.name }
+      : null;
+  const online = memberPaymentsEnabled(member.gym.settings) || isMockMode();
 
   const daysLeft = member.membershipExpiry
     ? Math.ceil((member.membershipExpiry.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
@@ -72,37 +84,59 @@ export default async function PayPage() {
 
         {blocked ? (
           <p className="text-neutral-300">Payments are paused for this membership. Please speak to the gym.</p>
-        ) : !memberPaymentsEnabled(member.gym.settings) && !isMockMode() ? (
-          <p className="text-neutral-300">Online payments are currently turned off. Please pay at the gym.</p>
+        ) : pendingRenewal ? (
+          <div className="rounded-2xl border border-amber-800 bg-amber-950/60 p-6 text-sm">
+            <h2 className="font-display text-xl font-semibold text-amber-200">Renewal request sent</h2>
+            <p className="mt-2 text-amber-100/90">
+              You asked to renew on <strong>{pendingRenewal.plan.name}</strong> for {rp(Number(pendingRenewal.amount))} on{" "}
+              {pendingRenewal.createdAt.toLocaleString("id-ID", { timeZone: member.gym.timezone })}. The gym is checking the transfer; your membership extends as soon as they confirm it.
+            </p>
+            <p className="mt-3 text-xs text-amber-200/70">Taking long? Ask at the front desk and mention the date of your transfer.</p>
+          </div>
         ) : plans.length === 0 ? (
           <p className="text-neutral-300">This gym hasn&apos;t published any plans yet. Please ask the front desk.</p>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {plans.map((p) => {
-              const current = p.id === member.planId;
-              return (
-                <article key={p.id} className="flex flex-col rounded-2xl border border-neutral-800 bg-neutral-900 p-6">
-                  <div className="flex items-start justify-between gap-3">
-                    <h2 className="font-display text-xl font-semibold">{p.name}</h2>
-                    {current && <span className="rounded-full border border-neutral-700 px-2 py-0.5 text-xs text-neutral-400">Your plan</span>}
-                  </div>
-                  <p className="mt-4 font-display text-3xl font-semibold tabular-nums">{rp(Number(p.price))}</p>
-                  <p className="mt-1 flex-1 text-sm text-neutral-400">
-                    {p.durationDays} days of access
-                  </p>
-                  <div className="mt-6">
-                    <PayButton planId={p.id} label={`Pay ${rp(Number(p.price))}`} primary={current} />
-                  </div>
-                </article>
-              );
-            })}
+          <div className="space-y-8">
+            {online && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {plans.map((p) => {
+                  const current = p.id === member.planId;
+                  return (
+                    <article key={p.id} className="flex flex-col rounded-2xl border border-neutral-800 bg-neutral-900 p-6">
+                      <div className="flex items-start justify-between gap-3">
+                        <h2 className="font-display text-xl font-semibold">{p.name}</h2>
+                        {current && <span className="rounded-full border border-neutral-700 px-2 py-0.5 text-xs text-neutral-400">Your plan</span>}
+                      </div>
+                      <p className="mt-4 font-display text-3xl font-semibold tabular-nums">{rp(Number(p.price))}</p>
+                      <p className="mt-1 flex-1 text-sm text-neutral-400">
+                        {p.durationDays} days of access
+                      </p>
+                      <div className="mt-6">
+                        <PayButton planId={p.id} label={`Pay ${rp(Number(p.price))}`} primary={current} />
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+            {online && (
+              <p className="text-xs text-neutral-500">
+                You&apos;ll be taken to a secure payment page to pay by bank transfer, e-wallet or card. Your
+                membership switches on as soon as the payment clears.
+              </p>
+            )}
+            {bank ? (
+              <>
+                {online && <p className="text-sm text-neutral-400">Or, if you&apos;d rather transfer directly:</p>}
+                <TransferRenewalForm
+                  bank={bank}
+                  plans={plans.map((p) => ({ id: p.id, name: p.name, price: Number(p.price), days: p.durationDays, current: p.id === member.planId }))}
+                />
+              </>
+            ) : (
+              !online && <p className="text-neutral-300">Online payments are currently turned off. Please pay at the gym.</p>
+            )}
           </div>
-        )}
-        {!blocked && (memberPaymentsEnabled(member.gym.settings) || isMockMode()) && plans.length > 0 && (
-          <p className="mt-8 text-xs text-neutral-500">
-            You&apos;ll be taken to a secure payment page to pay by bank transfer, e-wallet or card. Your
-            membership switches on as soon as the payment clears.
-          </p>
         )}
       </div>
     </main>

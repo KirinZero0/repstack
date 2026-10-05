@@ -88,10 +88,16 @@ export async function completeMemberSignup(signupId: string, paidAt: Date) {
  * found, wasn't awaiting review, or its email got taken by someone else in the meantime (flagged
  * as a CONFLICT for manual follow-up, same as the online flow).
  */
-export async function approveMemberSignup(gym: { id: string; name: string; slug: string; timezone: string }, signupId: string) {
+export async function approveMemberSignup(
+  gym: { id: string; name: string; slug: string; timezone: string },
+  signupId: string,
+  opts: { recordedById?: string } = {},
+) {
   const created = await tenantTransaction(gym.id, async (tx) => {
     const signup = await tx.memberSignup.findUnique({ where: { id: signupId }, include: { plan: true } });
     if (!signup || signup.gymId !== gym.id || signup.status !== "PENDING_REVIEW") return null;
+
+    if (signup.kind === "RENEWAL") return approveRenewal(tx, signup, opts.recordedById);
 
     const taken = await tx.member.findUnique({ where: { email: signup.email } });
     if (taken) {
@@ -132,19 +138,64 @@ export async function approveMemberSignup(gym: { id: string; name: string; slug:
       where: { id: signup.id },
       data: { status: "COMPLETED", memberId: member.id, completedAt: new Date() },
     });
-    return { member, signup, expiry };
+    return { member, signup, expiry, renewal: false as const };
   });
 
   if (!created) return null;
 
+  const until = created.expiry.toLocaleDateString("id-ID", { timeZone: gym.timezone });
   await notifyMember(gym.id, {
     to: decrypt(created.signup.phoneWhatsapp),
-    message: `Welcome to ${gym.name}, ${created.signup.fullName}! Your membership is active until ${created.expiry.toLocaleDateString("id-ID", { timeZone: gym.timezone })}. Log in with ${created.signup.email} at ${process.env.NEXT_PUBLIC_APP_URL}/${gym.slug}/login to see your check-in QR.`,
-    type: "member_welcome",
+    message: created.renewal
+      ? `Hi ${created.member.fullName}, ${gym.name} confirmed your transfer. Your ${created.signup.plan.name} membership is now active until ${until}. See you at the gym!`
+      : `Welcome to ${gym.name}, ${created.signup.fullName}! Your membership is active until ${until}. Log in with ${created.signup.email} at ${process.env.NEXT_PUBLIC_APP_URL}/${gym.slug}/login to see your check-in QR.`,
+    type: created.renewal ? "renewal_confirmed" : "member_welcome",
     memberId: created.member.id,
   }).catch((err) => console.error("Member welcome message failed", err));
 
   return created.member;
+}
+
+type Tx = Parameters<Parameters<typeof tenantTransaction>[1]>[0];
+type SignupWithPlan = NonNullable<Awaited<ReturnType<Tx["memberSignup"]["findUnique"]>>> & { plan: { durationDays: number; currency: string; name: string } };
+
+/**
+ * A renewal request belongs to an existing member: approving it adds the plan's days on top of
+ * whatever is left (or from today if they lapsed), switches them to that plan, records the CASH
+ * payment, and reactivates them. A frozen member stays frozen but still gets the time, the same as
+ * a desk payment. A cancelled member can't renew this way; the request is left for staff to sort out.
+ */
+async function approveRenewal(tx: Tx, signup: SignupWithPlan, recordedById?: string) {
+  if (!signup.memberId) return null;
+  const member = await tx.member.findUnique({ where: { id: signup.memberId } });
+  if (!member || member.gymId !== signup.gymId || member.anonymizedAt || member.status === "CANCELLED") return null;
+
+  const paidAt = new Date();
+  const expiry = extendedExpiry(member.membershipExpiry, signup.plan.durationDays, paidAt);
+  const updated = await tx.member.update({
+    where: { id: member.id },
+    data: {
+      planId: signup.planId,
+      membershipExpiry: expiry,
+      status: member.status === "FROZEN" ? "FROZEN" : "ACTIVE",
+    },
+  });
+  await tx.payment.create({
+    data: {
+      gymId: signup.gymId,
+      memberId: member.id,
+      planId: signup.planId,
+      provider: "CASH",
+      amount: signup.amount,
+      currency: signup.plan.currency,
+      status: "PAID",
+      paidAt,
+      note: "Bank transfer, confirmed from the member's renewal request",
+      recordedById: recordedById ?? null,
+    },
+  });
+  await tx.memberSignup.update({ where: { id: signup.id }, data: { status: "COMPLETED", completedAt: paidAt } });
+  return { member: updated, signup, expiry, renewal: true as const };
 }
 
 /** Staff couldn't confirm the transfer. Doesn't create a Member; the requester sees this on their status page. */

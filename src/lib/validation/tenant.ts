@@ -43,6 +43,10 @@ export const gymSettingsSchema = z
     paymentsEnabled: z.boolean().optional(),
     notifyWhatsapp: z.boolean().optional(),
     notifyEmail: z.boolean().optional(),
+    /** How long after a check-in a member still counts as "in the gym" if they never checked out. */
+    occupancyWindowHours: z.number().int().min(1).max(12).optional(),
+    /** Members see each other's first names and visit counts on their dashboard. Off by default. */
+    leaderboardEnabled: z.boolean().optional(),
     name: z.string().trim().min(2).max(80).optional(),
     timezone: z.string().trim().max(60).refine(isValidTimezone, "Unknown timezone").optional(),
     bankName: z.string().trim().max(60).optional(),
@@ -70,6 +74,9 @@ export const createPlanSchema = z.object({ ...planFields, isActive: planFields.i
 export const updatePlanSchema = z.object(planFields).partial().refine((v) => Object.keys(v).length > 0, "Nothing to update");
 
 export const payMembershipSchema = z.object({ planId: z.string().uuid() });
+
+/** A logged-in member asks to renew by bank transfer; the proof image travels as multipart beside it. */
+export const renewalRequestSchema = z.object({ planId: z.string().uuid() });
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 
@@ -198,6 +205,12 @@ export const createClassSessionSchema = z.object({
 });
 
 export const classSessionActionSchema = z.object({ action: z.enum(["cancel"]) });
+
+/** Staff marks who turned up. null clears a mark made by mistake. */
+export const classAttendanceSchema = z.object({ attendance: z.enum(["ATTENDED", "NO_SHOW"]).nullable() });
+
+/** How early before a session starts the roster can be marked (people arrive before the hour). */
+export const ATTENDANCE_OPENS_BEFORE_MS = 30 * 60 * 1000;
 
 /** Staff confirms a member's registration by recording what they paid at the front desk. */
 export const confirmClassRegistrationSchema = z.object({

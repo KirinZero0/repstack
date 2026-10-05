@@ -9,6 +9,7 @@ export interface RegistrationRow {
   status: "PENDING_PAYMENT" | "CONFIRMED" | "CANCELLED";
   paid: boolean;
   amount: number | null;
+  attendance: "ATTENDED" | "NO_SHOW" | null;
 }
 
 export interface SessionRow {
@@ -19,6 +20,8 @@ export interface SessionRow {
   capacity: number | null;
   taken: number;
   past: boolean;
+  /** True from 30 minutes before start: staff can mark who turned up. */
+  attendanceOpen: boolean;
   registrations: RegistrationRow[];
 }
 
@@ -42,8 +45,8 @@ const rp = (n: number) => `Rp ${n.toLocaleString("id-ID")}`;
 
 type ClassInput = { name: string; description: string; instructor: string; price: number; capacity: number | null; durationMinutes: number };
 
-async function call(url: string, method: "POST" | "PATCH", body: unknown): Promise<{ error: string | null; data: Record<string, unknown> }> {
-  const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+async function call(url: string, method: "POST" | "PATCH" | "DELETE", body?: unknown): Promise<{ error: string | null; data: Record<string, unknown> }> {
+  const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) return { error: typeof data.error === "string" ? data.error : "Something went wrong. Try again.", data };
   return { error: null, data };
@@ -202,6 +205,27 @@ function Roster({ slug, session, isOwner, price, onChanged }: { slug: string; se
     onChanged();
   }
 
+  async function deleteSession() {
+    if (!window.confirm("Delete this session? Nobody has booked it, so nothing else changes.")) return;
+    setBusy("session");
+    setError(null);
+    const { error } = await call(`/api/${slug}/class-sessions/${session.id}`, "DELETE");
+    setBusy(null);
+    if (error) return setError(error);
+    onChanged();
+  }
+
+  async function mark(r: RegistrationRow, attendance: "ATTENDED" | "NO_SHOW") {
+    setBusy(r.id);
+    setError(null);
+    // Clicking the mark already set clears it, so a slip can be undone.
+    const next = r.attendance === attendance ? null : attendance;
+    const { error } = await call(`/api/${slug}/class-registrations/${r.id}/attendance`, "POST", { attendance: next });
+    setBusy(null);
+    if (error) return setError(error);
+    onChanged();
+  }
+
   return (
     <div className="border-t border-neutral-800 bg-neutral-950 px-4 py-3">
       {session.registrations.length === 0 ? (
@@ -212,6 +236,26 @@ function Roster({ slug, session, isOwner, price, onChanged }: { slug: string; se
             <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <span>{r.memberName}</span>
               <span className="flex items-center gap-3">
+                {session.attendanceOpen && r.status !== "CANCELLED" && (
+                  <span className="flex items-center gap-1" role="group" aria-label={`Attendance for ${r.memberName}`}>
+                    <button
+                      onClick={() => mark(r, "ATTENDED")}
+                      disabled={busy === r.id}
+                      aria-pressed={r.attendance === "ATTENDED"}
+                      className={`rounded-md border px-2 py-1 text-xs disabled:opacity-50 ${r.attendance === "ATTENDED" ? "border-emerald-600 bg-emerald-950 text-emerald-300" : "border-neutral-700 text-neutral-400 hover:bg-neutral-800"}`}
+                    >
+                      Attended
+                    </button>
+                    <button
+                      onClick={() => mark(r, "NO_SHOW")}
+                      disabled={busy === r.id}
+                      aria-pressed={r.attendance === "NO_SHOW"}
+                      className={`rounded-md border px-2 py-1 text-xs disabled:opacity-50 ${r.attendance === "NO_SHOW" ? "border-red-800 bg-red-950 text-red-300" : "border-neutral-700 text-neutral-400 hover:bg-neutral-800"}`}
+                    >
+                      No-show
+                    </button>
+                  </span>
+                )}
                 {r.status === "CONFIRMED" ? (
                   <span className="text-emerald-400">Confirmed{r.amount !== null ? ` · ${rp(r.amount)}` : " · free"}</span>
                 ) : (
@@ -229,11 +273,18 @@ function Roster({ slug, session, isOwner, price, onChanged }: { slug: string; se
           ))}
         </ul>
       )}
-      {isOwner && session.status === "SCHEDULED" && !session.past && (
-        <div className="mt-3">
-          <button onClick={cancelSession} disabled={busy === "session"} className="text-xs text-red-400 hover:underline disabled:opacity-50">
-            Cancel this session
-          </button>
+      {isOwner && session.status === "SCHEDULED" && (
+        <div className="mt-3 flex gap-4">
+          {!session.past && (
+            <button onClick={cancelSession} disabled={busy === "session"} className="text-xs text-red-400 hover:underline disabled:opacity-50">
+              Cancel this session
+            </button>
+          )}
+          {session.registrations.length === 0 && (
+            <button onClick={deleteSession} disabled={busy === "session"} className="text-xs text-neutral-400 hover:text-red-400 hover:underline disabled:opacity-50">
+              Delete this session
+            </button>
+          )}
         </div>
       )}
       {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
@@ -341,6 +392,18 @@ export default function ClassesManager({ slug, classes, isOwner, timezone }: { s
                       className={ghostCls}
                     >
                       {c.isActive ? "Hide" : "Show"}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm(`Delete "${c.name}" and its sessions? This only works for a class nobody has booked.`)) return;
+                        setRowError(null);
+                        const { error } = await call(`/api/${slug}/classes/${c.id}`, "DELETE");
+                        if (error) return setRowError(error);
+                        refresh();
+                      }}
+                      className={`${ghostCls} hover:border-red-800 hover:text-red-400`}
+                    >
+                      Delete
                     </button>
                   </div>
                 )}

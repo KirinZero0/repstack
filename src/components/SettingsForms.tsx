@@ -524,3 +524,66 @@ export function NotificationsForm({
     </div>
   );
 }
+
+export function OccupancyForm({ slug, initialHours }: { slug: string; initialHours: number }) {
+  const [hours, setHours] = useState(initialHours);
+  const { state, error, save } = useSave(`/api/${slug}/settings`);
+
+  return (
+    <div className="space-y-3">
+      <label className="block text-sm text-neutral-300">
+        <span className="mb-1 block">Count a member as in the gym for</span>
+        <select
+          value={hours}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            setHours(v);
+            save({ occupancyWindowHours: v });
+          }}
+          className={selectCls}
+          aria-label="Occupancy window"
+        >
+          {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((h) => (
+            <option key={h} value={h}>
+              {h} hour{h === 1 ? "" : "s"} after check-in
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="text-xs text-neutral-500">
+        Members and staff can also check out explicitly. Anyone who doesn&apos;t drops off the &ldquo;in the gym now&rdquo; list after this long.
+      </p>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {state === "saved" && <p className="text-sm text-emerald-400">Saved</p>}
+    </div>
+  );
+}
+
+export function LeaderboardForm({ slug, initial }: { slug: string; initial: boolean }) {
+  const [on, setOn] = useState(initial);
+  const { state, error, save } = useSave(`/api/${slug}/settings`);
+
+  return (
+    <div className="space-y-3">
+      <label className="flex items-start gap-3 text-sm text-neutral-300">
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(e) => {
+            setOn(e.target.checked);
+            save({ leaderboardEnabled: e.target.checked });
+          }}
+          className="mt-0.5 h-4 w-4"
+        />
+        <span>
+          Show members a leaderboard
+          <span className="mt-1 block text-neutral-500">
+            Most visits this month and longest current streaks, on every member&apos;s dashboard. Members appear as first name and last initial only. Off by default.
+          </span>
+        </span>
+      </label>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {state === "saved" && <p className="text-sm text-emerald-400">Saved</p>}
+    </div>
+  );
+}

@@ -167,7 +167,17 @@ export default async function MyClassesPage() {
                     {r.session.class.name} <span className="text-neutral-500">{whenLabel(r.session.startsAt, tz)}</span>
                   </span>
                   <span className="text-neutral-500">
-                    {r.session.status === "CANCELLED" ? "Class cancelled" : r.status === "CANCELLED" ? "You cancelled" : r.status === "CONFIRMED" ? "Attended" : "Not paid"}
+                    {r.session.status === "CANCELLED"
+                      ? "Class cancelled"
+                      : r.status === "CANCELLED"
+                        ? "You cancelled"
+                        : r.attendance === "ATTENDED"
+                          ? "Attended"
+                          : r.attendance === "NO_SHOW"
+                            ? "Missed"
+                            : r.status === "CONFIRMED"
+                              ? "Booked"
+                              : "Not paid"}
                   </span>
                 </li>
               ))}

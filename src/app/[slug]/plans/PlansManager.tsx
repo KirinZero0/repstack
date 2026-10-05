@@ -79,8 +79,10 @@ export default function PlansManager({ slug, plans }: { slug: string; plans: Pla
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(plans.length === 0);
 
-  async function call(url: string, method: "POST" | "PATCH", body: unknown): Promise<string | null> {
-    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const [rowError, setRowError] = useState<string | null>(null);
+
+  async function call(url: string, method: "POST" | "PATCH" | "DELETE", body?: unknown): Promise<string | null> {
+    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
     if (!res.ok) {
       const b = await res.json().catch(() => ({}));
       return typeof b.error === "string" ? b.error : "Could not save the plan. Check the values and try again.";
@@ -159,6 +161,16 @@ export default function PlansManager({ slug, plans }: { slug: string; plans: Pla
                     <button onClick={() => call(`/api/${slug}/plans/${p.id}`, "PATCH", { isActive: !p.isActive })} className={ghostCls}>
                       {p.isActive ? "Hide" : "Put on sale"}
                     </button>
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm(`Delete "${p.name}"? This only works for a plan nobody has used.`)) return;
+                        setRowError(null);
+                        setRowError(await call(`/api/${slug}/plans/${p.id}`, "DELETE"));
+                      }}
+                      className={`${ghostCls} hover:border-red-800 hover:text-red-400`}
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ),
@@ -173,8 +185,9 @@ export default function PlansManager({ slug, plans }: { slug: string; plans: Pla
           </tbody>
         </table>
       </div>
+      {rowError && <p className="text-sm text-red-400">{rowError}</p>}
       <p className="text-xs text-neutral-500">
-        Hidden plans stay on existing members but can&apos;t be chosen for new members or renewals.
+        Hidden plans stay on existing members but can&apos;t be chosen for new members or renewals. A plan can only be deleted while nobody has used it.
       </p>
     </div>
   );
