@@ -13,7 +13,7 @@ export const SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
  */
 export const RESERVED_SLUGS = new Set([
   "api", "g", "demo", "signup", "superadmin", "activate", "my", "my-qr", "check-in", "login", "forgot",
-  "privacy", "terms", "reset",
+  "privacy", "terms", "reset", "features",
   "admin", "app", "www", "iron-ledger", "ironledger", "repstack", "support", "billing", "pricing", "static",
 ]);
 
