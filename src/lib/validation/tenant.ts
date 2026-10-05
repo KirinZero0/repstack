@@ -71,6 +71,18 @@ export const updatePlanSchema = z.object(planFields).partial().refine((v) => Obj
 
 export const payMembershipSchema = z.object({ planId: z.string().uuid() });
 
+const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+
+/** Query string of the owner's finance CSV export. Dates are days in the gym's timezone, inclusive. */
+export const financeExportQuerySchema = z
+  .object({
+    report: z.enum(["transactions", "monthly"]).default("transactions"),
+    from: ymd.optional(),
+    to: ymd.optional(),
+    status: z.enum(["paid", "all"]).default("paid"),
+  })
+  .refine((q) => !q.from || !q.to || q.from <= q.to, { message: "'from' must not be after 'to'", path: ["from"] });
+
 export const signupSchema = z.object({
   saasPlanId: z.string().uuid(),
   gymName: z.string().trim().min(2).max(80),
