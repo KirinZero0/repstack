@@ -1,6 +1,9 @@
 import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { getMemberAttendance } from "@/lib/stats";
+import { findOpenCheckIn } from "@/lib/occupancy";
+import { getLeaderboard, leaderboardEnabled, rankOf } from "@/lib/leaderboard";
+import CheckOutButton from "./CheckOutButton";
 import { BarChart, Card, Heatmap, StatCard, StatusPill, rp } from "@/components/charts";
 import MemberLogout from "./MemberLogout";
 import DeleteAccount from "./DeleteAccount";
@@ -36,7 +39,8 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
     );
   }
 
-  const [att, payments] = await Promise.all([
+  const showBoard = leaderboardEnabled(member.gym.settings);
+  const [att, payments, openCheckIn, pendingRenewal, board] = await Promise.all([
     getMemberAttendance(db, member.id, member.gym.timezone),
     db.payment.findMany({
       where: { memberId: member.id, gymId: member.gymId },
@@ -44,6 +48,9 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
       take: 5,
       include: { plan: { select: { name: true } } },
     }),
+    findOpenCheckIn(db, member.gymId, member.id, member.gym.settings),
+    db.memberSignup.findFirst({ where: { gymId: member.gymId, memberId: member.id, kind: "RENEWAL", status: "PENDING_REVIEW" } }),
+    showBoard ? getLeaderboard(db, member.gymId, member.gym.timezone) : Promise.resolve(null),
   ]);
 
   const mockId = isMockMode() ? searchParams["mock-invoice"] : undefined;
@@ -105,6 +112,9 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
             <path d="M8 12h8" />
           </svg>
         </a>
+        {openCheckIn && (
+          <CheckOutButton sinceLabel={openCheckIn.checkedInAt.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: member.gym.timezone })} />
+        )}
         {member.status === "FROZEN" ? (
           <p className="mb-6 text-sm text-amber-400">Your membership is frozen, so check-in is paused. Ask the front desk to unfreeze it.</p>
         ) : member.status === "CANCELLED" ? (
@@ -137,9 +147,12 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
                 : "border border-neutral-700 text-white hover:bg-neutral-800"
             }`}
           >
-            {needsPayment ? "Pay for membership" : "Renew"}
+            {pendingRenewal ? "Renewal pending" : needsPayment ? "Pay for membership" : "Renew"}
           </a>
         </div>
+        {pendingRenewal && (
+          <p className="-mt-4 mb-6 text-sm text-amber-400">Your renewal request is with the gym. Your membership extends as soon as they confirm the transfer.</p>
+        )}
 
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatCard label="Visits this month" value={String(att.thisMonth)} />
@@ -157,6 +170,23 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
             <BarChart data={att.weekly} />
           </Card>
         </div>
+
+        {board && (
+          <div className="mb-6 grid gap-6 sm:grid-cols-2">
+            <Card title="Leaderboard · visits this month">
+              <Board rows={board.visits} me={member.id} unit="visits" />
+              {rankOf(board.visits, member.id) !== null && (
+                <p className="mt-3 text-xs text-neutral-500">You&apos;re #{rankOf(board.visits, member.id)} of {board.visits.length}.</p>
+              )}
+            </Card>
+            <Card title="Leaderboard · current streaks">
+              <Board rows={board.streaks} me={member.id} unit="days" />
+              {rankOf(board.streaks, member.id) !== null && (
+                <p className="mt-3 text-xs text-neutral-500">You&apos;re #{rankOf(board.streaks, member.id)} of {board.streaks.length}.</p>
+              )}
+            </Card>
+          </div>
+        )}
 
         <div className="grid gap-6 sm:grid-cols-2">
           <Card title="Recent visits">
@@ -201,5 +231,23 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
         </div>
       </div>
     </main>
+  );
+}
+
+function Board({ rows, me, unit }: { rows: { memberId: string; name: string; value: number }[]; me: string; unit: string }) {
+  if (rows.length === 0) return <p className="text-sm text-neutral-500">Nobody on the board yet. Be the first.</p>;
+  return (
+    <ol className="space-y-1 text-sm">
+      {rows.slice(0, 10).map((r, i) => (
+        <li key={r.memberId} className={`flex items-center justify-between rounded-md px-2 py-1 ${r.memberId === me ? "bg-neutral-800 font-medium" : ""}`}>
+          <span>
+            <span className="mr-3 inline-block w-5 text-right tabular-nums text-neutral-500">{i + 1}</span>
+            {r.name}
+            {r.memberId === me && <span className="ml-2 text-xs text-neutral-400">you</span>}
+          </span>
+          <span className="tabular-nums text-neutral-300">{`${r.value} ${unit}`}</span>
+        </li>
+      ))}
+    </ol>
   );
 }

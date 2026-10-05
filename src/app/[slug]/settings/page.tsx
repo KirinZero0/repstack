@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymThemeFromSettings } from "@/lib/theme";
 import { Card } from "@/components/charts";
-import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm, OnlinePaymentsForm, GymProfileForm, WhatsAppForm, NotificationsForm } from "@/components/SettingsForms";
+import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm, OnlinePaymentsForm, GymProfileForm, WhatsAppForm, NotificationsForm, OccupancyForm, LeaderboardForm } from "@/components/SettingsForms";
+import { occupancyWindowHours } from "@/lib/occupancy";
+import { leaderboardEnabled } from "@/lib/leaderboard";
 import GymPhotosManager from "@/components/GymPhotosManager";
 import { gymAcceptsSignups } from "@/lib/memberSignup";
 import { notificationChannels } from "@/lib/notify";
@@ -148,6 +150,18 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
               initial={gymAcceptsSignups(gym.settings)}
               joinUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/${params.slug}/join`}
             />
+          </Card>
+        </div>
+
+        <div className="mb-6">
+          <Card title="Who's in the gym">
+            <OccupancyForm slug={params.slug} initialHours={occupancyWindowHours(gym.settings)} />
+          </Card>
+        </div>
+
+        <div className="mb-6">
+          <Card title="Leaderboard">
+            <LeaderboardForm slug={params.slug} initial={leaderboardEnabled(gym.settings)} />
           </Card>
         </div>
 

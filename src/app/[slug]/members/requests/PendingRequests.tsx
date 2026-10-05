@@ -12,6 +12,7 @@ export interface PendingRow {
   amount: string;
   createdAt: string;
   hasProof: boolean;
+  kind: "JOIN" | "RENEWAL";
 }
 
 export default function PendingRequests({ slug, requests }: { slug: string; requests: PendingRow[] }) {
@@ -53,7 +54,12 @@ export default function PendingRequests({ slug, requests }: { slug: string; requ
                 </button>
               )}
               <div>
-                <p className="font-medium">{r.fullName}</p>
+                <p className="font-medium">
+                  {r.fullName}
+                  <span className={`ml-2 rounded-full border px-2 py-0.5 text-xs font-normal ${r.kind === "RENEWAL" ? "border-blue-800 bg-blue-950 text-blue-300" : "border-neutral-700 text-neutral-400"}`}>
+                    {r.kind === "RENEWAL" ? "Renewal · existing member" : "New member"}
+                  </span>
+                </p>
                 <p className="text-sm text-neutral-400">{r.plan} · Rp {Number(r.amount).toLocaleString("id-ID")}</p>
                 <p className="mt-1 text-xs text-neutral-500">
                   {r.email} · {r.phone}

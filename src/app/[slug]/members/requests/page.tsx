@@ -29,6 +29,7 @@ export default async function PendingRequestsPage({ params }: { params: { slug: 
     amount: p.amount.toString(),
     createdAt: p.createdAt.toISOString(),
     hasProof: Boolean(p.proofImageUrl),
+    kind: p.kind === "RENEWAL" ? ("RENEWAL" as const) : ("JOIN" as const),
   }));
 
   return (
@@ -37,7 +38,7 @@ export default async function PendingRequestsPage({ params }: { params: { slug: 
         <a href={`/${params.slug}/members`} className="text-sm text-neutral-400 hover:text-white">← Members</a>
         <h1 className="mt-2 text-2xl font-semibold">Pending requests</h1>
         <p className="mb-8 text-sm text-neutral-400">
-          People who submitted a bank-transfer join request. Confirm the payment before approving.
+          Bank-transfer requests: people joining, and members renewing. Confirm the money arrived before approving.
         </p>
 
         {requests.length === 0 ? (

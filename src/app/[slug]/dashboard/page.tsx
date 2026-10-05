@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { dayKeyInTimezone } from "@/lib/date";
+import { getOccupancy, occupancyWindowHours } from "@/lib/occupancy";
+import { getLeaderboard } from "@/lib/leaderboard";
 import GymNav from "@/components/GymNav";
+import OccupancyList from "./OccupancyList";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +21,7 @@ export default async function DashboardPage({ params }: { params: { slug: string
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const soonCutoff = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  const [activeMembers, todaysCheckins, monthPayments, expiringSoon] = await Promise.all([
+  const [activeMembers, todaysCheckins, monthPayments, expiringSoon, present, board] = await Promise.all([
     db.member.count({ where: { gymId: gym.id, status: "ACTIVE" } }),
     db.checkIn.findMany({
       where: { gymId: gym.id, checkedInAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) } },
@@ -36,6 +39,8 @@ export default async function DashboardPage({ params }: { params: { slug: string
       orderBy: { membershipExpiry: "asc" },
       take: 20,
     }),
+    getOccupancy(db, gym.id, gym.settings, now),
+    getLeaderboard(db, gym.id, gym.timezone, now),
   ]);
 
   const todayKey = dayKeyInTimezone(now, gym.timezone);
@@ -44,6 +49,7 @@ export default async function DashboardPage({ params }: { params: { slug: string
   );
 
   const monthRevenue = monthPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+  const timeOf = (d: Date) => d.toLocaleTimeString("id-ID", { timeZone: gym.timezone, hour: "2-digit", minute: "2-digit" });
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
@@ -56,13 +62,43 @@ export default async function DashboardPage({ params }: { params: { slug: string
           <GymNav slug={params.slug} role={session.role} current="dashboard" />
         </div>
 
-        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatCard label="Active members" value={activeMembers.toString()} />
+        <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatCard label="In the gym now" value={present.length.toString()} />
           <StatCard label="Check-ins today" value={checkinsToday.length.toString()} />
+          <StatCard label="Active members" value={activeMembers.toString()} />
           <StatCard
             label="Revenue this month"
             value={`Rp ${monthRevenue.toLocaleString("id-ID")}`}
           />
+        </div>
+
+        <div className="mb-6 grid gap-6 lg:grid-cols-2">
+          <OccupancyList
+            slug={params.slug}
+            windowHours={occupancyWindowHours(gym.settings)}
+            rows={present.map((p) => ({ checkInId: p.checkInId, fullName: p.fullName, sinceLabel: timeOf(p.since) }))}
+          />
+
+          <div className="rounded-xl border border-neutral-800">
+            <div className="border-b border-neutral-800 px-4 py-3">
+              <h2 className="font-medium">Most visits this month</h2>
+            </div>
+            {board.visits.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-neutral-500">No check-ins yet this month.</p>
+            ) : (
+              <ol className="divide-y divide-neutral-800 text-sm">
+                {board.visits.slice(0, 8).map((r, i) => (
+                  <li key={r.memberId} className="flex items-center justify-between px-4 py-2.5">
+                    <span>
+                      <span className="mr-3 inline-block w-5 text-right tabular-nums text-neutral-500">{i + 1}</span>
+                      {r.fullName}
+                    </span>
+                    <span className="tabular-nums text-neutral-300">{`${r.value} visit${r.value === 1 ? "" : "s"}`}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
         </div>
 
         <div className="rounded-xl border border-neutral-800">

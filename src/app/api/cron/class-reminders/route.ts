@@ -6,7 +6,7 @@ import { decrypt } from "@/lib/crypto";
 import { whenLabel } from "@/lib/classes";
 
 /** Sessions starting within this long get their reminders on the next run. Runs hourly (vercel.json). */
-export const CLASS_REMINDER_WINDOW_MS = 3 * 60 * 60 * 1000;
+const CLASS_REMINDER_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 /**
  * A WhatsApp nudge to everyone confirmed for a class that starts soon. Each booking is reminded at
