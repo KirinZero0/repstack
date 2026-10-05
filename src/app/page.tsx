@@ -1,6 +1,8 @@
-import BrandMark from "@/components/BrandMark";
 import HeroLedger from "@/components/landing/HeroLedger";
 import Pricing, { type Tier } from "@/components/landing/Pricing";
+import { SiteFooter, SiteHeader } from "@/components/landing/SiteChrome";
+import { FEATURE_GROUPS } from "@/components/landing/features";
+import { PlateGlyph } from "@/components/BrandMark";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -34,76 +36,63 @@ async function loadTiers(): Promise<Tier[]> {
 
 const steps = [
   {
-    title: "Add the member",
-    body: "Enter a name, phone number and plan. They get an activation link and an invoice on WhatsApp.",
+    title: "Bring your members over",
+    body: "Import the spreadsheet you already keep, or add people one at a time. Each member gets a WhatsApp link to set a password and see their QR.",
   },
   {
-    title: "They pay and activate",
-    body: "Paying the invoice switches their membership on. They set a password and add a photo.",
+    title: "They pay the way they already do",
+    body: "Record cash at the desk, or let members transfer to your bank account and send the proof from their phone. Switch on online payments when you are ready.",
   },
   {
     title: "They scan at the door",
-    body: "Print your gym's QR poster once. Members scan it with their own phone, so nobody has to mind a webcam.",
+    body: "Print your gym's QR poster once. Members scan it with their own phone; you see who is in, who is due, and who stopped coming.",
   },
 ];
 
-const features = [
-  {
-    title: "Check-in without a front desk",
-    body: "One visit per member per day. Expired or frozen memberships get a red screen. Staff can still scan a member's own QR if a phone dies.",
-  },
-  {
-    title: "Billing that chases itself",
-    body: "Members get a WhatsApp reminder three days before they expire, and lapsed memberships are flagged for you automatically.",
-  },
-  {
-    title: "Numbers you can read",
-    body: "Revenue by month and plan, unpaid invoices, and every member's attendance streak, without exporting a spreadsheet.",
-  },
-  {
-    title: "Your gym's data stays yours",
-    body: "Every query is scoped to your gym. Member phone numbers are encrypted, and only masked digits appear in lists.",
-  },
-];
+const PLATE: Record<string, string> = {
+  yellow: "var(--plate-yellow)",
+  green: "var(--plate-green)",
+  blue: "var(--plate-blue)",
+  red: "var(--plate-red)",
+};
+
+/** The groups the home page summarises; the rest live on /features. */
+const HOME_GROUPS = ["members", "checkin", "payments", "classes", "finance", "member-app"];
 
 const faqs = [
   {
     q: "Who pays whom?",
-    a: "Your members pay you for their memberships. Repstack bills you separately, monthly or yearly, for the software.",
+    a: "Your members pay you for their memberships, by cash, bank transfer or online. Repstack bills you separately, monthly or yearly, for the software.",
   },
   {
     q: "What do my members need?",
-    a: "A phone with a camera and WhatsApp. They log in with an email and password, and open their QR code or scan your poster.",
+    a: "A phone with a camera and WhatsApp. They log in with an email and password, and open their QR code or scan your poster. Nothing to install.",
   },
   {
     q: "Do I need my own WhatsApp number?",
-    a: "Yes. Messages go out from a Fonnte or Wablas number connected to your gym, and we set that up with you.",
+    a: "No. Messages go out from day one within your plan's monthly allowance. Connect your own Fonnte number in Settings whenever you like and the cap goes away.",
+  },
+  {
+    q: "We have 80 members in a spreadsheet. How long does switching take?",
+    a: "An afternoon. Export your sheet as CSV, upload it, check the preview, import. Each member gets their activation link, or you can send links later if you'd rather tell them first.",
   },
   {
     q: "What if a member forgets their password at the door?",
-    a: "Send them a one-time QR link over WhatsApp from their member page, or scan their QR yourself from the staff scanner.",
+    a: "Send a one-time QR link over WhatsApp from their member page, or scan their QR yourself from the staff scanner.",
+  },
+  {
+    q: "What happens to my data if I stop?",
+    a: "Your account is suspended, not deleted, and you can export your members and finances as CSV at any time before or after.",
   },
 ];
 
 export default async function Home() {
   const tiers = await loadTiers();
+  const groups = HOME_GROUPS.map((id) => FEATURE_GROUPS.find((g) => g.id === id)!);
 
   return (
     <div className="bg-neutral-950 text-white">
-      <header className="sticky top-0 z-30 border-b border-neutral-800 bg-neutral-950/85 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <BrandMark />
-          <nav className="flex items-center gap-6 text-sm text-neutral-300">
-            <a href="#how" className="hidden hover:text-white sm:inline">How it works</a>
-            <a href="/demo" className="hidden hover:text-white sm:inline">Demo</a>
-            <a href="#pricing" className="hover:text-white">Pricing</a>
-            <a href="#faq" className="hidden hover:text-white sm:inline">FAQ</a>
-            <a href="/login" className="rounded-full bg-white px-4 py-1.5 font-medium text-neutral-950 hover:bg-neutral-200">
-              Log in
-            </a>
-          </nav>
-        </div>
-      </header>
+      <SiteHeader current="home" />
 
       <main>
         {/* Hero */}
@@ -113,8 +102,8 @@ export default async function Home() {
               Know who trained. Know who paid.
             </h1>
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-neutral-400">
-              Repstack runs memberships, door check-ins and billing for independent gyms. Members
-              scan a poster to check in, and invoices go out over WhatsApp.
+              Repstack runs memberships, door check-ins, payments and classes for independent gyms.
+              Members scan a poster to check in and renew from their phone. You see everything from one dashboard.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <a href="#pricing" className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-neutral-950 hover:bg-neutral-200">
@@ -124,14 +113,15 @@ export default async function Home() {
                 Try the demo
               </a>
             </div>
+            <p className="mt-6 text-sm text-neutral-500">No setup fee. No app to install. Cancel any time and take your data with you.</p>
           </div>
           <HeroLedger />
         </section>
 
-        {/* How it works: a real sequence, so the steps are numbered */}
+        {/* How it works */}
         <section id="how" className="scroll-mt-16 border-t border-neutral-800 bg-neutral-900/40">
           <div className="mx-auto max-w-6xl px-6 py-24">
-            <h2 className="max-w-md text-3xl font-semibold sm:text-4xl">From sign-up to first workout</h2>
+            <h2 className="max-w-md text-3xl font-semibold sm:text-4xl">From your spreadsheet to the first scan</h2>
             <ol className="mt-14 grid gap-10 md:grid-cols-3">
               {steps.map((s, i) => (
                 <li key={s.title} className="flex gap-5">
@@ -146,26 +136,61 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* Features as ruled rows, ledger-style, not cards */}
-        <section className="mx-auto max-w-6xl px-6 py-24">
-          <h2 className="max-w-lg text-3xl font-semibold sm:text-4xl">Built for how gyms actually run</h2>
-          <dl className="mt-12 border-t border-neutral-700">
-            {features.map((f) => (
-              <div key={f.title} className="grid gap-2 border-b border-neutral-800 py-7 md:grid-cols-[0.8fr_1.2fr] md:gap-10">
-                <dt className="font-display text-xl font-semibold">{f.title}</dt>
-                <dd className="max-w-xl leading-relaxed text-neutral-400">{f.body}</dd>
+        {/* Features: six groups, three lines each, with the full catalogue a click away */}
+        <section id="features" className="scroll-mt-16 mx-auto max-w-6xl px-6 py-24">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <h2 className="max-w-lg text-3xl font-semibold sm:text-4xl">Built for how gyms actually run</h2>
+            <a href="/features" className="text-sm font-medium text-neutral-300 underline-offset-4 hover:text-white hover:underline">
+              See every feature →
+            </a>
+          </div>
+          <div className="mt-12 grid gap-x-12 gap-y-12 md:grid-cols-2 lg:grid-cols-3">
+            {groups.map((g) => (
+              <div key={g.id} className="border-t border-neutral-700 pt-5">
+                <div className="flex items-center gap-2.5">
+                  <PlateGlyph size={22} color={PLATE[g.color]} />
+                  <h3 className="font-display text-xl font-semibold">{g.title}</h3>
+                </div>
+                <p className="mt-2 text-sm text-neutral-500">{g.lede}</p>
+                <ul className="mt-4 space-y-2.5 text-[15px] leading-relaxed text-neutral-300">
+                  {g.items.slice(0, 3).map((f) => (
+                    <li key={f.title} className="flex gap-2.5">
+                      <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-600" aria-hidden="true" />
+                      <span>{f.title}</span>
+                    </li>
+                  ))}
+                </ul>
+                <a href={`/features#${g.id}`} className="mt-4 inline-block text-sm text-neutral-500 hover:text-white">
+                  More about {g.title.toLowerCase()} →
+                </a>
               </div>
             ))}
-          </dl>
+          </div>
+        </section>
+
+        {/* Security strip */}
+        <section className="border-t border-neutral-800 bg-neutral-900/40">
+          <div className="mx-auto grid max-w-6xl gap-8 px-6 py-16 md:grid-cols-3">
+            {[
+              { title: "Each gym is sealed off", body: "Scoped in the app, enforced again by the database. One gym can never see another." },
+              { title: "Encrypted where it matters", body: "Member phone numbers and WhatsApp credentials are encrypted at rest. Lists show masked digits." },
+              { title: "Your data is yours", body: "Export members and finances as CSV any time. Erase a member on request. Leave whenever you like." },
+            ].map((s) => (
+              <div key={s.title}>
+                <h3 className="font-display text-lg font-semibold">{s.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-neutral-400">{s.body}</p>
+              </div>
+            ))}
+          </div>
         </section>
 
         {/* Pricing */}
-        <section id="pricing" className="scroll-mt-16 border-t border-neutral-800 bg-neutral-900/40">
+        <section id="pricing" className="scroll-mt-16 border-t border-neutral-800">
           <div className="mx-auto max-w-6xl px-6 py-24">
             <h2 className="max-w-md text-3xl font-semibold sm:text-4xl">Pricing that scales with your floor</h2>
             <p className="mb-10 mt-4 max-w-lg text-neutral-400">
-              Every plan includes check-in, billing and dashboards. Pick the size that fits your
-              member count.
+              Every plan includes everything: check-in, payments, classes, finance and WhatsApp. Pick the size that fits
+              your member count. No setup fee.
             </p>
             {tiers.length > 0 ? (
               <Pricing tiers={tiers} />
@@ -176,23 +201,25 @@ export default async function Home() {
         </section>
 
         {/* FAQ */}
-        <section id="faq" className="scroll-mt-16 mx-auto max-w-3xl px-6 py-24">
-          <h2 className="text-3xl font-semibold sm:text-4xl">Questions gym owners ask</h2>
-          <div className="mt-10 divide-y divide-neutral-800 border-y border-neutral-800">
-            {faqs.map((f) => (
-              <details key={f.q} className="group py-5">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium">
-                  {f.q}
-                  <span className="text-xl text-neutral-500 transition-transform group-open:rotate-45" aria-hidden="true">+</span>
-                </summary>
-                <p className="mt-3 max-w-xl leading-relaxed text-neutral-400">{f.a}</p>
-              </details>
-            ))}
+        <section id="faq" className="scroll-mt-16 border-t border-neutral-800 bg-neutral-900/40">
+          <div className="mx-auto max-w-3xl px-6 py-24">
+            <h2 className="text-3xl font-semibold sm:text-4xl">Questions gym owners ask</h2>
+            <div className="mt-10 divide-y divide-neutral-800 border-y border-neutral-800">
+              {faqs.map((f) => (
+                <details key={f.q} className="group py-5">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium">
+                    {f.q}
+                    <span className="text-xl text-neutral-500 transition-transform group-open:rotate-45" aria-hidden="true">+</span>
+                  </summary>
+                  <p className="mt-3 max-w-xl leading-relaxed text-neutral-400">{f.a}</p>
+                </details>
+              ))}
+            </div>
           </div>
         </section>
 
         {/* Log in */}
-        <section id="login" className="scroll-mt-16 border-t border-neutral-800 bg-neutral-900/40">
+        <section id="login" className="scroll-mt-16 border-t border-neutral-800">
           <div className="mx-auto grid max-w-6xl gap-10 px-6 py-24 md:grid-cols-2">
             <div>
               <h2 className="text-3xl font-semibold sm:text-4xl">Already on Repstack?</h2>
@@ -212,16 +239,7 @@ export default async function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-neutral-800">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-neutral-500">
-          <BrandMark />
-          <nav className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <a href="/terms" className="hover:text-neutral-300">Terms</a>
-            <a href="/privacy" className="hover:text-neutral-300">Privacy</a>
-            <a href="/superadmin/login" className="hover:text-neutral-300">Platform admin</a>
-          </nav>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
