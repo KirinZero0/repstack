@@ -3,6 +3,8 @@ import { requireTenantSession, SessionError } from "@/lib/session";
 import { getGymFinance } from "@/lib/stats";
 import { BarChart, Card, HBars, StatCard, StatusPill, rp } from "@/components/charts";
 import GymNav from "@/components/GymNav";
+import { defaultMonthlyRange, defaultTransactionsRange } from "@/lib/financeExport";
+import FinanceExportCard from "./FinanceExportCard";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,8 @@ export default async function FinancePage({ params }: { params: { slug: string }
   }
 
   const f = await getGymFinance(db, gym.id, gym.timezone);
+  const thisMonth = defaultTransactionsRange(gym.timezone);
+  const lastYear = defaultMonthlyRange(gym.timezone);
   const short = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
   const change =
     f.changePct === null ? "no prior month" : `${f.changePct >= 0 ? "+" : ""}${f.changePct.toFixed(0)}% vs last month`;
@@ -54,6 +58,10 @@ export default async function FinancePage({ params }: { params: { slug: string }
             sub={`${f.pendingCount} unpaid invoice${f.pendingCount === 1 ? "" : "s"}`}
             tone={f.pendingCount > 0 ? "bad" : undefined}
           />
+        </div>
+
+        <div className="mb-6">
+          <FinanceExportCard slug={params.slug} monthStart={thisMonth.from} today={thisMonth.to} yearStart={lastYear.from} />
         </div>
 
         <div className="mb-6">
