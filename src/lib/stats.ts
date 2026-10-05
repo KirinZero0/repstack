@@ -26,61 +26,105 @@ function monthlyEquivalent(price: number, interval: string) {
   return interval === "annual" ? price / 12 : price;
 }
 
+/**
+ * The owner's money picture: membership payments and class payments together, since both are
+ * revenue. Breakdowns are per item ("Monthly" plan, "Yoga class") and per method.
+ */
 export async function getGymFinance(db: TenantDb, gymId: string, timezone: string) {
   const months = lastMonthKeys(12, timezone);
   const since = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
 
-  const [paid, pendingAgg, statusGroups, recent] = await Promise.all([
+  const [paid, paidClasses, pendingAgg, pendingClassAgg, statusGroups, classStatusGroups, recent, recentClasses] = await Promise.all([
     db.payment.findMany({
       where: { gymId, status: "PAID", paidAt: { gte: since } },
       include: { plan: { select: { name: true } } },
     }),
+    db.classPayment.findMany({
+      where: { gymId, status: "PAID", paidAt: { gte: since } },
+      include: { registration: { select: { session: { select: { class: { select: { name: true } } } } } } },
+    }),
     db.payment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
+    db.classPayment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
     db.payment.groupBy({ by: ["status"], where: { gymId }, _count: true }),
+    db.classPayment.groupBy({ by: ["status"], where: { gymId }, _count: true }),
     db.payment.findMany({
       where: { gymId },
       orderBy: { createdAt: "desc" },
       take: 10,
       include: { plan: { select: { name: true } }, member: { select: { fullName: true } } },
     }),
+    db.classPayment.findMany({
+      where: { gymId },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      include: { registration: { select: { member: { select: { fullName: true } }, session: { select: { class: { select: { name: true } } } } } } },
+    }),
   ]);
 
+  type PaidRow = { when: Date; amount: number; item: string; kind: "membership" | "class"; provider: string };
+  const rows: PaidRow[] = [
+    ...paid.map((p) => ({ when: p.paidAt ?? p.createdAt, amount: Number(p.amount), item: p.plan.name, kind: "membership" as const, provider: p.provider })),
+    ...paidClasses.map((p) => ({
+      when: p.paidAt ?? p.createdAt,
+      amount: Number(p.amount),
+      item: `${p.registration.session.class.name} class`,
+      kind: "class" as const,
+      provider: p.provider,
+    })),
+  ];
+
   const byMonth = new Map<string, number>(months.map((k) => [k, 0]));
+  const byMonthClasses = new Map<string, number>(months.map((k) => [k, 0]));
   const byPlan = new Map<string, number>();
   const byMethod = new Map<string, number>();
-  for (const p of paid) {
-    const key = monthKey(p.paidAt ?? p.createdAt, timezone);
-    if (byMonth.has(key)) byMonth.set(key, (byMonth.get(key) ?? 0) + Number(p.amount));
+  for (const p of rows) {
+    const key = monthKey(p.when, timezone);
+    if (byMonth.has(key)) {
+      byMonth.set(key, (byMonth.get(key) ?? 0) + p.amount);
+      if (p.kind === "class") byMonthClasses.set(key, (byMonthClasses.get(key) ?? 0) + p.amount);
+    }
     if (key === months[months.length - 1]) {
-      byPlan.set(p.plan.name, (byPlan.get(p.plan.name) ?? 0) + Number(p.amount));
+      byPlan.set(p.item, (byPlan.get(p.item) ?? 0) + p.amount);
       const method = p.provider === "CASH" ? "Recorded manually" : "Online payment";
-      byMethod.set(method, (byMethod.get(method) ?? 0) + Number(p.amount));
+      byMethod.set(method, (byMethod.get(method) ?? 0) + p.amount);
     }
   }
 
   const monthly = months.map((k) => ({ key: k, label: monthLabel(k), value: byMonth.get(k) ?? 0 }));
   const thisMonth = monthly[monthly.length - 1].value;
+  const thisMonthClasses = byMonthClasses.get(months[months.length - 1]) ?? 0;
   const lastMonth = monthly[monthly.length - 2]?.value ?? 0;
 
-  return {
-    monthly,
-    thisMonth,
-    lastMonth,
-    changePct: lastMonth > 0 ? ((thisMonth - lastMonth) / lastMonth) * 100 : null,
-    yearTotal: monthly.reduce((s, m) => s + m.value, 0),
-    pendingAmount: Number(pendingAgg._sum.amount ?? 0),
-    pendingCount: pendingAgg._count,
-    byPlan: Array.from(byPlan.entries()).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value),
-    byMethod: Array.from(byMethod.entries()).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value),
-    statusCounts: statusGroups.map((g) => ({ status: g.status, count: g._count })),
-    recent: recent.map((p) => ({
+  const statusCounts = new Map<string, number>();
+  for (const g of [...statusGroups, ...classStatusGroups]) statusCounts.set(g.status, (statusCounts.get(g.status) ?? 0) + g._count);
+
+  const recentAll = [
+    ...recent.map((p) => ({ id: p.id, member: p.member.fullName, plan: p.plan.name, amount: Number(p.amount), status: p.status, date: p.createdAt })),
+    ...recentClasses.map((p) => ({
       id: p.id,
-      member: p.member.fullName,
-      plan: p.plan.name,
+      member: p.registration.member.fullName,
+      plan: `${p.registration.session.class.name} class`,
       amount: Number(p.amount),
       status: p.status,
       date: p.createdAt,
     })),
+  ]
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .slice(0, 10);
+
+  return {
+    monthly,
+    thisMonth,
+    thisMonthClasses,
+    lastMonth,
+    changePct: lastMonth > 0 ? ((thisMonth - lastMonth) / lastMonth) * 100 : null,
+    yearTotal: monthly.reduce((s, m) => s + m.value, 0),
+    pendingAmount: Number(pendingAgg._sum.amount ?? 0) + Number(pendingClassAgg._sum.amount ?? 0),
+    pendingCount: pendingAgg._count + pendingClassAgg._count,
+    byPlan: Array.from(byPlan.entries()).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value),
+    byMethod: Array.from(byMethod.entries()).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value),
+    statusCounts: Array.from(statusCounts.entries()).map(([status, count]) => ({ status, count })),
+    recent: recentAll,
   };
 }
 

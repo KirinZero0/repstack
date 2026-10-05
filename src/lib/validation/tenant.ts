@@ -199,6 +199,12 @@ export const createClassSessionSchema = z.object({
 
 export const classSessionActionSchema = z.object({ action: z.enum(["cancel"]) });
 
+/** Staff marks who turned up. null clears a mark made by mistake. */
+export const classAttendanceSchema = z.object({ attendance: z.enum(["ATTENDED", "NO_SHOW"]).nullable() });
+
+/** How early before a session starts the roster can be marked (people arrive before the hour). */
+export const ATTENDANCE_OPENS_BEFORE_MS = 30 * 60 * 1000;
+
 /** Staff confirms a member's registration by recording what they paid at the front desk. */
 export const confirmClassRegistrationSchema = z.object({
   amount: z.number().int().min(0).max(100_000_000),

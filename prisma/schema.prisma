@@ -212,6 +212,7 @@ model CheckIn {
   staffUserId String?
   staffUser   StaffUser?    @relation(fields: [staffUserId], references: [id])
   checkedInAt DateTime      @default(now())
+  checkedOutAt DateTime?    // explicit check-out (member or staff); a SUCCESS without one counts as "in the gym" until the occupancy window lapses
   result      CheckInResult
   deviceLabel String?
 
@@ -350,7 +351,8 @@ model MemberSignup {
   email               String
   phoneWhatsapp       String // AES-256-GCM encrypted, like Member.phoneWhatsapp
   phoneWhatsappLookup String
-  passwordHash        String
+  passwordHash        String? // null for a RENEWAL: the member already has an account
+  kind                String       @default("JOIN") // "JOIN" (new member) | "RENEWAL" (existing member, memberId set from the start)
   amount              Decimal // snapshot of the plan price when the request was made
   status              SignupStatus @default(PENDING_REVIEW)
   proofImageUrl       String? // Vercel Blob URL (private access), a screenshot of the transfer
@@ -430,6 +432,9 @@ model ClassRegistration {
   memberId  String
   member    Member                  @relation(fields: [memberId], references: [id])
   status    ClassRegistrationStatus @default(PENDING_PAYMENT)
+  attendance     String?   // "ATTENDED" | "NO_SHOW", marked by staff from the roster once the session has started; null = not marked
+  attendanceAt   DateTime?
+  reminderSentAt DateTime? // set by the class-reminders cron before the message goes out, so it's sent at most once
   createdAt DateTime                @default(now())
 
   payment ClassPayment?

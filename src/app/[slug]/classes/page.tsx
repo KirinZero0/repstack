@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { SEAT_HOLDING_STATUSES, effectiveCapacity, whenLabel } from "@/lib/classes";
+import { ATTENDANCE_OPENS_BEFORE_MS } from "@/lib/validation/tenant";
 import GymNav from "@/components/GymNav";
 import ClassesManager, { type ClassRow } from "./ClassesManager";
 
@@ -56,12 +57,14 @@ export default async function ClassesPage({ params }: { params: { slug: string }
       capacity: effectiveCapacity(s, c),
       taken: s.registrations.filter((r) => (SEAT_HOLDING_STATUSES as readonly string[]).includes(r.status)).length,
       past: s.startsAt.getTime() <= now.getTime(),
+      attendanceOpen: s.status !== "CANCELLED" && s.startsAt.getTime() - now.getTime() <= ATTENDANCE_OPENS_BEFORE_MS,
       registrations: s.registrations.map((r) => ({
         id: r.id,
         memberName: r.member.fullName,
         status: r.status,
         paid: r.payment?.status === "PAID",
         amount: r.payment?.status === "PAID" ? Number(r.payment.amount) : null,
+        attendance: (r.attendance as "ATTENDED" | "NO_SHOW" | null) ?? null,
       })),
     })),
   }));

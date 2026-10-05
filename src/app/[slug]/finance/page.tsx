@@ -47,7 +47,7 @@ export default async function FinancePage({ params }: { params: { slug: string }
           <StatCard
             label="Revenue this month"
             value={rp(f.thisMonth)}
-            sub={change}
+            sub={f.thisMonthClasses > 0 ? `${change} · ${rp(f.thisMonthClasses)} from classes` : change}
             tone={f.changePct === null ? undefined : f.changePct >= 0 ? "good" : "bad"}
           />
           <StatCard label="Last month" value={rp(f.lastMonth)} />
@@ -65,13 +65,13 @@ export default async function FinancePage({ params }: { params: { slug: string }
         </div>
 
         <div className="mb-6">
-          <Card title="Membership revenue — last 12 months">
+          <Card title="Revenue — last 12 months (memberships and classes)">
             <BarChart data={f.monthly} format={short} />
           </Card>
         </div>
 
         <div className="mb-6 grid gap-6 lg:grid-cols-2">
-          <Card title="This month by plan">
+          <Card title="This month by plan or class">
             <HBars data={f.byPlan} format={rp} />
           </Card>
           <Card title="This month by how they paid">
@@ -96,7 +96,7 @@ export default async function FinancePage({ params }: { params: { slug: string }
               <tr>
                 <th className="pb-2 font-normal">Date</th>
                 <th className="pb-2 font-normal">Member</th>
-                <th className="pb-2 font-normal">Plan</th>
+                <th className="pb-2 font-normal">Plan / class</th>
                 <th className="pb-2 font-normal">Amount</th>
                 <th className="pb-2 font-normal">Status</th>
               </tr>

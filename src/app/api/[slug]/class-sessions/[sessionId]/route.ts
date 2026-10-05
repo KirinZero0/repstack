@@ -52,3 +52,29 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
 
   return NextResponse.json({ ok: true, cancelledRegistrations: cs.registrations.filter((r) => r.status !== "CANCELLED").length });
 }
+
+/** Owner deletes a session nobody booked. One with bookings, past or present, is cancelled instead so the history stays. */
+export async function DELETE(_req: NextRequest, { params }: { params: { slug: string; sessionId: string } }) {
+  let session, gym, db;
+  try {
+    ({ session, gym, db } = await requireTenantSession(params.slug));
+  } catch (err) {
+    if (err instanceof SessionError) {
+      const status = err.code === "GYM_SUSPENDED" ? 403 : err.code === "NOT_FOUND" ? 404 : 401;
+      return NextResponse.json({ error: err.message }, { status });
+    }
+    throw err;
+  }
+  if (session.role !== "OWNER") {
+    return NextResponse.json({ error: "Only the owner can manage class sessions" }, { status: 403 });
+  }
+
+  const cs = await db.classSession.findUnique({ where: { id: params.sessionId }, include: { _count: { select: { registrations: true } } } });
+  if (!cs || cs.gymId !== gym.id) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  if (cs._count.registrations > 0) {
+    return NextResponse.json({ error: "This session has bookings on record. Cancel it instead so everyone is told." }, { status: 409 });
+  }
+
+  await db.classSession.delete({ where: { id: cs.id } });
+  return NextResponse.json({ ok: true });
+}
