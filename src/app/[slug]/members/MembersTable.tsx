@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ResendFallbackButton from "./ResendFallbackButton";
 
 export interface MemberRow {
@@ -18,8 +18,11 @@ const digitsOf = (s: string) => s.replace(/\D/g, "");
 // 62812… and 0812… are the same number; compare them in one form.
 const toLocal = (d: string) => (d.startsWith("62") ? `0${d.slice(2)}` : d);
 
+const PAGE_SIZE = 20;
+
 export default function MembersTable({ slug, isOwner, rows }: { slug: string; isOwner: boolean; rows: MemberRow[] }) {
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -32,6 +35,13 @@ export default function MembersTable({ slug, isOwner, rows }: { slug: string; is
       return p.includes(qDigits) || toLocal(p).includes(toLocal(qDigits));
     });
   }, [rows, query]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const current = Math.min(page, pageCount);
+  const visible = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+
+  // A new search starts back on the first page.
+  useEffect(() => setPage(1), [query]);
 
   return (
     <>
@@ -67,7 +77,7 @@ export default function MembersTable({ slug, isOwner, rows }: { slug: string; is
             </tr>
           </thead>
           <tbody>
-            {filtered.map((m) => (
+            {visible.map((m) => (
               <tr key={m.id} className="border-t border-neutral-800">
                 <td className="px-4 py-3">
                   <a href={`/${slug}/members/${m.id}`} className="font-medium underline-offset-2 hover:underline">
@@ -107,6 +117,35 @@ export default function MembersTable({ slug, isOwner, rows }: { slug: string; is
           </tbody>
         </table>
       </div>
+
+      {filtered.length > PAGE_SIZE && (
+        <nav aria-label="Members pagination" className="mt-4 flex items-center justify-between text-sm text-neutral-400">
+          <span>
+            {(current - 1) * PAGE_SIZE + 1}–{Math.min(current * PAGE_SIZE, filtered.length)} of {filtered.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage(current - 1)}
+              disabled={current === 1}
+              className="rounded-md border border-neutral-700 px-3 py-1 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <span>
+              Page {current} of {pageCount}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage(current + 1)}
+              disabled={current === pageCount}
+              className="rounded-md border border-neutral-700 px-3 py-1 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </nav>
+      )}
     </>
   );
 }
