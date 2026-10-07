@@ -11,13 +11,26 @@ export function isBlobMock(): boolean {
 
 export const MOCK_BLOB_ORIGIN = "https://mock-blob.local";
 
+/**
+ * A Blob store is either public or private, never both. Private files (payment proofs, member photos) use the
+ * default store (BLOB_READ_WRITE_TOKEN); public gym photos use a second, public store (BLOB_PUBLIC_READ_WRITE_TOKEN).
+ */
+function publicToken(): string | undefined {
+  return process.env.BLOB_PUBLIC_READ_WRITE_TOKEN || undefined;
+}
+
+/** Public blobs live on a "<store>.public.blob.vercel-storage.com" host; everything else belongs to the private store. */
+function tokenFor(url: string): string | undefined {
+  return /\.public\.blob\./.test(url) ? publicToken() : undefined;
+}
+
 /** Uploads a publicly readable image (gym photos). Returns the URL to store. */
 export async function putPublicImage(pathname: string, file: File | Blob, contentType: string): Promise<string> {
   if (isBlobMock()) {
     console.log(`[blob:mock] would upload ${pathname} (${contentType}, ${file.size} bytes)`);
     return `${MOCK_BLOB_ORIGIN}/${pathname}`;
   }
-  const blob = await put(pathname, file, { access: "public", contentType, addRandomSuffix: true });
+  const blob = await put(pathname, file, { access: "public", contentType, addRandomSuffix: true, token: publicToken() });
   return blob.url;
 }
 
@@ -44,5 +57,5 @@ export async function getPrivateFile(url: string): Promise<{ stream: ReadableStr
 /** Best effort: removes a blob so storage doesn't leak. Failures are logged, never thrown. */
 export async function deleteBlob(url: string): Promise<void> {
   if (isBlobMock() || url.startsWith(MOCK_BLOB_ORIGIN)) return;
-  await del(url).catch((err) => console.error(`Could not delete blob ${url}`, err));
+  await del(url, { token: tokenFor(url) }).catch((err) => console.error(`Could not delete blob ${url}`, err));
 }
