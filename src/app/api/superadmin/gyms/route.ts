@@ -47,9 +47,12 @@ export async function POST(req: NextRequest) {
 
   const passwordHash = await bcrypt.hash(data.ownerTempPassword, 10);
 
+  // A lifetime gym is never billed. Otherwise the trial runs trialDays (the plan's interval doesn't matter), then the
+  // first invoice goes out. With no trial the first invoice is due immediately and goes out at the next billing run.
+  const hasTrial = !data.isLifetime && data.allowTrial;
   const nextBillingDate = data.isLifetime
     ? null
-    : new Date(Date.now() + (plan.billingInterval === "annual" ? 365 : 30) * 24 * 60 * 60 * 1000);
+    : new Date(Date.now() + (hasTrial ? data.trialDays : 0) * 24 * 60 * 60 * 1000);
 
   const { gym, owner } = await prisma.$transaction(async (tx) => {
     const gym = await tx.gym.create({
@@ -58,9 +61,9 @@ export async function POST(req: NextRequest) {
         slug: data.slug,
         saasPlanId: data.saasPlanId,
         isLifetime: data.isLifetime,
-        // A new gym starts on a 30-day trial: the first invoice (and the first payment that makes it ACTIVE) comes at the end of it.
-        // A lifetime gym is never billed, so it has no trial.
-        subscriptionStatus: data.isLifetime ? "ACTIVE" : "TRIALING",
+        // On a trial the first invoice (and the first payment that makes it ACTIVE) comes at the end of it.
+        // A lifetime gym is never billed, so it has no trial; a gym created without one is ACTIVE and billed straight away.
+        subscriptionStatus: hasTrial ? "TRIALING" : "ACTIVE",
         nextBillingDate,
       },
     });
@@ -104,6 +107,7 @@ export async function POST(req: NextRequest) {
       slug: gym.slug,
       ownerEmail: owner.email,
       isLifetime: gym.isLifetime,
+      trialDays: hasTrial ? data.trialDays : null,
       setupFee: data.setupFee,
       setupFeePaid: data.setupFee > 0 ? data.setupFeePaid : null,
     },
@@ -113,7 +117,7 @@ export async function POST(req: NextRequest) {
     const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL}/${gym.slug}/login`;
     await sendPlatformWhatsapp({
       to: data.ownerPhone,
-      message: `Welcome to Liftmora, ${data.ownerName}! Your gym "${data.gymName}" is set up. Log in at ${loginUrl} with email ${data.ownerEmail} and the temporary password you were given.${data.isLifetime ? "" : " You have a free 30-day trial."}`,
+      message: `Welcome to Liftmora, ${data.ownerName}! Your gym "${data.gymName}" is set up. Log in at ${loginUrl} with email ${data.ownerEmail} and the temporary password you were given.${hasTrial ? ` You have a free ${data.trialDays}-day trial.` : ""}`,
     });
   }
 

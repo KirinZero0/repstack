@@ -20,6 +20,8 @@ export default function CreateGymForm({ saasPlans }: { saasPlans: SaasPlanOption
     slug: "",
     saasPlanId: saasPlans[0]?.id ?? "",
     isLifetime: false,
+    allowTrial: true,
+    trialDays: "14",
     setupFee: "",
     setupFeePaid: false,
     ownerName: "",
@@ -42,7 +44,7 @@ export default function CreateGymForm({ saasPlans }: { saasPlans: SaasPlanOption
       const res = await fetch("/api/superadmin/gyms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, setupFee, setupFeePaid: setupFee > 0 && form.setupFeePaid }),
+        body: JSON.stringify({ ...form, trialDays: Number(form.trialDays) || 14, setupFee, setupFeePaid: setupFee > 0 && form.setupFeePaid }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -111,6 +113,28 @@ export default function CreateGymForm({ saasPlans }: { saasPlans: SaasPlanOption
           checked={form.isLifetime}
           onChange={(e) => update("isLifetime", e.target.checked)}
           className="h-5 w-5"
+        />
+      </Field>
+      <Field label="Allow trial access">
+        <input
+          type="checkbox"
+          checked={form.allowTrial && !form.isLifetime}
+          disabled={form.isLifetime}
+          onChange={(e) => update("allowTrial", e.target.checked)}
+          className="h-5 w-5 disabled:opacity-40"
+        />
+      </Field>
+      <Field label="Trial length (days)">
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={365}
+          step={1}
+          value={form.trialDays}
+          disabled={!form.allowTrial || form.isLifetime}
+          onChange={(e) => update("trialDays", e.target.value)}
+          className="input disabled:opacity-40"
         />
       </Field>
       <Field label="Setup fee, Rp (optional, one-time)">

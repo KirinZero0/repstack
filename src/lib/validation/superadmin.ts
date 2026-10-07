@@ -14,6 +14,9 @@ export const createGymSchema = z.object({
     .regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
   saasPlanId: z.string().uuid(),
   isLifetime: z.boolean().default(false),
+  // Free trial before the first invoice. Off = the first invoice goes out at the next billing run. Ignored for lifetime gyms.
+  allowTrial: z.boolean().default(true),
+  trialDays: z.number().int().min(1).max(365).default(14),
   // Optional one-time onboarding charge (e.g. importing their member list by hand). Whole rupiah; 0 = none.
   setupFee: z.number().int().min(0).max(1_000_000_000).default(0),
   setupFeePaid: z.boolean().default(false),
