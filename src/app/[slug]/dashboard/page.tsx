@@ -48,6 +48,12 @@ export default async function DashboardPage({ params }: { params: { slug: string
     (c) => dayKeyInTimezone(c.checkedInAt, gym.timezone) === todayKey && c.result === "SUCCESS",
   );
 
+  const todaysMembers = await db.member.findMany({
+    where: { gymId: gym.id, id: { in: Array.from(new Set(checkinsToday.map((c) => c.memberId))) } },
+    select: { id: true, fullName: true },
+  });
+  const nameOf = new Map(todaysMembers.map((m) => [m.id, m.fullName]));
+
   const monthRevenue = monthPayments.reduce((sum, p) => sum + Number(p.amount), 0);
   const timeOf = (d: Date) => d.toLocaleTimeString("id-ID", { timeZone: gym.timezone, hour: "2-digit", minute: "2-digit" });
 
@@ -58,6 +64,14 @@ export default async function DashboardPage({ params }: { params: { slug: string
           <div>
             <h1 className="text-2xl font-semibold">{gym.name}</h1>
             <p className="text-sm text-neutral-400">Dashboard</p>
+            <a
+              href={`/${params.slug}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-block rounded-lg border border-neutral-700 px-3 py-1.5 text-sm text-neutral-200 hover:border-neutral-500 hover:text-white"
+            >
+              View gym page ↗
+            </a>
           </div>
           <GymNav slug={params.slug} role={session.role} current="dashboard" />
         </div>
@@ -70,6 +84,24 @@ export default async function DashboardPage({ params }: { params: { slug: string
             label="Revenue this month"
             value={`Rp ${monthRevenue.toLocaleString("id-ID")}`}
           />
+        </div>
+
+        <div className="mb-6 rounded-xl border border-neutral-800">
+          <div className="border-b border-neutral-800 px-4 py-3">
+            <h2 className="font-medium">Checked in today</h2>
+          </div>
+          {checkinsToday.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-neutral-500">No check-ins yet today.</p>
+          ) : (
+            <ul className="divide-y divide-neutral-800 text-sm">
+              {checkinsToday.map((c) => (
+                <li key={c.id} className="flex items-center justify-between px-4 py-2.5">
+                  <span>{nameOf.get(c.memberId) ?? "Member"}</span>
+                  <span className="tabular-nums text-neutral-400">{timeOf(c.checkedInAt)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="mb-6 grid gap-6 lg:grid-cols-2">
