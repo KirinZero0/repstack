@@ -119,6 +119,14 @@ export default async function SuperadminGymsPage() {
                     <td className="px-4 py-3">{gym._count.members}</td>
                     <td className="px-4 py-3">
                       <StatusBadge status={gym.subscriptionStatus} />
+                      {gym.subscriptionStatus === "TRIALING" && gym.nextBillingDate && (
+                        <span className="mt-1 block whitespace-nowrap text-xs text-neutral-500">
+                          {(() => {
+                            const days = Math.ceil((gym.nextBillingDate.getTime() - Date.now()) / 86_400_000);
+                            return days > 0 ? `trial ends in ${days} day${days === 1 ? "" : "s"}` : "trial ended, invoice due";
+                          })()}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">{gym.isLifetime ? "Yes" : "—"}</td>
                     <td className="whitespace-nowrap px-4 py-3">

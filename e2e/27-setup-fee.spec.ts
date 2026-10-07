@@ -58,7 +58,7 @@ test("an unpaid setup fee is recorded, shown, marked paid once, and never touche
   const after = await prisma.gym.findUniqueOrThrow({ where: { id: gymId } });
   expect(after.nextBillingDate?.getTime()).toBe(before.nextBillingDate?.getTime());
   expect(after.saasPlanId).toBe(before.saasPlanId);
-  expect(after.subscriptionStatus).toBe("ACTIVE");
+  expect(after.subscriptionStatus).toBe(before.subscriptionStatus); // a setup fee never changes the subscription status (still on trial)
 
   // Marking it again finds nothing owed; no second payment row appears.
   const again = await request.post(`${baseURL}/api/superadmin/gyms/${gymId}/setup-fee-paid`);

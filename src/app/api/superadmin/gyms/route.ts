@@ -58,7 +58,9 @@ export async function POST(req: NextRequest) {
         slug: data.slug,
         saasPlanId: data.saasPlanId,
         isLifetime: data.isLifetime,
-        subscriptionStatus: "ACTIVE",
+        // A new gym starts on a 30-day trial: the first invoice (and the first payment that makes it ACTIVE) comes at the end of it.
+        // A lifetime gym is never billed, so it has no trial.
+        subscriptionStatus: data.isLifetime ? "ACTIVE" : "TRIALING",
         nextBillingDate,
       },
     });
@@ -111,7 +113,7 @@ export async function POST(req: NextRequest) {
     const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL}/${gym.slug}/login`;
     await sendPlatformWhatsapp({
       to: data.ownerPhone,
-      message: `Welcome to Repstack, ${data.ownerName}! Your gym "${data.gymName}" is set up. Log in at ${loginUrl} with email ${data.ownerEmail} and the temporary password you were given.`,
+      message: `Welcome to Repstack, ${data.ownerName}! Your gym "${data.gymName}" is set up. Log in at ${loginUrl} with email ${data.ownerEmail} and the temporary password you were given.${data.isLifetime ? "" : " You have a free 30-day trial."}`,
     });
   }
 
