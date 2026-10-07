@@ -18,7 +18,7 @@ const SUBJECTS: Record<string, string> = {
   qr_fallback: "Your check-in QR link",
   class_confirmation: "Your class booking",
   class_cancelled: "A class was cancelled",
-  class_reminder: "Your class starts soon",
+  class_reminder: "Your class is tomorrow",
   renewal_confirmed: "Membership renewed",
 };
 

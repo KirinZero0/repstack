@@ -22,7 +22,7 @@ for end-to-end tests. Deployed on Vercel.
 - Join and renew by bank transfer: a public join page and a member renewal form that file requests
   with a transfer screenshot; staff confirm them from one queue.
 - Classes: class types, weekly sessions, member booking with seat limits, desk or online payment,
-  attendance marking, reminders three hours before.
+  attendance marking, a reminder the evening before.
 - Finance: revenue by month, by plan or class, by method; CSV exports for the bookkeeper.
 - Settings: public profile page and photos, bank details, notification channels, the gym's own
   WhatsApp number, occupancy window, member leaderboard, theme.

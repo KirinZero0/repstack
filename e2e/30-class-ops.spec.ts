@@ -2,6 +2,7 @@ import { test, expect, type APIRequestContext } from "@playwright/test";
 import bcrypt from "bcryptjs";
 import { prisma, staffLoginUI } from "./helpers";
 import { encrypt, hmacLookup } from "../src/lib/crypto";
+import { dayKeyInTimezone, zonedTimeToUtc } from "../src/lib/date";
 
 const DAY = 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
@@ -123,11 +124,14 @@ test("the roster shows attendance buttons to staff and marking works in the brow
   expect(cls.id).toBeTruthy();
 });
 
-test("the reminder cron messages each confirmed booking once, three hours before, and skips the rest", async ({ request, baseURL }) => {
+test("the reminder cron messages each confirmed booking for tomorrow once, and skips the rest", async ({ request, baseURL }) => {
   const f = await makeGym(2);
-  const inTwoHours = await sessionWithBookings(f, new Date(Date.now() + 2 * HOUR));
-  const tomorrow = await sessionWithBookings(f, new Date(Date.now() + DAY));
-  const cancelled = await sessionWithBookings(f, new Date(Date.now() + 1 * HOUR));
+  // "Tomorrow" is the calendar day in the gym's timezone (Jakarta here), whatever the time it runs.
+  const tomorrowKey = dayKeyInTimezone(new Date(Date.now() + DAY), "Asia/Jakarta");
+  const dayAfterKey = dayKeyInTimezone(new Date(Date.now() + 2 * DAY), "Asia/Jakarta");
+  const dueTomorrow = await sessionWithBookings(f, zonedTimeToUtc(`${tomorrowKey}T10:00`, "Asia/Jakarta"));
+  const dayAfter = await sessionWithBookings(f, zonedTimeToUtc(`${dayAfterKey}T10:00`, "Asia/Jakarta"));
+  const cancelled = await sessionWithBookings(f, zonedTimeToUtc(`${tomorrowKey}T18:00`, "Asia/Jakarta"));
   await prisma.classSession.update({ where: { id: cancelled.session.id }, data: { status: "CANCELLED" } });
   // One pending-payment booking on the soon session: not confirmed, so no reminder.
   const extra = await prisma.member.create({
@@ -142,7 +146,7 @@ test("the reminder cron messages each confirmed booking once, three hours before
       membershipExpiry: new Date(Date.now() + 30 * DAY),
     },
   });
-  await prisma.classRegistration.create({ data: { gymId: f.gym.id, sessionId: inTwoHours.session.id, memberId: extra.id, status: "PENDING_PAYMENT" } });
+  await prisma.classRegistration.create({ data: { gymId: f.gym.id, sessionId: dueTomorrow.session.id, memberId: extra.id, status: "PENDING_PAYMENT" } });
 
   expect((await request.get(`${baseURL}/api/cron/class-reminders`)).status()).toBe(401);
 
@@ -151,10 +155,10 @@ test("the reminder cron messages each confirmed booking once, three hours before
   const sentNow = (await first.json()).remindersSent;
   expect(sentNow).toBeGreaterThanOrEqual(2);
 
-  const soonRegs = await prisma.classRegistration.findMany({ where: { sessionId: inTwoHours.session.id } });
+  const soonRegs = await prisma.classRegistration.findMany({ where: { sessionId: dueTomorrow.session.id } });
   expect(soonRegs.filter((r) => r.status === "CONFIRMED").every((r) => r.reminderSentAt !== null)).toBeTruthy();
   expect(soonRegs.find((r) => r.memberId === extra.id)!.reminderSentAt).toBeNull();
-  expect((await prisma.classRegistration.findMany({ where: { sessionId: tomorrow.session.id } })).every((r) => r.reminderSentAt === null)).toBeTruthy();
+  expect((await prisma.classRegistration.findMany({ where: { sessionId: dayAfter.session.id } })).every((r) => r.reminderSentAt === null)).toBeTruthy();
   expect((await prisma.classRegistration.findMany({ where: { sessionId: cancelled.session.id } })).every((r) => r.reminderSentAt === null)).toBeTruthy();
   for (const m of f.members) {
     expect(await prisma.notificationLog.count({ where: { memberId: m.row.id, type: "class_reminder" } })).toBe(1);

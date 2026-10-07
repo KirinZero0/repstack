@@ -118,8 +118,8 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
         body: "Staff see who booked and who paid. From half an hour before the session, mark who turned up. Members see Attended or Missed in their history.",
       },
       {
-        title: "A reminder three hours before",
-        body: "Everyone confirmed for a class gets a WhatsApp nudge before it starts. Once, automatically.",
+        title: "A reminder the evening before",
+        body: "Everyone confirmed for tomorrow's classes gets a WhatsApp nudge in the evening. Once, automatically.",
       },
     ],
   },
