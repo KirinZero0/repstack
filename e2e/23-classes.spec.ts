@@ -440,7 +440,7 @@ test("hidden classes and past sessions can't be booked; a cancelled member can't
 test("owner sets up a class in the browser and a member books it", async ({ page, baseURL, browser }) => {
   const f = await makeGym(1);
   // This flow works on the full per-class sections, which is the List layout.
-  await page.addInitScript(() => window.localStorage.setItem("repstack.classesView", "list"));
+  await page.addInitScript(() => window.localStorage.setItem("liftmora.classesView", "list"));
   await page.goto(`${baseURL}/${f.slug}/login`);
   await page.getByLabel("Email").fill(f.owner.email);
   await page.getByLabel("Password").fill(f.owner.password);

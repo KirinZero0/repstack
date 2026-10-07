@@ -20,12 +20,12 @@ export interface ImportRowResult {
 }
 
 /**
- * Bulk-adds members from a CSV (the gym's old spreadsheet, or a Repstack export). Multipart form:
+ * Bulk-adds members from a CSV (the gym's old spreadsheet, or a Liftmora export). Multipart form:
  * `file`, `planId` (used for rows with no Plan, or when the sheet has no Plan column), `notify`
  * ("1" sends activation links, "0" doesn't) and `dryRun` ("1" validates and reports, creates nothing).
  *
  * Owner only, like export. Imported members get no CASH payment record: they paid before the gym
- * used Repstack, so booking the plan price today would invent revenue. A past "Paid until" makes
+ * used Liftmora, so booking the plan price today would invent revenue. A past "Paid until" makes
  * the member EXPIRED rather than ACTIVE, so the roster is honest from the first day.
  */
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {

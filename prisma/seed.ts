@@ -37,7 +37,7 @@ async function main() {
   const superadminPassword = "changeme123";
   const superadmin = await prisma.superadmin.create({
     data: {
-      name: "Repstack Admin",
+      name: "Liftmora Admin",
       email: "admin@ironledger.dev",
       passwordHash: await bcrypt.hash(superadminPassword, 10),
     },

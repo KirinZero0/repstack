@@ -1,4 +1,4 @@
-# Deploying Repstack
+# Deploying Liftmora
 
 A first production deploy on Vercel + Neon, in order. Tick each box as you go. Everything here uses scripts
 already in the repo; nothing needs code changes. Commands are written for PowerShell on Windows; the Git Bash

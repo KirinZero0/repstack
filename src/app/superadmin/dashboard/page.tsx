@@ -23,7 +23,7 @@ export default async function SuperadminDashboardPage() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Platform dashboard</h1>
-            <p className="text-sm text-neutral-400">Revenue and tenants across Repstack</p>
+            <p className="text-sm text-neutral-400">Revenue and tenants across Liftmora</p>
           </div>
           <nav className="flex items-center gap-4 text-sm">
             <a href="/superadmin/gyms" className="text-neutral-300 hover:text-white">Gyms</a>

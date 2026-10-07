@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
 import LegalPage, { ContactLine } from "@/components/LegalPage";
 
-export const metadata: Metadata = { title: "Terms of Service · Repstack" };
+export const metadata: Metadata = { title: "Terms of Service · Liftmora" };
 
 export default function TermsPage() {
   return (
     <LegalPage title="Terms of Service" updated="26 September 2026">
       <p>
-        These terms apply when you use Repstack, a service that helps gyms manage memberships, payments and check-ins
-        (&ldquo;the service&rdquo;). By creating an account, joining a gym through Repstack or otherwise using the service you agree to them.
+        These terms apply when you use Liftmora, a service that helps gyms manage memberships, payments and check-ins
+        (&ldquo;the service&rdquo;). By creating an account, joining a gym through Liftmora or otherwise using the service you agree to them.
       </p>
 
       <h2>1. Who is who</h2>
       <ul>
-        <li><strong>Repstack</strong> (&ldquo;we&rdquo;) runs the software.</li>
-        <li><strong>Gym owners</strong> subscribe to Repstack to run their gym. Each gym is a separate customer.</li>
+        <li><strong>Liftmora</strong> (&ldquo;we&rdquo;) runs the software.</li>
+        <li><strong>Gym owners</strong> subscribe to Liftmora to run their gym. Each gym is a separate customer.</li>
         <li><strong>Members</strong> buy a membership from a gym. Your membership is an agreement between you and that gym; we provide the tools and are not a party to it.</li>
       </ul>
 

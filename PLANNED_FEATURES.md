@@ -9,7 +9,7 @@ deploying it — four new tenant tables need their policies and grants.
 
 ## 1. Gym profile page + photos
 
-- **Public page** `src/app/[slug]/page.tsx` — `repstack.com/<slug>`. Name, description, address,
+- **Public page** `src/app/[slug]/page.tsx` — `liftmora.com/<slug>`. Name, description, address,
   photo gallery, active class types (no prices), a Log in link, and a Join call-to-action only when
   `JOIN_PAGE_ENABLED` and the gym accepts sign-ups. Suspended/cancelled gyms keep the page, minus the
   join button. Owner client, no session, no member data or money on it.

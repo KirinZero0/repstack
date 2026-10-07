@@ -73,7 +73,7 @@ export default function GlobalLoginPage() {
         </button>
 
         <div className="mt-4 flex items-center justify-between text-sm text-neutral-500">
-          <span>New to Repstack? <a href="/signup" className="text-neutral-300 underline underline-offset-2 hover:text-white">Set up a gym</a></span>
+          <span>New to Liftmora? <a href="/signup" className="text-neutral-300 underline underline-offset-2 hover:text-white">Set up a gym</a></span>
           <a href="/forgot" className="text-neutral-300 underline underline-offset-2 hover:text-white">
             Forgot password?
           </a>

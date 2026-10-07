@@ -10,7 +10,7 @@ export type PlatformBank = {
 };
 
 /**
- * Until a payment provider is approved, gyms pay their Repstack subscription by bank transfer to the
+ * Until a payment provider is approved, gyms pay their Liftmora subscription by bank transfer to the
  * platform's account and the superadmin confirms it by hand. Online payments (or dev mock mode) take over
  * the moment they're switched on, so this flow disappears without any other change.
  */

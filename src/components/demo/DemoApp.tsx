@@ -187,7 +187,7 @@ const STEPS: TourStep[] = [
   },
   {
     title: "That's the owner side",
-    body: "Members log in to see their check-in QR and book classes. Ready to run your own gym on Repstack?",
+    body: "Members log in to see their check-in QR and book classes. Ready to run your own gym on Liftmora?",
     tab: "dashboard",
     final: true,
   },
@@ -711,7 +711,7 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
             <div data-tour="poster" className="rounded-2xl bg-[#ffffff] p-6">
               <FakeQr />
             </div>
-            <p className="mt-6 max-w-sm text-sm text-neutral-400">Members: open your Repstack app and scan this code to check yourself in.</p>
+            <p className="mt-6 max-w-sm text-sm text-neutral-400">Members: open your Liftmora app and scan this code to check yourself in.</p>
           </div>
         )}
 

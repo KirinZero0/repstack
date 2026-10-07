@@ -1,8 +1,8 @@
-# Repstack
+# Liftmora
 
 Gym management for small and mid-sized gyms in Indonesia: members, QR check-in, plans and
 payments, classes, WhatsApp notifications and the owner's finances, in one web app. Multi-tenant
-SaaS: one deployment serves many gyms, each at `repstack.com/<slug>`, and the platform operator
+SaaS: one deployment serves many gyms, each at `liftmora.com/<slug>`, and the platform operator
 bills the gyms.
 
 Built with Next.js 14 (App Router), TypeScript, Prisma on PostgreSQL, Tailwind, and Playwright

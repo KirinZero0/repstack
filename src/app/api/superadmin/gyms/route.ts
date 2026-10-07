@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   }
   const data = parsed.data;
 
-  // The gym's slug is the first path segment (repstack.com/slug), same depth as every static page —
+  // The gym's slug is the first path segment (liftmora.com/slug), same depth as every static page —
   // a reserved name would make that gym's own pages permanently unreachable at that address.
   if (RESERVED_SLUGS.has(data.slug)) {
     return NextResponse.json({ error: "That web address is reserved. Choose another slug." }, { status: 409 });
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
     const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL}/${gym.slug}/login`;
     await sendPlatformWhatsapp({
       to: data.ownerPhone,
-      message: `Welcome to Repstack, ${data.ownerName}! Your gym "${data.gymName}" is set up. Log in at ${loginUrl} with email ${data.ownerEmail} and the temporary password you were given.${data.isLifetime ? "" : " You have a free 30-day trial."}`,
+      message: `Welcome to Liftmora, ${data.ownerName}! Your gym "${data.gymName}" is set up. Log in at ${loginUrl} with email ${data.ownerEmail} and the temporary password you were given.${data.isLifetime ? "" : " You have a free 30-day trial."}`,
     });
   }
 

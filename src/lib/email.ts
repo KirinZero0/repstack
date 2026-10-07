@@ -16,7 +16,7 @@ export function emailConfigured(): boolean {
 
 /** A display name can't contain the characters that delimit an address header. */
 function safeName(name: string): string {
-  return name.replace(/[<>",\r\n]/g, "").trim().slice(0, 60) || "Repstack";
+  return name.replace(/[<>",\r\n]/g, "").trim().slice(0, 60) || "Liftmora";
 }
 
 /**

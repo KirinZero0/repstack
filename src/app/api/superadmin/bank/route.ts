@@ -4,7 +4,7 @@ import { platformBankSchema } from "@/lib/validation/superadmin";
 import { setPlatformBank } from "@/lib/platformBank";
 import { writeAuditLog } from "@/lib/audit";
 
-/** The bank account gyms transfer their Repstack subscription to. */
+/** The bank account gyms transfer their Liftmora subscription to. */
 export async function POST(req: NextRequest) {
   let session;
   try {

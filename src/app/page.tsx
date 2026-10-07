@@ -62,7 +62,7 @@ const HOME_GROUPS = ["members", "checkin", "payments", "classes", "finance", "me
 const faqs = [
   {
     q: "Who pays whom?",
-    a: "Your members pay you for their memberships, by cash, bank transfer or online. Repstack bills you separately, monthly or yearly, for the software.",
+    a: "Your members pay you for their memberships, by cash, bank transfer or online. Liftmora bills you separately, monthly or yearly, for the software.",
   },
   {
     q: "What do my members need?",
@@ -102,7 +102,7 @@ export default async function Home() {
               Know who trained. Know who paid.
             </h1>
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-neutral-400">
-              Repstack runs memberships, door check-ins, payments and classes for independent gyms.
+              Liftmora runs memberships, door check-ins, payments and classes for independent gyms.
               Members scan a poster to check in and renew from their phone. You see everything from one dashboard.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
@@ -222,7 +222,7 @@ export default async function Home() {
         <section id="login" className="scroll-mt-16 border-t border-neutral-800">
           <div className="mx-auto grid max-w-6xl gap-10 px-6 py-24 md:grid-cols-2">
             <div>
-              <h2 className="text-3xl font-semibold sm:text-4xl">Already on Repstack?</h2>
+              <h2 className="text-3xl font-semibold sm:text-4xl">Already on Liftmora?</h2>
               <p className="mt-4 max-w-sm text-neutral-400">
                 One login for staff and members, at any gym. Just your email and password — nothing else to remember.
               </p>

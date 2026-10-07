@@ -190,7 +190,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
   {
     id: "public-page",
     title: "Your gym's public page",
-    lede: "repstack.com/your-gym, ready to share.",
+    lede: "liftmora.com/your-gym, ready to share.",
     color: "red",
     items: [
       {

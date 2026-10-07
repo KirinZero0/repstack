@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { isMockMode, onlinePaymentsEnabled } from "@/lib/gateway";
 import SignupForm from "./SignupForm";
 
-export const metadata: Metadata = { title: "Set up your gym · Repstack" };
+export const metadata: Metadata = { title: "Set up your gym · Liftmora" };
 export const dynamic = "force-dynamic";
 
 export default async function SignupPage({ searchParams }: { searchParams: { plan?: string } }) {

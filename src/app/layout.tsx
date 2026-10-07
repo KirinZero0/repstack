@@ -24,7 +24,7 @@ const display = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  title: "Repstack",
+  title: "Liftmora",
   description: "Memberships, door check-ins and billing for independent gyms. Know who trained and who paid.",
 };
 

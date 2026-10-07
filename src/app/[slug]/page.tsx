@@ -9,12 +9,12 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const gym = await prisma.gym.findUnique({ where: { slug: params.slug }, select: { name: true, description: true } }).catch(() => null);
   return gym
-    ? { title: `${gym.name} · Repstack`, description: gym.description?.slice(0, 160) ?? `${gym.name} on Repstack` }
+    ? { title: `${gym.name} · Liftmora`, description: gym.description?.slice(0, 160) ?? `${gym.name} on Liftmora` }
     : { title: "Gym not found" };
 }
 
 /**
- * A gym's public profile: repstack.com/<slug>. No session, so this uses the owner client and only
+ * A gym's public profile: liftmora.com/<slug>. No session, so this uses the owner client and only
  * shows what a poster would — name, description, address, photos, class types. Never member data
  * or money. A suspended gym still has a page, just no way to join.
  */
@@ -130,7 +130,7 @@ export default async function GymProfilePage({ params }: { params: { slug: strin
 
       <footer className="border-t border-neutral-800">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-neutral-500">
-          <span>Powered by <a href="/" className="text-neutral-300 hover:text-white">Repstack</a></span>
+          <span>Powered by <a href="/" className="text-neutral-300 hover:text-white">Liftmora</a></span>
           <nav className="flex gap-6">
             <a href="/terms" className="hover:text-neutral-300">Terms</a>
             <a href="/privacy" className="hover:text-neutral-300">Privacy</a>

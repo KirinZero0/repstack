@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { prisma } from "./helpers";
 
 /**
- * Gym pages moved from /g/[slug]/... to /[slug]/... (repstack.com/slug instead of repstack.com/g/slug).
+ * Gym pages moved from /g/[slug]/... to /[slug]/... (liftmora.com/slug instead of liftmora.com/g/slug).
  * Old links must still work, forever, since some may already be out in WhatsApp messages or bookmarks.
  */
 test("an old /g/[slug]/... link redirects permanently to /[slug]/...", async ({ request, baseURL }) => {

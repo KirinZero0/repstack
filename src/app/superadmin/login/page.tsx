@@ -39,7 +39,7 @@ export default function SuperadminLoginPage() {
         onSubmit={handleSubmit}
         className="w-full"
       >
-        <h1 className="mb-1 text-2xl font-semibold text-white">Repstack</h1>
+        <h1 className="mb-1 text-2xl font-semibold text-white">Liftmora</h1>
         <p className="mb-6 text-sm text-neutral-400">Superadmin login</p>
 
         <label htmlFor="email" className="mb-1 block text-sm text-neutral-300">Email</label>

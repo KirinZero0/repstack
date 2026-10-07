@@ -270,7 +270,7 @@ export function OnlinePaymentsForm({ slug, initial, providerReady }: { slug: str
       </label>
       {!providerReady && (
         <p className="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2 text-xs text-amber-400">
-          Online payments aren&apos;t set up on Repstack yet, so this won&apos;t take effect until they are.
+          Online payments aren&apos;t set up on Liftmora yet, so this won&apos;t take effect until they are.
         </p>
       )}
       {error && <p className="text-sm text-red-400">{error}</p>}
@@ -431,7 +431,7 @@ export function NotificationsForm({
       </label>
       {email && !emailReady && (
         <p className="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2 text-xs text-amber-400">
-          Email isn&apos;t set up on Repstack yet, so this won&apos;t take effect until it is.
+          Email isn&apos;t set up on Liftmora yet, so this won&apos;t take effect until it is.
         </p>
       )}
       {!whatsapp && !email && (

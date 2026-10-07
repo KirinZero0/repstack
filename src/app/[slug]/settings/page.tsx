@@ -102,7 +102,7 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
                 </>
               ) : (
                 <>
-                  <span className="font-medium text-neutral-200">Not connected</span> — messages go out from Repstack&apos;s shared number, with your gym&apos;s name on each one, and count against your plan&apos;s monthly allowance. To send from your own number instead, contact Repstack and we&apos;ll connect it for you.
+                  <span className="font-medium text-neutral-200">Not connected</span> — messages go out from Liftmora&apos;s shared number, with your gym&apos;s name on each one, and count against your plan&apos;s monthly allowance. To send from your own number instead, contact Liftmora and we&apos;ll connect it for you.
                 </>
               )}
             </p>

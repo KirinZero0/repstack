@@ -1,4 +1,4 @@
-# Repstack — Build Brief for Claude Code
+# Liftmora — Build Brief for Claude Code
 
 ## What this is
 

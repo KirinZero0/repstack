@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     prisma.staffUser.findUnique({ where: { email: d.ownerEmail } }),
   ]);
   if (gym) return fieldError("slug", "That web address is already taken. Try another.");
-  if (owner) return fieldError("ownerEmail", "That email already runs a gym on Repstack. Log in instead.");
+  if (owner) return fieldError("ownerEmail", "That email already runs a gym on Liftmora. Log in instead.");
 
   // Unpaid signups hold their slug and email for 24 hours.
   const recent = new Date(Date.now() - SIGNUP_TTL_MS);
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       externalId: signup.id,
       amount: Number(plan.price),
       payerEmail: d.ownerEmail,
-      description: `Repstack ${plan.name}: ${d.gymName}`,
+      description: `Liftmora ${plan.name}: ${d.gymName}`,
       currency: plan.currency,
       successRedirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/signup/success?id=${signup.id}`,
     });

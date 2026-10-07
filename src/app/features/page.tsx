@@ -4,8 +4,8 @@ import { FEATURE_GROUPS } from "@/components/landing/features";
 import { PlateGlyph } from "@/components/BrandMark";
 
 export const metadata: Metadata = {
-  title: "Features · Repstack",
-  description: "Everything Repstack does for a gym: members, QR check-in, payments and renewals, classes, finance, WhatsApp, the member dashboard, and how your data is protected.",
+  title: "Features · Liftmora",
+  description: "Everything Liftmora does for a gym: members, QR check-in, payments and renewals, classes, finance, WhatsApp, the member dashboard, and how your data is protected.",
 };
 
 const PLATE: Record<string, string> = {
@@ -23,12 +23,12 @@ export default function FeaturesPage() {
 
       <main>
         <section className="mx-auto max-w-6xl px-6 pb-14 pt-16 lg:pt-24">
-          <p className="text-sm font-medium text-plate-yellow">Everything Repstack does</p>
+          <p className="text-sm font-medium text-plate-yellow">Everything Liftmora does</p>
           <h1 className="mt-3 max-w-2xl text-4xl font-semibold leading-[1.05] sm:text-5xl">
             One system for the door, the money and the members.
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-neutral-400">
-            Repstack replaces the WhatsApp group, the spreadsheet and the paper logbook. Here is every part of it,
+            Liftmora replaces the WhatsApp group, the spreadsheet and the paper logbook. Here is every part of it,
             in the order a gym meets it.
           </p>
           <nav aria-label="Feature groups" className="mt-10 flex flex-wrap gap-2 text-sm">

@@ -292,7 +292,7 @@ function Roster({ slug, session, isOwner, price, onChanged }: { slug: string; se
   );
 }
 
-const VIEW_KEY = "repstack.classesView";
+const VIEW_KEY = "liftmora.classesView";
 
 /** Compact tile for the grid view: what the class is, what's next, and whether anything needs attention. */
 function ClassCard({ c, onOpen }: { c: ClassRow; onOpen: () => void }) {

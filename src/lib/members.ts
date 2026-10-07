@@ -18,7 +18,7 @@ export interface NewMemberInput {
 export interface CreateMemberOptions {
   /**
    * Record a CASH payment of the plan's price, dated now. Right for "they just paid at the desk";
-   * wrong for a member imported from the gym's old spreadsheet, who paid before Repstack existed.
+   * wrong for a member imported from the gym's old spreadsheet, who paid before Liftmora existed.
    */
   recordPayment: { recordedById: string; amount: Prisma.Decimal | number; currency: string } | null;
   /** Send the activation link on the gym's channels. Off lets an owner import quietly and hand links over later. */

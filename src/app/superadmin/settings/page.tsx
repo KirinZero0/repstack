@@ -30,7 +30,7 @@ export default async function SuperadminSettingsPage() {
         <Card title="Bank account for subscriptions">
           <PlatformBankForm initial={bank} />
           <p className="mt-4 text-xs text-neutral-500">
-            Shown to gym owners when they pay their Repstack subscription by bank transfer, until online payments are switched on.
+            Shown to gym owners when they pay their Liftmora subscription by bank transfer, until online payments are switched on.
             You confirm each transfer from Gyms.
           </p>
         </Card>

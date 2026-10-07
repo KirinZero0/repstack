@@ -5,7 +5,7 @@ import { countMemberSeats } from "@/lib/limits";
 import { openPlatformInvoice, PaymentsDisabledError, retirePendingPlatformInvoices } from "@/lib/platformBilling";
 
 /**
- * Owner switches the gym's Repstack plan.
+ * Owner switches the gym's Liftmora plan.
  *  - A plan that costs less and gives no more than the current one (e.g. yearly to monthly of the same tier)
  *    takes effect at once, if the gym fits inside its limits. The already-paid period is kept.
  *  - Anything else must be paid for first: we return an invoice, and the plan switches when it's paid.

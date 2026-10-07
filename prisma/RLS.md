@@ -1,6 +1,6 @@
 # Row-level security
 
-Repstack keeps gyms apart in two layers. Application code always filters by the gym in the
+Liftmora keeps gyms apart in two layers. Application code always filters by the gym in the
 verified session (`requireTenantSession`), and Postgres enforces the same rule underneath, so a
 missing `where gymId` in some future query can't leak another gym's data.
 

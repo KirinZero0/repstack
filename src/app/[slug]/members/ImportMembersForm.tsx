@@ -105,7 +105,7 @@ export default function ImportMembersForm({ slug, plans }: { slug: string; plans
             A CSV with columns <span className="text-neutral-200">Name, Email, Phone</span> and optionally{" "}
             <span className="text-neutral-200">Plan</span> and <span className="text-neutral-200">Paid until</span>. In Excel or Google Sheets, use
             &ldquo;Save as&rdquo; or &ldquo;Download&rdquo; and pick CSV.{" "}
-            <a href={templateHref} download="repstack-members-template.csv" className="underline underline-offset-2 hover:text-white">
+            <a href={templateHref} download="liftmora-members-template.csv" className="underline underline-offset-2 hover:text-white">
               Download a template
             </a>
             .
@@ -163,7 +163,7 @@ export default function ImportMembersForm({ slug, plans }: { slug: string; plans
       )}
 
       <p className="mt-3 text-xs text-neutral-500">
-        Imported members are not given a payment record: they paid before Repstack. A &ldquo;Paid until&rdquo; in the past makes them Expired rather than Active.
+        Imported members are not given a payment record: they paid before Liftmora. A &ldquo;Paid until&rdquo; in the past makes them Expired rather than Active.
         Rows whose email is already a member here are skipped, so importing an export changes nothing.
       </p>
 

@@ -33,7 +33,7 @@ export function buildSnapRequest(p: MidtransInvoiceParams, orderId: string) {
   const amount = Math.round(p.amount);
   return {
     transaction_details: { order_id: orderId, gross_amount: amount },
-    item_details: [{ id: "repstack", price: amount, quantity: 1, name: p.description.slice(0, 50) }],
+    item_details: [{ id: "liftmora", price: amount, quantity: 1, name: p.description.slice(0, 50) }],
     ...(p.payerEmail ? { customer_details: { email: p.payerEmail } } : {}),
     ...(p.successRedirectUrl ? { callbacks: { finish: p.successRedirectUrl } } : {}),
     expiry: { unit: "hours", duration: 24 },

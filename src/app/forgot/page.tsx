@@ -28,7 +28,7 @@ export default function GlobalForgotPasswordPage() {
     <AuthShell tagline="Your members, your check-ins, your revenue.">
       <div className="w-full">
         <h1 className="mb-1 text-2xl font-semibold text-white">Forgot your password?</h1>
-        <p className="mb-6 text-sm text-neutral-400">Works for any gym on Repstack.</p>
+        <p className="mb-6 text-sm text-neutral-400">Works for any gym on Liftmora.</p>
 
         {sent ? (
           <div>

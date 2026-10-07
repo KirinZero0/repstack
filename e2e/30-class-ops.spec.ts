@@ -110,7 +110,7 @@ test("staff mark attendance once a session is about to start; the member sees at
 test("the roster shows attendance buttons to staff and marking works in the browser", async ({ page, baseURL }) => {
   const f = await makeGym(1);
   const { cls, regs } = await sessionWithBookings(f, new Date(Date.now() + 5 * 60 * 1000));
-  await page.addInitScript(() => window.localStorage.setItem("repstack.classesView", "list"));
+  await page.addInitScript(() => window.localStorage.setItem("liftmora.classesView", "list"));
   await staffLoginUI(page, baseURL!, f.slug, f.staff.email, f.staff.password);
   await page.waitForURL(`${baseURL}/${f.slug}/dashboard`);
   await page.goto(`${baseURL}/${f.slug}/classes`);

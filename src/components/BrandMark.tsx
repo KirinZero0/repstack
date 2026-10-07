@@ -14,7 +14,7 @@ export default function BrandMark({ href = "/" }: { href?: string }) {
       <span className="text-plate-yellow">
         <PlateGlyph size={26} />
       </span>
-      Repstack
+      Liftmora
     </a>
   );
 }

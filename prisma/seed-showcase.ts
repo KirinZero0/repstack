@@ -79,7 +79,7 @@ async function ensureSuperadmin() {
   return (
     (await prisma.superadmin.findUnique({ where: { email: SUPERADMIN_EMAIL } })) ??
     (await prisma.superadmin.create({
-      data: { name: "Repstack Admin", email: SUPERADMIN_EMAIL, passwordHash: await bcrypt.hash(SUPERADMIN_PASSWORD, 10) },
+      data: { name: "Liftmora Admin", email: SUPERADMIN_EMAIL, passwordHash: await bcrypt.hash(SUPERADMIN_PASSWORD, 10) },
     }))
   );
 }
@@ -555,8 +555,8 @@ async function main() {
   const superadmin = await ensureSuperadmin();
   await prisma.appConfig.upsert({ where: { key: "theme.default" }, update: {}, create: { key: "theme.default", value: "dark" } });
 
-  // Where gym owners send their Repstack subscription until a payment provider is approved.
-  const bank = { bankName: "BCA", accountNumber: "1234567890", accountHolder: "PT Repstack Teknologi" };
+  // Where gym owners send their Liftmora subscription until a payment provider is approved.
+  const bank = { bankName: "BCA", accountNumber: "1234567890", accountHolder: "PT Liftmora Teknologi" };
   await prisma.appConfig.upsert({ where: { key: "platform.bank" }, update: { value: bank }, create: { key: "platform.bank", value: bank } });
 
   const main_ = await seedMainGym(saas, superadmin.id);
