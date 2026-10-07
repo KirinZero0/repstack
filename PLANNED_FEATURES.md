@@ -63,5 +63,59 @@ deploying it — four new tenant tables need their policies and grants.
 
 ## Not built (deliberately)
 
-- Attendance marking per session, class reminders before start, instructor accounts, class revenue on
-  the Finance page. Each is a small follow-up on top of the tables above.
+- Instructor accounts. (Attendance marking, class reminders and class revenue on the Finance page
+  have since been built on top of the tables above; reminders run once a day for the next day's
+  classes so they fit a daily-cron hosting plan.)
+
+# Roadmap
+
+Planned for later updates. None of this is built, and none of it is needed for a first pilot.
+Nothing here changes how the current version works; the notes say where each piece would touch the code.
+
+## More staff roles
+
+- Today `Role` is `OWNER | STAFF` and permissions are `role` checks spread across pages and API routes
+  (the nav hides pages with `ownerOnly` in `GymNav`). New roles (manager, trainer, front office, sales)
+  mean new enum values plus one central permissions list so the checks stop being scattered.
+- Owner-only today: staff, plans, finance, billing, settings. A manager role would sit between the two.
+- Personal trainers are the common ask for small gyms: PT sessions per client, not just a class
+  instructor name.
+
+## Multi-branch
+
+- Everything is isolated by a single `gymId` from the session, and row-level security (`prisma/rls.sql`)
+  is keyed on it. A chain needs an organisation above gyms, with an owner who can see several branches.
+- That touches the session shape, `requireTenantSession`, the RLS policies and the cross-tenant tests.
+  Do it carefully and re-run `04-checkin-rejections` (the tenant-isolation regression test) first.
+- Billing is per gym today; decide whether a chain pays per branch or per organisation.
+
+## Mobile apps
+
+- Sessions are an httpOnly JWT cookie, which suits the browser. A native app needs token-based auth
+  against the same API. The member QR and check-in endpoints can be reused as they are.
+- Custom-branded apps per gym (a competitor offers this) is a separate, larger step.
+
+## Card maker and titles
+
+- Print a member card with their QR, photo, name and a title (for example a membership tier).
+- The member QR has no expiry: `issuedAt` is only part of the signed data and is never checked. A printed
+  card keeps working until that member's `qrSecret` is rotated. There is no rotate button yet; add one
+  before cards ship, so a lost card can be killed.
+- Staff and owners can already open a member's QR (`GET /api/[slug]/members/[memberId]/qr`, shown on the
+  member page), which is the data a card needs.
+
+## Face recognition (door check-in)
+
+- Treat as its own project, decided separately from the rest of the roadmap.
+- **Code provenance:** build it from public libraries or papers, written without reference to any
+  former or current employer's code, and keep a short note of each source and its license. Check the
+  license of every pretrained model; several popular ones are research-only and not allowed in a paid product.
+- **Personal data:** a face template is biometric data. Under Indonesia's personal data protection law
+  (UU PDP) it is treated as specific personal data, so expect to need explicit per-member consent, a
+  stated purpose and retention period, encryption at rest, and a delete path (the existing "erase my
+  data" flow is the base). Confirm the exact requirements before collecting any.
+- **Security:** a printed photo can fool a basic matcher, so a door needs liveness detection. Keep the QR
+  as the fallback, since false rejects at the door are a daily complaint and false accepts let someone
+  in on another member's membership.
+- **Hardware** (turnstiles, readers) is per-device integration and support work; treat it as a later paid
+  add-on.
