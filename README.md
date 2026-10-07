@@ -96,8 +96,9 @@ npm run db:migrate   # applies pending migrations, never resets
 npm run db:rls       # idempotent; grants the app role on any new tables
 ```
 
-Cron routes are declared in `vercel.json`: daily subscription billing, daily member expiry
-reminders, hourly class reminders. See `prisma/MIGRATIONS.md` for the schema workflow.
+Cron routes are declared in `vercel.json`, all daily: subscription billing, member expiry reminders, and a
+reminder the evening before each class. See `DEPLOYMENT.md` for the full first-deploy checklist and
+`prisma/MIGRATIONS.md` for the schema workflow.
 
 ## How tenancy is enforced
 
