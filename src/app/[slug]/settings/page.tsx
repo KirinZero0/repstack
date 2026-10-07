@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymThemeFromSettings } from "@/lib/theme";
 import { Card } from "@/components/charts";
-import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm, OnlinePaymentsForm, GymProfileForm, WhatsAppForm, NotificationsForm, OccupancyForm, LeaderboardForm } from "@/components/SettingsForms";
-import { occupancyWindowHours } from "@/lib/occupancy";
-import { leaderboardEnabled } from "@/lib/leaderboard";
+import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm, OnlinePaymentsForm, GymProfileForm, NotificationsForm, OccupancyForm, WhoIsInForm, CheckinRulesForm } from "@/components/SettingsForms";
+import { occupancyWindowHours, whoIsInEnabled } from "@/lib/occupancy";
+import { checkinRules } from "@/lib/checkin";
 import GymPhotosManager from "@/components/GymPhotosManager";
 import { gymAcceptsSignups } from "@/lib/memberSignup";
 import { notificationChannels } from "@/lib/notify";
@@ -45,14 +45,16 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
-      <div className="mx-auto max-w-xl">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+      <div className="mx-auto max-w-7xl">
+        <div className="gym-head mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">Settings</h1>
             <p className="text-sm text-neutral-400">{gym.name}</p>
           </div>
           <GymNav slug={params.slug} role={session.role} current="settings" />
         </div>
+
+        <div className="gym-masonry">
 
         <div className="mb-6">
           <Card title="Gym details">
@@ -92,7 +94,18 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
             <p className="mb-4 text-sm text-neutral-400">
               Activation links, payment receipts and expiry reminders go to your members over WhatsApp.
             </p>
-            <WhatsAppForm slug={params.slug} connectedNumber={waConfig?.isActive ? waConfig.senderNumber : null} />
+            <p className="text-sm text-neutral-400">
+              {waConfig?.isActive ? (
+                <>
+                  <span className="font-medium text-emerald-400">Connected</span> — messages to your members are sent from{" "}
+                  <span className="text-neutral-200">{waConfig.senderNumber}</span>.
+                </>
+              ) : (
+                <>
+                  <span className="font-medium text-neutral-200">Not connected</span> — messages go out from Repstack&apos;s shared number, with your gym&apos;s name on each one, and count against your plan&apos;s monthly allowance. To send from your own number instead, contact Repstack and we&apos;ll connect it for you.
+                </>
+              )}
+            </p>
             {plan && !waConfig?.isActive && (
               <p className="mt-6 border-t border-neutral-800 pt-4 text-sm text-neutral-300">
                 <span className="font-semibold tabular-nums">{used.toLocaleString("id-ID")}</span> of{" "}
@@ -154,20 +167,24 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
         </div>
 
         <div className="mb-6">
-          <Card title="Who's in the gym">
-            <OccupancyForm slug={params.slug} initialHours={occupancyWindowHours(gym.settings)} />
+          <Card title="Check-ins">
+            <CheckinRulesForm slug={params.slug} initialPerDay={checkinRules(gym.settings).perDay} initialGap={checkinRules(gym.settings).gapMinutes} />
           </Card>
         </div>
 
         <div className="mb-6">
-          <Card title="Leaderboard">
-            <LeaderboardForm slug={params.slug} initial={leaderboardEnabled(gym.settings)} />
+          <Card title="Who's in the gym">
+            <OccupancyForm slug={params.slug} initialHours={occupancyWindowHours(gym.settings)} />
+            <div className="mt-4">
+              <WhoIsInForm slug={params.slug} initial={whoIsInEnabled(gym.settings)} />
+            </div>
           </Card>
         </div>
 
         <Card title="Appearance">
           <GymThemeForm slug={params.slug} initial={gymThemeFromSettings(gym.settings) ?? "inherit"} />
         </Card>
+        </div>
       </div>
     </main>
   );

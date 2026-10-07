@@ -8,6 +8,7 @@ import {
   PaymentsDisabledError,
   platformProviderName,
 } from "./gateway";
+import { manualPlatformBilling } from "./platformBank";
 
 export { PaymentsDisabledError };
 
@@ -37,6 +38,25 @@ export async function retirePendingPlatformInvoices(gymId: string, exceptId?: st
 }
 
 /**
+ * Bank-transfer invoice: no provider involved. The billing page shows the platform's bank details and a
+ * reference; the superadmin marks it paid once the money arrives. Reuses the gym's open one for the same plan.
+ */
+async function openManualInvoice(gym: BillableGym, plan: BillablePlan): Promise<{ paymentId: string; url: string; created: boolean }> {
+  const url = `/${gym.slug}/billing`;
+  const open = await prisma.platformPayment.findFirst({
+    where: { gymId: gym.id, kind: "SUBSCRIPTION", status: "PENDING", provider: "manual" },
+    orderBy: { createdAt: "desc" },
+  });
+  if (open && open.saasPlanId === plan.id) return { paymentId: open.id, url, created: false };
+
+  await retirePendingPlatformInvoices(gym.id);
+  const payment = await prisma.platformPayment.create({
+    data: { gymId: gym.id, saasPlanId: plan.id, provider: "manual", amount: Number(plan.price), status: "PENDING" },
+  });
+  return { paymentId: payment.id, url, created: true };
+}
+
+/**
  * Returns a payable subscription invoice for `plan`, reusing the gym's open one if it's still live.
  * A gym only ever has one open invoice: creating a new one retires the others, so paying an old
  * renewal can't undo a plan change (or vice versa).
@@ -46,6 +66,7 @@ export async function openPlatformInvoice(
   plan: BillablePlan,
   purpose: "renewal" | "plan change",
 ): Promise<{ paymentId: string; url: string; created: boolean }> {
+  if (manualPlatformBilling()) return openManualInvoice(gym, plan);
   if (!onlinePaymentsEnabled() && !isMockMode()) throw new PaymentsDisabledError();
 
   const open = await prisma.platformPayment.findFirst({

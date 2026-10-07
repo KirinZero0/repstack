@@ -53,8 +53,8 @@ export default async function DashboardPage({ params }: { params: { slug: string
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+      <div className="mx-auto max-w-7xl">
+        <div className="gym-head mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">{gym.name}</h1>
             <p className="text-sm text-neutral-400">Dashboard</p>
@@ -138,9 +138,9 @@ export default async function DashboardPage({ params }: { params: { slug: string
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-5">
+    <div className="stat-card rounded-xl border border-neutral-800 bg-neutral-900 p-5 pl-6">
       <p className="text-sm text-neutral-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      <p className="stat-value mt-1 text-3xl font-semibold">{value}</p>
     </div>
   );
 }

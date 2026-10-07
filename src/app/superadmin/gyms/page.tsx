@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireSuperadminSession, SessionError } from "@/lib/session";
 import CreateGymForm from "./CreateGymForm";
+import { transferReference } from "@/lib/platformBank";
 import GymActions from "./GymActions";
 import LogoutButton from "./LogoutButton";
 
@@ -19,18 +20,33 @@ export default async function SuperadminGymsPage() {
     throw err;
   }
 
-  const [gyms, saasPlans] = await Promise.all([
+  const [gyms, saasPlans, transfers] = await Promise.all([
     prisma.gym.findMany({
       include: {
         saasPlan: true,
         _count: { select: { members: true } },
+        whatsappConfig: { select: { senderNumber: true, isActive: true } },
         // A gym has at most one setup fee; the status is what matters here.
         platformPayments: { where: { kind: "SETUP" }, orderBy: { createdAt: "desc" }, take: 1 },
       },
       orderBy: { createdAt: "desc" },
     }),
     prisma.saasPlan.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    // Subscription invoices the owner is paying by bank transfer, waiting for us to confirm the money arrived.
+    prisma.platformPayment.findMany({ where: { provider: "manual", kind: "SUBSCRIPTION", status: "PENDING" }, orderBy: { createdAt: "desc" } }),
   ]);
+  const transferByGym = new Map<string, { amount: number; hasProof: boolean; senderName: string | null; transferDate: string | null; reference: string; submittedAt: string | null }>();
+  for (const t of transfers) {
+    if (transferByGym.has(t.gymId)) continue;
+    transferByGym.set(t.gymId, {
+      amount: Number(t.amount),
+      hasProof: Boolean(t.proofImageUrl),
+      senderName: t.senderName,
+      transferDate: t.transferDate,
+      reference: transferReference(t.id),
+      submittedAt: t.proofSubmittedAt?.toISOString() ?? null,
+    });
+  }
 
   const recurringGyms = gyms.filter((g) => !g.isLifetime && g.subscriptionStatus === "ACTIVE");
   const mrr = recurringGyms.reduce(
@@ -46,7 +62,7 @@ export default async function SuperadminGymsPage() {
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Gym tenants</h1>
@@ -78,8 +94,8 @@ export default async function SuperadminGymsPage() {
           />
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-neutral-800">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto rounded-xl border border-neutral-800">
+          <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-neutral-900 text-neutral-400">
               <tr>
                 <th className="px-4 py-3">Gym</th>
@@ -97,8 +113,8 @@ export default async function SuperadminGymsPage() {
                 const setupFee = gym.platformPayments[0];
                 return (
                   <tr key={gym.id} className="border-t border-neutral-800">
-                    <td className="px-4 py-3">{gym.name}</td>
-                    <td className="px-4 py-3 text-neutral-400">{gym.slug}</td>
+                    <td className="px-4 py-3 font-medium">{gym.name}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-neutral-400">{gym.slug}</td>
                     <td className="px-4 py-3">{gym.saasPlan.name}</td>
                     <td className="px-4 py-3">{gym._count.members}</td>
                     <td className="px-4 py-3">
@@ -115,8 +131,8 @@ export default async function SuperadminGymsPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <GymActions gymId={gym.id} status={gym.subscriptionStatus} setupFeeDue={setupFee?.status === "PENDING"} />
+                    <td className="w-[300px] px-4 py-3 align-top">
+                      <GymActions gymId={gym.id} status={gym.subscriptionStatus} setupFeeDue={setupFee?.status === "PENDING"} transfer={transferByGym.get(gym.id) ?? null} waNumber={gym.whatsappConfig?.isActive ? gym.whatsappConfig.senderNumber : null} />
                     </td>
                   </tr>
                 );

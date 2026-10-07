@@ -1,3 +1,4 @@
+import DownloadButton from "@/components/DownloadButton";
 import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { decrypt } from "@/lib/crypto";
@@ -43,8 +44,8 @@ export default async function MembersPage({ params }: { params: { slug: string }
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+      <div className="mx-auto max-w-7xl">
+        <div className="gym-head mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">Members</h1>
             <p className="text-sm text-neutral-400">
@@ -78,13 +79,13 @@ export default async function MembersPage({ params }: { params: { slug: string }
           />
           {session.role === "OWNER" && (
             <>
-              <a
+              <DownloadButton
                 href={`/api/${params.slug}/members/export`}
-                download
+                fallbackName={`members-${params.slug}.csv`}
                 className="rounded-md border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
               >
                 Export CSV
-              </a>
+              </DownloadButton>
               <div className="basis-full">
                 <ImportMembersForm slug={params.slug} plans={plans.map((p) => ({ id: p.id, name: p.name }))} />
               </div>

@@ -3,9 +3,10 @@ import { requireTenantSession, SessionError } from "@/lib/session";
 import { countMemberSeats } from "@/lib/limits";
 import { isMockMode } from "@/lib/xendit";
 import { onlinePaymentsEnabled } from "@/lib/gateway";
+import { getPlatformBank, manualPlatformBilling, transferReference } from "@/lib/platformBank";
 import GymNav from "@/components/GymNav";
 import MockCheckout from "@/app/my/MockCheckout";
-import { PayNowButton, PlanSwitcher } from "./BillingActions";
+import { PayNowButton, PlanSwitcher, TransferProofForm } from "./BillingActions";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,11 @@ export default async function BillingPage({
     db.notificationLog.count({ where: { gymId: gym.id, channel: "whatsapp", status: "SENT", sentAt: { gte: monthStart } } }),
   ]);
 
-  const paymentsOn = onlinePaymentsEnabled() || isMockMode();
+  const manual = manualPlatformBilling();
+  // Bank transfer counts as a way to pay: the owner can always renew or upgrade, and we confirm it by hand.
+  const paymentsOn = onlinePaymentsEnabled() || isMockMode() || manual;
+  const bank = manual ? await getPlatformBank() : null;
+  const transfer = manual ? payments.find((p) => p.status === "PENDING" && p.provider === "manual" && p.kind === "SUBSCRIPTION") : undefined;
   const suspended = gym.subscriptionStatus === "SUSPENDED";
   const overdue = gym.subscriptionStatus === "PAST_DUE" || suspended;
   const open = payments.find((p) => p.status === "PENDING" && p.invoiceUrl);
@@ -85,10 +90,10 @@ export default async function BillingPage({
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
-      <div className="mx-auto max-w-3xl">
-        <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+      <div className="mx-auto max-w-7xl">
+        <div className="gym-head mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="mb-1 text-2xl font-semibold">Billing</h1>
+            <h1 className="text-2xl font-semibold">Billing</h1>
             <p className="text-sm text-neutral-400">{gym.name}</p>
           </div>
           <GymNav slug={params.slug} role={session.role} current="billing" billingOnly={suspended} />
@@ -101,6 +106,37 @@ export default async function BillingPage({
             planName={mockPayment.saasPlan.name}
             returnTo={`/${params.slug}/billing`}
           />
+        )}
+
+        {transfer && (
+          <div className="mb-6 rounded-xl border border-sky-800 bg-sky-950 px-5 py-4 text-sm text-sky-200">
+            <p className="font-semibold">Pay Rp {Number(transfer.amount).toLocaleString("id-ID")} by bank transfer</p>
+            {bank ? (
+              <dl className="mt-3 grid grid-cols-[auto,1fr] gap-x-4 gap-y-1">
+                <dt className="text-sky-400">Bank</dt>
+                <dd>{bank.bankName}</dd>
+                <dt className="text-sky-400">Account number</dt>
+                <dd className="font-mono">{bank.accountNumber}</dd>
+                <dt className="text-sky-400">Account name</dt>
+                <dd>{bank.accountHolder}</dd>
+                <dt className="text-sky-400">Amount</dt>
+                <dd>Rp {Number(transfer.amount).toLocaleString("id-ID")} ({transfer.saasPlan.name})</dd>
+                <dt className="text-sky-400">Transfer note</dt>
+                <dd className="font-mono">{transferReference(transfer.id)}</dd>
+              </dl>
+            ) : (
+              <p className="mt-2">Our bank details aren&apos;t set up yet. Contact us and we&apos;ll send them.</p>
+            )}
+            <p className="mt-3 text-xs text-sky-400">
+              Put the transfer note in your transfer so we can match it. We confirm payments by hand, usually the same day, and your plan updates as soon as we do.
+            </p>
+            {transfer.rejectionReason && (
+              <p className="mt-3 rounded-md border border-red-900 bg-red-950 px-3 py-2 text-red-300">
+                We couldn&apos;t confirm your last proof: {transfer.rejectionReason} Please send it again below.
+              </p>
+            )}
+            <TransferProofForm slug={params.slug} submitted={Boolean(transfer.proofImageUrl)} senderName={transfer.senderName} />
+          </div>
         )}
 
         {suspended && (
@@ -164,11 +200,21 @@ export default async function BillingPage({
             <div className="mt-6 border-t border-neutral-800 pt-5">
               {paymentsOn ? (
                 <>
-                  <PayNowButton
-                    slug={params.slug}
-                    label={overdue ? `Pay Rp ${Number(saasPlan.price).toLocaleString("id-ID")} now` : `Renew early · Rp ${Number(saasPlan.price).toLocaleString("id-ID")}`}
-                  />
-                  {!overdue && (
+                  {transfer ? (
+                    <p className="text-sm text-neutral-400">{transfer.proofImageUrl ? "Your proof was sent and is waiting for confirmation." : "Waiting for your transfer. Send us proof using the form at the top of this page."}</p>
+                  ) : (
+                    <PayNowButton
+                      slug={params.slug}
+                      label={
+                        manual
+                          ? `Pay by bank transfer · Rp ${Number(saasPlan.price).toLocaleString("id-ID")}`
+                          : overdue
+                            ? `Pay Rp ${Number(saasPlan.price).toLocaleString("id-ID")} now`
+                            : `Renew early · Rp ${Number(saasPlan.price).toLocaleString("id-ID")}`
+                      }
+                    />
+                  )}
+                  {!overdue && !transfer && (
                     <p className="mt-2 text-xs text-neutral-500">Renewing early adds a full period after your current billing date.</p>
                   )}
                 </>

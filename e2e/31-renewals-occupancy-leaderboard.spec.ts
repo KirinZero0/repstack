@@ -261,7 +261,7 @@ test("who's in the gym: recent check-ins count once per member, check-outs and t
   expect(html).toContain(c.row.fullName);
 });
 
-test("the leaderboard ranks visits and streaks, shows short names to members only when the owner turns it on", async ({ request, baseURL, playwright }) => {
+test("the leaderboard ranks visits and streaks, and members always see it with short names", async ({ request, baseURL, playwright }) => {
   const f = await makeGym(3);
   const [a, b, c] = f.members;
   const today = new Date();
@@ -281,13 +281,10 @@ test("the leaderboard ranks visits and streaks, shows short names to members onl
   expect(board.streaks.map((r) => [r.fullName, r.value])).toEqual([[a.row.fullName, 3]]);
   expect(board.visits[0].name).toBe("Member1 S.");
 
-  // Off by default: members see no board.
+  // Always on: members see the board without any switch.
   const ctxB = await playwright.request.newContext();
   await memberLogin(ctxB, baseURL!, f.slug, b);
-  expect(await (await ctxB.get(`${baseURL}/my`)).text()).not.toContain("Leaderboard");
-
   await staffLogin(request, baseURL!, f.slug, f.owner);
-  expect((await request.post(`${baseURL}/api/${f.slug}/settings`, { data: { leaderboardEnabled: true } })).status()).toBe(200);
   const html = await (await ctxB.get(`${baseURL}/my`)).text();
   expect(html).toContain("Leaderboard · visits this month");
   expect(html).toContain("Member1 S.");
@@ -296,19 +293,19 @@ test("the leaderboard ranks visits and streaks, shows short names to members onl
   expect(html).toContain("3 days");
   await ctxB.dispose();
 
-  // Staff see full names on the dashboard regardless of the member-facing switch.
+  // Staff see full names on their own dashboard.
   const dash = await (await request.get(`${baseURL}/${f.slug}/dashboard`)).text();
   expect(dash).toContain("Most visits this month");
   expect(dash).toContain(a.row.fullName);
 });
 
-test("the settings page carries the two new switches", async ({ page, baseURL }) => {
+test("the settings page carries the occupancy window, and no leaderboard switch", async ({ page, baseURL }) => {
   const f = await makeGym(0);
   await staffLoginUI(page, baseURL!, f.slug, f.owner.email, f.owner.password);
   await page.waitForURL(`${baseURL}/${f.slug}/dashboard`);
   await page.goto(`${baseURL}/${f.slug}/settings`);
   await page.getByLabel("Occupancy window").selectOption("6");
   await expect(page.getByText("Saved").first()).toBeVisible();
-  await page.getByLabel("Show members a leaderboard").check();
-  await expect.poll(async () => (await prisma.gym.findUniqueOrThrow({ where: { id: f.gym.id } })).settings).toMatchObject({ occupancyWindowHours: 6, leaderboardEnabled: true });
+  await expect(page.getByLabel("Show members a leaderboard")).toHaveCount(0);
+  await expect.poll(async () => (await prisma.gym.findUniqueOrThrow({ where: { id: f.gym.id } })).settings).toMatchObject({ occupancyWindowHours: 6 });
 });

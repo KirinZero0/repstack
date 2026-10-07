@@ -1,5 +1,6 @@
 "use client";
 
+import { StatusPill } from "@/components/charts";
 import { useEffect, useMemo, useState } from "react";
 import ResendFallbackButton from "./ResendFallbackButton";
 
@@ -79,15 +80,15 @@ export default function MembersTable({ slug, isOwner, rows }: { slug: string; is
           <tbody>
             {visible.map((m) => (
               <tr key={m.id} className="border-t border-neutral-800">
-                <td className="px-4 py-3">
+                <td className="whitespace-nowrap px-4 py-3">
                   <a href={`/${slug}/members/${m.id}`} className="font-medium underline-offset-2 hover:underline">
                     {m.fullName}
                   </a>
                 </td>
                 <td className="px-4 py-3 text-neutral-400">{m.email}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-neutral-300">{m.phone}</td>
-                <td className="px-4 py-3">{m.plan}</td>
-                <td className="px-4 py-3">{m.status}</td>
+                <td className="whitespace-nowrap px-4 py-3">{m.plan}</td>
+                <td className="whitespace-nowrap px-4 py-3"><StatusPill status={m.status} /></td>
                 <td className="px-4 py-3 text-neutral-400">
                   {m.membershipExpiry ? new Date(m.membershipExpiry).toLocaleDateString("id-ID") : "—"}
                 </td>

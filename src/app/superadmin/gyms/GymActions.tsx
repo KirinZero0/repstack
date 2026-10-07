@@ -2,22 +2,31 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import WhatsAppPanel from "./WhatsAppPanel";
+import TransferReview, { type TransferInfo } from "./TransferReview";
 
 export default function GymActions({
   gymId,
   status,
   setupFeeDue = false,
+  waNumber = null,
+  transfer = null,
 }: {
   gymId: string;
   status: string;
   /** True when the gym has an unpaid setup fee on record. */
   setupFeeDue?: boolean;
+  /** The gym's own connected WhatsApp number, if any. */
+  waNumber?: string | null;
+  /** A bank transfer for the subscription that is waiting to be confirmed. */
+  transfer?: TransferInfo | null;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<{ url: string; ownerEmail: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [waOpen, setWaOpen] = useState(false);
 
   function callAction(action: "suspend" | "reactivate" | "setup-fee-paid") {
     setError(null);
@@ -48,7 +57,7 @@ export default function GymActions({
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {setupFeeDue && (
           <button
             onClick={() => callAction("setup-fee-paid")}
@@ -59,11 +68,17 @@ export default function GymActions({
           </button>
         )}
         <button
+          onClick={() => setWaOpen((o) => !o)}
+          className="whitespace-nowrap rounded-md border border-neutral-700 px-3 py-1 text-sm text-neutral-300 hover:bg-neutral-800"
+        >
+          WhatsApp{waNumber ? " ✓" : ""}
+        </button>
+        <button
           onClick={ownerLink}
           disabled={isPending}
           className="whitespace-nowrap rounded-md border border-neutral-700 px-3 py-1 text-sm text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
         >
-          Owner password link
+          Owner link
         </button>
         {status === "SUSPENDED" ? (
           <button
@@ -83,6 +98,8 @@ export default function GymActions({
           </button>
         )}
       </div>
+      {transfer && <TransferReview gymId={gymId} transfer={transfer} />}
+      {waOpen && <WhatsAppPanel gymId={gymId} connectedNumber={waNumber} />}
       {error && <span className="text-xs text-red-400">{error}</span>}
       {link && (
         <div className="max-w-xs rounded-md border border-neutral-700 bg-neutral-950 p-2 text-left text-xs">

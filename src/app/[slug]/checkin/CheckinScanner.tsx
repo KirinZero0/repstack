@@ -15,6 +15,8 @@ type ResultCode =
 
 interface ScanOutcome {
   result: ResultCode;
+  /** Explains a refusal more specifically than the default label (e.g. the daily limit). */
+  message?: string;
   member?: { fullName: string; photoUrl: string | null };
 }
 
@@ -119,7 +121,7 @@ export default function CheckinScanner({ slug }: { slug: string }) {
       {outcome && (
         <ScanResultModal
           tone={OVERLAY_STYLE[outcome.result].tone}
-          label={OVERLAY_STYLE[outcome.result].label}
+          label={outcome.message ?? OVERLAY_STYLE[outcome.result].label}
           name={outcome.member?.fullName}
           durationMs={SHOW_MS}
           onClose={dismiss}

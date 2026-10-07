@@ -274,14 +274,15 @@ test("the members page shows Export and Import to the owner only, and the import
   await staffPage.waitForURL(`${baseURL}/${f.slug}/dashboard`);
   await staffPage.goto(`${baseURL}/${f.slug}/members`);
   await expect(staffPage.getByRole("button", { name: "+ Add member" })).toBeVisible();
-  await expect(staffPage.getByRole("link", { name: "Export CSV" })).toHaveCount(0);
+  await expect(staffPage.getByRole("button", { name: "Export CSV" })).toHaveCount(0);
   await expect(staffPage.getByRole("button", { name: "Import CSV" })).toHaveCount(0);
   await staffPage.context().close();
 
   await staffLoginUI(page, baseURL!, f.slug, f.owner.email, f.owner.password);
   await page.waitForURL(`${baseURL}/${f.slug}/dashboard`);
   await page.goto(`${baseURL}/${f.slug}/members`);
-  await expect(page.getByRole("link", { name: "Export CSV" })).toHaveAttribute("href", `/api/${f.slug}/members/export`);
+  const [exported] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export CSV" }).click()]);
+  expect(exported.suggestedFilename()).toMatch(new RegExp(`^members-${f.slug}-.*\.csv$`));
   await page.getByRole("button", { name: "Import CSV" }).click();
   await expect(page.getByRole("link", { name: "Download a template" })).toBeVisible();
 

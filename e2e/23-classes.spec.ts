@@ -1,6 +1,6 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import bcrypt from "bcryptjs";
-import { prisma } from "./helpers";
+import { prisma, staffLoginUI } from "./helpers";
 import { encrypt, hmacLookup } from "../src/lib/crypto";
 import { zonedTimeToUtc } from "../src/lib/date";
 
@@ -83,7 +83,8 @@ test("zonedTimeToUtc turns a Jakarta wall-clock time into the right instant", ()
   expect(zonedTimeToUtc("2026-01-15T09:00", "America/New_York").toISOString()).toBe("2026-01-15T14:00:00.000Z");
 });
 
-test("owner creates a class and a weekly series; a member books (manual pay) and staff confirms it at the desk", async ({ request, baseURL, playwright }) => {
+test("owner creates a class and a weekly series; a member books (manual pay) and staff confirms it at the desk", async ({ request, baseURL, playwright, browser }) => {
+  test.setTimeout(90_000);
   const f = await makeGym();
   await login(request, baseURL!, f.slug, f.owner);
 
@@ -113,7 +114,7 @@ test("owner creates a class and a weekly series; a member books (manual pay) and
   // The owner's page lists the class and its sessions; the member's page lists them for booking.
   const ownerHtml = await (await request.get(`${baseURL}/${f.slug}/classes`)).text();
   expect(ownerHtml).toContain("Yoga");
-  expect(ownerHtml).toContain("Schedule sessions");
+  expect(ownerHtml).toContain("upcoming"); // the grid card (the default layout)
 
   // Online payments are off for this gym, so booking is a manual "pay at the desk" registration.
   const memberCtx = await playwright.request.newContext();
@@ -157,9 +158,25 @@ test("owner creates a class and a weekly series; a member books (manual pay) and
   expect((await staffCtx.post(`${baseURL}/api/${f.slug}/class-registrations/${registrationId}/confirm`, { data: { amount: 70000 } })).status()).toBe(409);
   expect(await prisma.classPayment.count({ where: { registrationId } })).toBe(1);
 
-  // The roster on the staff page shows the member as confirmed.
-  const roster = await (await staffCtx.get(`${baseURL}/${f.slug}/classes`)).text();
-  expect(roster).toContain(f.members[0].row.fullName);
+  // On the staff page the class is a card in the grid; opening it shows the roster with the member confirmed.
+  const ui = await browser.newContext();
+  const page = await ui.newPage();
+  await staffLoginUI(page, baseURL!, f.slug, f.staff.email, f.staff.password);
+  await page.waitForURL(`${baseURL}/${f.slug}/dashboard`);
+  await page.goto(`${baseURL}/${f.slug}/classes`);
+  await expect(page.getByRole("button", { name: /Yoga/ })).toBeVisible();
+  await page.getByRole("button", { name: /Yoga/ }).click();
+  await page.getByRole("button", { name: /booked/ }).first().click();
+  await expect(page.getByText(f.members[0].row.fullName)).toBeVisible();
+
+  // The layout switch: list shows every class's sessions at once, and the choice is remembered.
+  await page.getByRole("button", { name: "Back to all classes" }).click();
+  await page.getByRole("button", { name: "List", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Back to all classes" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /booked/ }).first()).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "List", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await ui.close();
 
   await memberCtx.dispose();
   await staffCtx.dispose();
@@ -422,6 +439,8 @@ test("hidden classes and past sessions can't be booked; a cancelled member can't
 
 test("owner sets up a class in the browser and a member books it", async ({ page, baseURL, browser }) => {
   const f = await makeGym(1);
+  // This flow works on the full per-class sections, which is the List layout.
+  await page.addInitScript(() => window.localStorage.setItem("repstack.classesView", "list"));
   await page.goto(`${baseURL}/${f.slug}/login`);
   await page.getByLabel("Email").fill(f.owner.email);
   await page.getByLabel("Password").fill(f.owner.password);

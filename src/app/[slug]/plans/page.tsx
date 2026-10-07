@@ -30,8 +30,8 @@ export default async function PlansPage({ params }: { params: { slug: string } }
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+      <div className="mx-auto max-w-7xl">
+        <div className="gym-head mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">Membership plans</h1>
             <p className="text-sm text-neutral-400">{gym.name}</p>

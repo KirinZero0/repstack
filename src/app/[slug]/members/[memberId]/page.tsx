@@ -6,6 +6,7 @@ import { Card, StatusPill, rp } from "@/components/charts";
 import { RecordPaymentForm, VoidPaymentButton } from "./RecordPayment";
 import PasswordLinkButton from "./PasswordLink";
 import MemberActions from "./MemberActions";
+import MemberQr from "./MemberQr";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,11 @@ export default async function MemberDetailPage({ params }: { params: { slug: str
               <div className="flex justify-between gap-4"><dt className="text-neutral-400">Visits</dt><dd>{visits}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-neutral-400">Last visit</dt><dd>{lastVisit ? lastVisit.checkedInAt.toLocaleDateString("id-ID") : "—"}</dd></div>
             </dl>
+            {!member.anonymizedAt && (
+              <div className="mt-4 border-t border-neutral-800 pt-4">
+                <MemberQr slug={params.slug} memberId={member.id} />
+              </div>
+            )}
           </Card>
         </div>
 

@@ -18,24 +18,23 @@ interface Item {
   label: string;
   href: (slug: string) => string;
   ownerOnly?: boolean;
+  /** The plate colour this section wears in the nav: floor work is yellow, people blue, classes and plans green, money red. */
+  tone: string;
 }
 
 const ITEMS: Item[] = [
-  { page: "dashboard", label: "Dashboard", href: (s) => `/${s}/dashboard` },
-  { page: "members", label: "Members", href: (s) => `/${s}/members` },
+  { page: "dashboard", label: "Dashboard", href: (s) => `/${s}/dashboard`, tone: "var(--plate-yellow)" },
+  { page: "members", label: "Members", href: (s) => `/${s}/members`, tone: "var(--plate-blue)" },
   // Staff see the roster and confirm front-desk payments; only the owner gets the set-up controls on the page itself.
-  { page: "classes", label: "Classes", href: (s) => `/${s}/classes` },
-  { page: "checkin-station", label: "Check-in poster", href: (s) => `/${s}/checkin-station` },
-  { page: "checkin", label: "Staff scanner", href: (s) => `/${s}/checkin` },
-  { page: "staff", label: "Staff", href: (s) => `/${s}/staff`, ownerOnly: true },
-  { page: "plans", label: "Plans", href: (s) => `/${s}/plans`, ownerOnly: true },
-  { page: "finance", label: "Finance", href: (s) => `/${s}/finance`, ownerOnly: true },
-  { page: "billing", label: "Billing", href: (s) => `/${s}/billing`, ownerOnly: true },
-  { page: "settings", label: "Settings", href: (s) => `/${s}/settings`, ownerOnly: true },
+  { page: "classes", label: "Classes", href: (s) => `/${s}/classes`, tone: "var(--plate-green)" },
+  { page: "checkin-station", label: "Check-in poster", href: (s) => `/${s}/checkin-station`, tone: "var(--plate-yellow)" },
+  { page: "checkin", label: "Staff scanner", href: (s) => `/${s}/checkin`, tone: "var(--plate-yellow)" },
+  { page: "staff", label: "Staff", href: (s) => `/${s}/staff`, ownerOnly: true, tone: "var(--plate-blue)" },
+  { page: "plans", label: "Plans", href: (s) => `/${s}/plans`, ownerOnly: true, tone: "var(--plate-green)" },
+  { page: "finance", label: "Finance", href: (s) => `/${s}/finance`, ownerOnly: true, tone: "var(--plate-red)" },
+  { page: "billing", label: "Billing", href: (s) => `/${s}/billing`, ownerOnly: true, tone: "var(--plate-red)" },
+  { page: "settings", label: "Settings", href: (s) => `/${s}/settings`, ownerOnly: true, tone: "var(--plate-blue)" },
 ];
-
-const linkCls = (active: boolean) =>
-  `whitespace-nowrap text-sm ${active ? "font-medium text-white" : "text-neutral-300 hover:text-white"}`;
 
 /**
  * The one nav every gym back-office page shares (dashboard, members, staff, plans, finance,
@@ -58,15 +57,21 @@ export default function GymNav({ slug, role, current, billingOnly = false }: Pro
   }
 
   return (
-    <div className="relative shrink-0">
+    <div className="relative shrink-0 sm:basis-full">
       {/* Desktop / wide screens: the full row, wraps if it has to but never disappears. */}
-      <nav className="hidden flex-wrap items-center gap-x-4 gap-y-2 sm:flex" aria-label="Gym navigation">
+      <nav className="hidden flex-wrap items-center gap-1.5 sm:flex" aria-label="Gym navigation">
         {items.map((i) => (
-          <a key={i.page} href={i.href(slug)} className={linkCls(i.page === current)}>
+          <a
+            key={i.page}
+            href={i.href(slug)}
+            className="nav-pill"
+            style={{ "--tone": i.tone } as React.CSSProperties}
+            aria-current={i.page === current ? "page" : undefined}
+          >
             {i.label}
           </a>
         ))}
-        <button type="button" onClick={logout} className="text-sm text-neutral-300 hover:text-white">
+        <button type="button" onClick={logout} className="nav-pill" style={{ "--tone": "var(--n-500)" } as React.CSSProperties}>
           Log out
         </button>
       </nav>

@@ -45,8 +45,12 @@ export const gymSettingsSchema = z
     notifyEmail: z.boolean().optional(),
     /** How long after a check-in a member still counts as "in the gym" if they never checked out. */
     occupancyWindowHours: z.number().int().min(1).max(12).optional(),
-    /** Members see each other's first names and visit counts on their dashboard. Off by default. */
-    leaderboardEnabled: z.boolean().optional(),
+    /** Successful check-ins allowed per member per day (1 = the original once-a-day rule). */
+    checkinsPerDay: z.number().int().min(1).max(10).optional(),
+    /** Minimum minutes between two check-ins when more than one a day is allowed. */
+    checkinGapMinutes: z.number().int().min(0).max(240).optional(),
+    /** Members can see who else is in the gym right now (first name and last initial; each member can hide themselves). Off by default. */
+    whoIsInEnabled: z.boolean().optional(),
     name: z.string().trim().min(2).max(80).optional(),
     timezone: z.string().trim().max(60).refine(isValidTimezone, "Unknown timezone").optional(),
     bankName: z.string().trim().max(60).optional(),
@@ -219,3 +223,8 @@ export const confirmClassRegistrationSchema = z.object({
 });
 
 export const registerForClassSchema = z.object({ sessionId: z.string().uuid() });
+
+export const transferProofSchema = z.object({
+  senderName: z.string().trim().min(2, "Enter the name on the sending account").max(80),
+  transferDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid date").optional(),
+});

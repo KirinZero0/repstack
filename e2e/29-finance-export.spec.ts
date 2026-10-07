@@ -201,15 +201,13 @@ test("the Finance page offers the exports to the owner with this month pre-fille
   const { from, to } = defaultTransactionsRange(TZ);
   await expect(page.getByLabel("From", { exact: true })).toHaveValue(from);
   await expect(page.getByLabel("To", { exact: true })).toHaveValue(to);
-  await expect(page.getByRole("link", { name: "Download transactions" })).toHaveAttribute(
-    "href",
-    `/api/${f.slug}/finance/export?report=transactions&from=${from}&to=${to}&status=paid`,
-  );
+  await expect(page.getByRole("button", { name: "Download transactions" })).toBeEnabled();
   await page.getByLabel("Include").selectOption("all");
-  await expect(page.getByRole("link", { name: "Download transactions" })).toHaveAttribute("href", /status=all$/);
-  await expect(page.getByRole("link", { name: "Download monthly summary" })).toHaveAttribute("href", /report=monthly&from=\d{4}-\d{2}-01&to=/);
 
-  // The link really downloads a CSV.
-  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Download monthly summary" }).click()]);
+  // The buttons save a properly named .csv, not a file called "export".
+  const [tx] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download transactions" }).click()]);
+  expect(tx.suggestedFilename()).toBe(`finance-transactions-${f.slug}-${from}-to-${to}.csv`);
+  
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download monthly summary" }).click()]);
   expect(download.suggestedFilename()).toMatch(new RegExp(`^finance-monthly-${f.slug}-.*\\.csv$`));
 });

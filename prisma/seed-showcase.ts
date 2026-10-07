@@ -465,7 +465,7 @@ async function seedMainGym(saas: Awaited<ReturnType<typeof ensureSaasPlans>>, su
   }
   const upcomingId = crypto.randomUUID();
   await prisma.platformPayment.create({
-    data: { id: upcomingId, gymId: gym.id, saasPlanId: growth.id, provider: "xendit", kind: "SUBSCRIPTION", amount: growth.price, status: "PENDING", ...invoiceFor(upcomingId) },
+    data: { id: upcomingId, gymId: gym.id, saasPlanId: growth.id, provider: "manual", kind: "SUBSCRIPTION", amount: growth.price, status: "PENDING" },
   });
 
   await prisma.auditLog.create({ data: { superadminId, gymId: gym.id, action: "gym.create", metadata: { name: gym.name, slug: gym.slug }, createdAt: ago(200 * DAY) } });
@@ -522,7 +522,7 @@ async function seedOtherGyms(saas: Awaited<ReturnType<typeof ensureSaasPlans>>, 
       }
       if (s.status === "PAST_DUE" || s.status === "SUSPENDED") {
         const id = crypto.randomUUID();
-        await prisma.platformPayment.create({ data: { id, gymId: gym.id, saasPlanId: plan.id, provider: "xendit", amount: plan.price, status: s.status === "PAST_DUE" ? "PENDING" : "EXPIRED", ...invoiceFor(id) } });
+        await prisma.platformPayment.create({ data: { id, gymId: gym.id, saasPlanId: plan.id, provider: "manual", amount: plan.price, status: s.status === "PAST_DUE" ? "PENDING" : "EXPIRED" } });
       }
     }
     await prisma.auditLog.create({ data: { superadminId, gymId: gym.id, action: "gym.create", metadata: { name: gym.name, slug: gym.slug }, createdAt: gym.createdAt } });
@@ -554,6 +554,10 @@ async function main() {
   const saas = await ensureSaasPlans();
   const superadmin = await ensureSuperadmin();
   await prisma.appConfig.upsert({ where: { key: "theme.default" }, update: {}, create: { key: "theme.default", value: "dark" } });
+
+  // Where gym owners send their Repstack subscription until a payment provider is approved.
+  const bank = { bankName: "BCA", accountNumber: "1234567890", accountHolder: "PT Repstack Teknologi" };
+  await prisma.appConfig.upsert({ where: { key: "platform.bank" }, update: { value: bank }, create: { key: "platform.bank", value: bank } });
 
   const main_ = await seedMainGym(saas, superadmin.id);
   await seedOtherGyms(saas, superadmin.id);

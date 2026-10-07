@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export interface RegistrationRow {
   id: string;
@@ -292,6 +292,76 @@ function Roster({ slug, session, isOwner, price, onChanged }: { slug: string; se
   );
 }
 
+const VIEW_KEY = "repstack.classesView";
+
+/** Compact tile for the grid view: what the class is, what's next, and whether anything needs attention. */
+function ClassCard({ c, onOpen }: { c: ClassRow; onOpen: () => void }) {
+  const upcoming = c.sessions.filter((s) => s.status !== "CANCELLED" && !s.past);
+  const next = upcoming[0];
+  const waiting = c.sessions.reduce((n, s) => n + (s.status === "SCHEDULED" ? s.registrations.filter((r) => r.status === "PENDING_PAYMENT").length : 0), 0);
+  const full = next && next.capacity !== null && next.taken >= next.capacity;
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`flex h-full flex-col rounded-xl border border-neutral-800 bg-neutral-900 p-4 text-left transition hover:border-neutral-600 hover:bg-neutral-800/60 ${c.isActive ? "" : "opacity-70"}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h2 className="text-base font-semibold leading-snug">{c.name}</h2>
+        {!c.isActive && <span className="rounded-full border border-neutral-700 px-2 py-0.5 text-[11px] text-neutral-500">Hidden</span>}
+      </div>
+      <p className="mt-1 text-sm text-neutral-400">
+        {c.price === 0 ? "Free" : rp(c.price)} · {c.durationMinutes} min
+      </p>
+      <p className="text-xs text-neutral-500">
+        {c.capacity === null ? "Unlimited seats" : `${c.capacity} seats`}
+        {c.instructor && ` · ${c.instructor}`}
+      </p>
+
+      <div className="mt-4 flex-1 rounded-lg bg-neutral-950 px-3 py-2 text-sm">
+        {next ? (
+          <>
+            <p className="text-xs uppercase tracking-wide text-neutral-500">Next session</p>
+            <p className="mt-0.5 text-neutral-200">{next.label}</p>
+            <p className={`text-xs ${full ? "text-amber-400" : "text-neutral-400"}`}>
+              {next.taken}
+              {next.capacity !== null ? ` / ${next.capacity}` : ""} booked{full ? " · full" : ""}
+            </p>
+          </>
+        ) : (
+          <p className="text-neutral-500">No upcoming sessions</p>
+        )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-neutral-500">{upcoming.length} upcoming</span>
+        {waiting > 0 && <span className="rounded-full bg-amber-950 px-2 py-0.5 text-amber-400">{waiting} awaiting payment</span>}
+        <span className="ml-auto text-neutral-400">Open ›</span>
+      </div>
+    </button>
+  );
+}
+
+function ViewToggle({ view, onChange }: { view: "grid" | "list"; onChange: (v: "grid" | "list") => void }) {
+  const opt = (v: "grid" | "list", label: string) => (
+    <button
+      type="button"
+      onClick={() => onChange(v)}
+      aria-pressed={view === v}
+      className={`px-3 py-1.5 text-xs ${view === v ? "bg-white font-semibold text-neutral-950" : "text-neutral-300 hover:bg-neutral-800"}`}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div role="group" aria-label="Classes layout" className="inline-flex overflow-hidden rounded-lg border border-neutral-700">
+      {opt("grid", "Grid")}
+      {opt("list", "List")}
+    </div>
+  );
+}
+
 export default function ClassesManager({ slug, classes, isOwner, timezone }: { slug: string; classes: ClassRow[]; isOwner: boolean; timezone: string }) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
@@ -299,49 +369,26 @@ export default function ClassesManager({ slug, classes, isOwner, timezone }: { s
   const [scheduling, setScheduling] = useState<string | null>(null);
   const [openSession, setOpenSession] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [openClass, setOpenClass] = useState<string | null>(null);
   const refresh = () => router.refresh();
 
-  return (
-    <div className="space-y-6">
-      {isOwner && (
-        <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-5">
-          {creating ? (
-            <>
-              <h2 className="mb-4 text-sm font-medium text-neutral-300">New class</h2>
-              <ClassForm
-                initial={{ name: "", description: "", instructor: "", price: 50000, capacity: null, durationMinutes: 60 }}
-                submitLabel="Create class"
-                onSubmit={async (v) => {
-                  const { error } = await call(`/api/${slug}/classes`, "POST", v);
-                  if (!error) {
-                    setCreating(false);
-                    refresh();
-                  }
-                  return error;
-                }}
-                onCancel={() => setCreating(false)}
-              />
-            </>
-          ) : (
-            <div className="flex flex-wrap items-center gap-4">
-              <button onClick={() => setCreating(true)} className={btnCls}>
-                + New class
-              </button>
-              <span className="text-sm text-neutral-400">Set up a class type, then schedule when it runs. Members book from their dashboard.</span>
-            </div>
-          )}
-        </div>
-      )}
+  // Remember the layout per browser. Read after mount so the server and first client render agree.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(VIEW_KEY);
+      if (saved === "grid" || saved === "list") setView(saved);
+    } catch {}
+  }, []);
+  function chooseView(v: "grid" | "list") {
+    setView(v);
+    setOpenClass(null);
+    try {
+      window.localStorage.setItem(VIEW_KEY, v);
+    } catch {}
+  }
 
-      {rowError && <p className="text-sm text-red-400">{rowError}</p>}
-
-      {classes.length === 0 && (
-        <p className="rounded-xl border border-neutral-800 px-4 py-8 text-center text-sm text-neutral-500">
-          {isOwner ? "No classes yet. Create your first one above." : "The owner hasn't set up any classes yet."}
-        </p>
-      )}
-
-      {classes.map((c) => (
+  const renderSection = (c: ClassRow) => (
         <section key={c.id} className={`rounded-xl border border-neutral-800 ${c.isActive ? "" : "opacity-70"}`}>
           <div className="flex flex-wrap items-start justify-between gap-3 bg-neutral-900 px-4 py-4">
             {editing === c.id ? (
@@ -459,7 +506,72 @@ export default function ClassesManager({ slug, classes, isOwner, timezone }: { s
             )}
           </div>
         </section>
-      ))}
+  );
+
+  return (
+    <div className="space-y-6">
+      {isOwner && (
+        <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-5">
+          {creating ? (
+            <>
+              <h2 className="mb-4 text-sm font-medium text-neutral-300">New class</h2>
+              <ClassForm
+                initial={{ name: "", description: "", instructor: "", price: 50000, capacity: null, durationMinutes: 60 }}
+                submitLabel="Create class"
+                onSubmit={async (v) => {
+                  const { error } = await call(`/api/${slug}/classes`, "POST", v);
+                  if (!error) {
+                    setCreating(false);
+                    refresh();
+                  }
+                  return error;
+                }}
+                onCancel={() => setCreating(false)}
+              />
+            </>
+          ) : (
+            <div className="flex flex-wrap items-center gap-4">
+              <button onClick={() => setCreating(true)} className={btnCls}>
+                + New class
+              </button>
+              <span className="text-sm text-neutral-400">Set up a class type, then schedule when it runs. Members book from their dashboard.</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {classes.length > 0 && (
+        <div className="flex justify-end">
+          <ViewToggle view={view} onChange={chooseView} />
+        </div>
+      )}
+
+      {rowError && <p className="text-sm text-red-400">{rowError}</p>}
+
+      {classes.length === 0 && (
+        <p className="rounded-xl border border-neutral-800 px-4 py-8 text-center text-sm text-neutral-500">
+          {isOwner ? "No classes yet. Create your first one above." : "The owner hasn't set up any classes yet."}
+        </p>
+      )}
+
+      {view === "list" ? (
+        classes.map((c) => renderSection(c))
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {classes.map((c) =>
+            openClass === c.id ? (
+              <div key={c.id} className="col-span-full space-y-3">
+                <button type="button" onClick={() => setOpenClass(null)} className={ghostCls}>
+                  ‹ Back to all classes
+                </button>
+                {renderSection(c)}
+              </div>
+            ) : (
+              <ClassCard key={c.id} c={c} onOpen={() => setOpenClass(c.id)} />
+            ),
+          )}
+        </div>
+      )}
     </div>
   );
 }

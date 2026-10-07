@@ -101,3 +101,75 @@ export function PlanSwitcher({ slug, options }: { slug: string; options: PlanOpt
     </div>
   );
 }
+
+/** The owner's evidence for a bank transfer: a screenshot and the name on the sending account. */
+export function TransferProofForm({ slug, submitted, senderName }: { slug: string; submitted: boolean; senderName: string | null }) {
+  const router = useRouter();
+  const [file, setFile] = useState<File | null>(null);
+  const [sender, setSender] = useState(senderName ?? "");
+  const [date, setDate] = useState("");
+  const [open, setOpen] = useState(!submitted);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.set("proof", file);
+      fd.set("senderName", sender);
+      if (date) fd.set("transferDate", date);
+      const res = await fetch(`/api/${slug}/billing/proof`, { method: "POST", body: fd });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof body.error === "string" ? body.error : "Something went wrong. Please try again.");
+        return;
+      }
+      setOpen(false);
+      router.refresh();
+    } catch {
+      setError("Network problem. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="mt-4 text-sm">
+        <p className="text-emerald-300">Proof sent{senderName ? ` (from ${senderName})` : ""}. We&apos;ll confirm it shortly.</p>
+        <button type="button" onClick={() => setOpen(true)} className="mt-1 text-xs text-sky-400 underline underline-offset-2">
+          Send a different screenshot
+        </button>
+      </div>
+    );
+  }
+
+  const field = "w-full rounded-md border border-sky-800 bg-neutral-950 px-3 py-2 text-sm text-white";
+  return (
+    <form onSubmit={submit} className="mt-4 space-y-3 border-t border-sky-800 pt-4">
+      <p className="font-medium">After you transfer, send us proof</p>
+      <div>
+        <label htmlFor="proofFile" className="mb-1 block text-xs text-sky-400">Screenshot or photo of the transfer (JPEG, PNG or WebP, max 2MB)</label>
+        <input id="proofFile" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className={field} />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor="proofSender" className="mb-1 block text-xs text-sky-400">Name on the sending account</label>
+          <input id="proofSender" value={sender} onChange={(e) => setSender(e.target.value)} maxLength={80} className={field} />
+        </div>
+        <div>
+          <label htmlFor="proofDate" className="mb-1 block text-xs text-sky-400">Transfer date (optional)</label>
+          <input id="proofDate" type="date" value={date} onChange={(e) => setDate(e.target.value)} className={field} />
+        </div>
+      </div>
+      <button type="submit" disabled={busy || !file || sender.trim().length < 2} className={primary}>
+        {busy ? "Sending…" : "Send proof"}
+      </button>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+    </form>
+  );
+}

@@ -31,7 +31,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (parsed.data.notifyWhatsapp !== undefined) next.notifyWhatsapp = parsed.data.notifyWhatsapp;
   if (parsed.data.notifyEmail !== undefined) next.notifyEmail = parsed.data.notifyEmail;
   if (parsed.data.occupancyWindowHours !== undefined) next.occupancyWindowHours = parsed.data.occupancyWindowHours;
-  if (parsed.data.leaderboardEnabled !== undefined) next.leaderboardEnabled = parsed.data.leaderboardEnabled;
+  if (parsed.data.checkinsPerDay !== undefined) next.checkinsPerDay = parsed.data.checkinsPerDay;
+  if (parsed.data.checkinGapMinutes !== undefined) next.checkinGapMinutes = parsed.data.checkinGapMinutes;
+  if (parsed.data.whoIsInEnabled !== undefined) next.whoIsInEnabled = parsed.data.whoIsInEnabled;
 
   await db.gym.update({
     where: { id: gym.id },

@@ -1,0 +1,185 @@
+/* ─── Back-office polish ─────────────────────────────────────────────────────────────────────
+   The app's pages share a handful of class combinations (card = rounded-xl + bg-neutral-900,
+   primary button = bg-white + text-neutral-950), so the look is set here once instead of in
+   every page. Colours come from the theme variables, so light mode follows along. */
+
+:root,
+[data-theme="dark"] {
+  --glow-a: rgba(37, 104, 201, 0.24);
+  --glow-b: rgba(232, 185, 35, 0.13);
+  --sheen: rgba(255, 255, 255, 0.035);
+  --edge: rgba(255, 255, 255, 0.05);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+}
+[data-theme="light"] {
+  --glow-a: rgba(37, 104, 201, 0.08);
+  --glow-b: rgba(232, 185, 35, 0.1);
+  --sheen: rgba(255, 255, 255, 0);
+  --edge: rgba(255, 255, 255, 0.9);
+  --shadow: 0 1px 2px rgba(15, 21, 27, 0.08), 0 8px 24px -14px rgba(15, 21, 27, 0.18);
+}
+@media (prefers-color-scheme: light) {
+  [data-theme="system"] {
+    --glow-a: rgba(37, 104, 201, 0.08);
+    --glow-b: rgba(232, 185, 35, 0.1);
+    --sheen: rgba(255, 255, 255, 0);
+    --edge: rgba(255, 255, 255, 0.9);
+    --shadow: 0 1px 2px rgba(15, 21, 27, 0.08), 0 8px 24px -14px rgba(15, 21, 27, 0.18);
+  }
+}
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    --glow-a: rgba(37, 104, 201, 0.24);
+    --glow-b: rgba(232, 185, 35, 0.13);
+    --sheen: rgba(255, 255, 255, 0.035);
+    --edge: rgba(255, 255, 255, 0.05);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* A soft wash of brand colour behind the page, fixed so it stays put while the content scrolls. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 420px at 88% -8%, var(--glow-a), transparent 70%),
+    radial-gradient(720px 380px at 4% -6%, var(--glow-b), transparent 70%);
+}
+
+/* Cards: a faint top sheen, a lit top edge and a soft drop, so they read as raised panels. */
+main [class*="rounded-xl"][class*="bg-neutral-900"],
+main [class*="rounded-2xl"][class*="bg-neutral-900"] {
+  background-image: linear-gradient(180deg, var(--sheen), transparent 60%);
+  box-shadow: inset 0 1px 0 var(--edge), var(--shadow);
+}
+main button[class*="rounded-xl"][class*="bg-neutral-900"] {
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+main button[class*="rounded-xl"][class*="bg-neutral-900"]:hover {
+  transform: translateY(-2px);
+}
+
+/* Tables sit in a bordered, rounded frame: give it the same lift and a stronger header. */
+main div[class*="rounded-xl"][class*="overflow-x-auto"],
+main div[class*="rounded-xl"][class*="overflow-hidden"] {
+  box-shadow: var(--shadow);
+}
+main thead {
+  background-image: linear-gradient(180deg, var(--sheen), transparent);
+}
+main tbody tr {
+  transition: background-color 120ms ease;
+}
+main tbody tr:hover {
+  background-color: color-mix(in srgb, var(--n-800) 45%, transparent);
+}
+
+/* Primary buttons: the brand yellow, with dark ink in both themes. */
+main button[class*="bg-white"][class*="text-neutral-950"],
+main a[class*="bg-white"][class*="text-neutral-950"] {
+  background-color: var(--plate-yellow);
+  color: #17130a;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.18), 0 6px 16px -8px color-mix(in srgb, var(--plate-yellow) 70%, transparent);
+  transition: filter 140ms ease, transform 140ms ease;
+}
+main button[class*="bg-white"][class*="text-neutral-950"]:hover:not(:disabled),
+main a[class*="bg-white"][class*="text-neutral-950"]:hover {
+  filter: brightness(1.08);
+  background-color: var(--plate-yellow);
+}
+main button[class*="bg-white"][class*="text-neutral-950"]:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Page titles: a little larger than body headings. */
+main h1 {
+  font-size: 1.75rem;
+  line-height: 1.15;
+  font-weight: 650;
+}
+
+/* Stat tiles: a coloured spine that cycles through the four plate colours across a row. */
+.stat-card {
+  position: relative;
+  overflow: hidden;
+  --spine: var(--plate-yellow);
+}
+.stat-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--spine);
+}
+.stat-card:nth-child(4n + 2) { --spine: var(--plate-blue); }
+.stat-card:nth-child(4n + 3) { --spine: var(--plate-green); }
+.stat-card:nth-child(4n + 4) { --spine: var(--plate-red); }
+.stat-card .stat-value {
+  font-family: var(--font-display), var(--font-geist-sans), system-ui, sans-serif;
+  letter-spacing: -0.03em;
+}
+
+/* Gym nav: each section carries its plate colour as a dot, and the open page wears it. */
+.nav-pill {
+  --tone: var(--plate-yellow);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.84rem;
+  white-space: nowrap;
+  color: var(--n-300);
+  border: 1px solid transparent;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.nav-pill::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--tone);
+  opacity: 0.55;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+.nav-pill:hover {
+  color: var(--white);
+  background: color-mix(in srgb, var(--n-800) 70%, transparent);
+}
+.nav-pill:hover::before {
+  opacity: 1;
+}
+.nav-pill[aria-current="page"] {
+  color: var(--white);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--tone) 16%, transparent);
+  border-color: color-mix(in srgb, var(--tone) 45%, transparent);
+}
+.nav-pill[aria-current="page"]::before {
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  main button[class*="rounded-xl"][class*="bg-neutral-900"]:hover { transform: none; }
+  .nav-pill, .nav-pill::before, main tbody tr { transition: none; }
+}
+
+/* Every gym page shares one container width and the nav sits on its own row under the title, left-aligned.
+   Settings is a stack of form cards, so it flows into two columns on wide screens instead of one long strip. */
+.gym-masonry {
+  columns: 1;
+  column-gap: 1.5rem;
+}
+.gym-masonry > * {
+  break-inside: avoid;
+  margin-bottom: 1.5rem;
+}
+@media (min-width: 1024px) {
+  .gym-masonry {
+    columns: 2;
+  }
+}

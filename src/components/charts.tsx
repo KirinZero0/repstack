@@ -14,9 +14,9 @@ export function StatCard({
   tone?: "good" | "bad";
 }) {
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-5">
+    <div className="stat-card rounded-xl border border-neutral-800 bg-neutral-900 p-5 pl-6">
       <p className="text-sm text-neutral-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      <p className="stat-value mt-1 text-3xl font-semibold">{value}</p>
       {sub && (
         <p className={`mt-1 text-xs ${tone === "good" ? "text-emerald-400" : tone === "bad" ? "text-red-400" : "text-neutral-500"}`}>
           {sub}

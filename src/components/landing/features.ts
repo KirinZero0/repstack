@@ -155,7 +155,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       },
       {
         title: "Or connect your own",
-        body: "Add your gym's Fonnte token in Settings and messages come from your own number, with no monthly cap.",
+        body: "Ask us to connect your own Fonnte number and messages come from it, with no monthly cap.",
       },
       {
         title: "Email too, if you want it",

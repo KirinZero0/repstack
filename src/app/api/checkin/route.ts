@@ -56,5 +56,5 @@ export async function POST(req: NextRequest) {
   }
 
   const outcome = await evaluateAndLogCheckin(db, member, gym, session.staffUserId);
-  return NextResponse.json({ result: outcome.result as ResultCode, member: outcome.memberSummary });
+  return NextResponse.json({ result: outcome.result as ResultCode, message: outcome.message, member: outcome.memberSummary });
 }

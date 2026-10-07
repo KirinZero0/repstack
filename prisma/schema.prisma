@@ -97,6 +97,13 @@ model PlatformPayment {
   status            PaymentStatus @default(PENDING)
   createdAt         DateTime      @default(now())
   paidAt            DateTime?
+  // Bank-transfer evidence (provider "manual"): the owner's transfer screenshot (private Vercel Blob), who sent it and when,
+  // reviewed by the superadmin. A rejection keeps the invoice open and records why, so the owner can send better proof.
+  proofImageUrl     String?
+  proofSubmittedAt  DateTime?
+  senderName        String?
+  transferDate      String?
+  rejectionReason   String?
 
   @@index([gymId])
 }
@@ -175,6 +182,7 @@ model Member {
   email               String         @unique // login identifier
   passwordHash        String? // nullable until first-time activation is completed
   photoUrl            String? // Vercel Blob URL (private access, signed at render time)
+  hideFromGymBoard    Boolean        @default(false) // the member opted out of the "who's in the gym" list other members can see
   qrSecret            String         @default(uuid())
   status              MemberStatus   @default(PENDING_PAYMENT)
   membershipExpiry    DateTime?

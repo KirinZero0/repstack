@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { requireSuperadminSession, SessionError } from "@/lib/session";
 import { getPlatformTheme } from "@/lib/theme";
 import { Card } from "@/components/charts";
-import { PlatformSettingsForm } from "@/components/SettingsForms";
+import { getPlatformBank } from "@/lib/platformBank";
+import { PlatformSettingsForm, PlatformBankForm } from "@/components/SettingsForms";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function SuperadminSettingsPage() {
     throw err;
   }
   const t = await getPlatformTheme();
+  const bank = await getPlatformBank();
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
@@ -25,6 +27,14 @@ export default async function SuperadminSettingsPage() {
             <a href="/superadmin/gyms" className="text-neutral-300 hover:text-white">Gyms</a>
           </nav>
         </div>
+        <Card title="Bank account for subscriptions">
+          <PlatformBankForm initial={bank} />
+          <p className="mt-4 text-xs text-neutral-500">
+            Shown to gym owners when they pay their Repstack subscription by bank transfer, until online payments are switched on.
+            You confirm each transfer from Gyms.
+          </p>
+        </Card>
+        <div className="h-6" />
         <Card title="Appearance">
           <PlatformSettingsForm initialMode={t.mode} initialOverride={t.allowUserOverride} />
           <p className="mt-4 text-xs text-neutral-500">

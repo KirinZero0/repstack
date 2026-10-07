@@ -1,4 +1,5 @@
 import type { TenantDb } from "./prisma";
+import { displayName } from "./leaderboard";
 
 export const DEFAULT_OCCUPANCY_WINDOW_HOURS = 3;
 
@@ -36,6 +37,40 @@ export async function getOccupancy(db: TenantDb, gymId: string, settings: unknow
     present.push({ checkInId: r.id, memberId: r.memberId, fullName: r.member.fullName, photoUrl: r.member.photoUrl, since: r.checkedInAt });
   }
   return present;
+}
+
+/** Whether members can see each other in the gym. The owner turns it on in Settings; off by default. */
+export function whoIsInEnabled(settings: unknown): boolean {
+  return (settings as { whoIsInEnabled?: unknown } | null)?.whoIsInEnabled === true;
+}
+
+export interface GymBoard {
+  /** Everyone counted as in the gym right now, including the viewer and members who chose to be hidden. */
+  total: number;
+  /** The other members who are in and haven't hidden themselves. First name and last initial only. */
+  others: { memberId: string; name: string; since: Date }[];
+}
+
+/**
+ * What a member may see of who's in the gym: a head count, plus the names of other members who haven't
+ * opted out. Members who hid themselves are counted but never named, and surnames stay private.
+ */
+export async function getGymBoardForMember(db: TenantDb, gymId: string, settings: unknown, viewerId: string, now = new Date()): Promise<GymBoard> {
+  const since = new Date(now.getTime() - occupancyWindowHours(settings) * 60 * 60 * 1000);
+  const rows = await db.checkIn.findMany({
+    where: { gymId, result: "SUCCESS", checkedOutAt: null, checkedInAt: { gte: since } },
+    orderBy: { checkedInAt: "desc" },
+    include: { member: { select: { fullName: true, hideFromGymBoard: true, anonymizedAt: true } } },
+  });
+  const seen = new Set<string>();
+  const others: GymBoard["others"] = [];
+  for (const r of rows) {
+    if (seen.has(r.memberId) || r.member.anonymizedAt) continue;
+    seen.add(r.memberId);
+    if (r.memberId === viewerId || r.member.hideFromGymBoard) continue;
+    others.push({ memberId: r.memberId, name: displayName(r.member.fullName), since: r.checkedInAt });
+  }
+  return { total: seen.size, others };
 }
 
 /**

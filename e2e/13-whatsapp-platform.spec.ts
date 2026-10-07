@@ -36,7 +36,7 @@ test("a gym over its plan's monthly WhatsApp allowance is not sent to, and logge
   expect(statuses).toEqual(["SENT", "SENT", "LIMIT"]);
 });
 
-test("a gym that hasn't connected its own number sees its shared-number usage and a Connect option", async ({ request, baseURL }) => {
+test("a gym that hasn't connected its own number sees its shared-number usage and is told to contact us to connect its own", async ({ request, baseURL }) => {
   const login = await request.post(`${baseURL}/api/test-gym-a/staff-login`, { data: { email: "owner-a@test.local", password: "owner-pass-123" } });
   expect(login.ok()).toBeTruthy();
   const page = await request.get(`${baseURL}/test-gym-a/settings`);

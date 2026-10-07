@@ -27,8 +27,18 @@ async function makeGym() {
 const login = (request: APIRequestContext, baseURL: string, slug: string, who: { email: string; password: string }) =>
   request.post(`${baseURL}/api/${slug}/login`, { data: who });
 
-const saveToken = (request: APIRequestContext, baseURL: string, slug: string, token: string, senderNumber = "0812 3456 7890") =>
-  request.post(`${baseURL}/api/${slug}/whatsapp`, { data: { token, senderNumber } });
+/** Only the superadmin connects a gym's token. Each call goes out on its own superadmin-logged-in context. */
+let admin: APIRequestContext;
+test.beforeAll(async ({ playwright, baseURL }) => {
+  admin = await playwright.request.newContext();
+  await admin.post(`${baseURL}/api/superadmin/login`, { data: { email: "superadmin@test.local", password: "superadmin-pass-123" } });
+});
+const gymIdOf = async (slug: string) => (await prisma.gym.findUniqueOrThrow({ where: { slug } })).id;
+const saveToken = async (_request: APIRequestContext, baseURL: string, slug: string, token: string, senderNumber = "0812 3456 7890") =>
+  admin.post(`${baseURL}/api/superadmin/gyms/${await gymIdOf(slug)}/whatsapp`, { data: { token, senderNumber } });
+const testSend = async (baseURL: string, slug: string) =>
+  admin.post(`${baseURL}/api/superadmin/gyms/${await gymIdOf(slug)}/whatsapp/test`, { data: { phone: "081200001111" } });
+const removeToken = async (baseURL: string, slug: string) => admin.delete(`${baseURL}/api/superadmin/gyms/${await gymIdOf(slug)}/whatsapp`);
 
 /** Adds a member (which sends an activation WhatsApp) and returns the statuses logged for that send. */
 async function addMemberAndGetStatuses(request: APIRequestContext, baseURL: string, f: Awaited<ReturnType<typeof makeGym>>) {
@@ -47,9 +57,8 @@ async function addMemberAndGetStatuses(request: APIRequestContext, baseURL: stri
   return Array.from(new Set(logs.map((l) => l.status)));
 }
 
-test("the token is stored encrypted, never shown again, and only the owner can touch it", async ({ request, baseURL }) => {
+test("the token is stored encrypted, never shown to the owner, and only the superadmin can touch it", async ({ request, baseURL }) => {
   const f = await makeGym();
-  await login(request, baseURL!, f.slug, f.owner);
 
   // Too short is rejected before anything is stored.
   expect((await saveToken(request, baseURL!, f.slug, "short")).status()).toBe(400);
@@ -66,11 +75,13 @@ test("the token is stored encrypted, never shown again, and only the owner can t
   expect(row.senderNumber).toBe("081234567890");
   expect(row.gatewayProvider).toBe("fonnte");
 
-  // The settings page says it's connected but never contains the token.
+  // The owner's settings page says it's connected but never contains the token or a way to change it.
+  await login(request, baseURL!, f.slug, f.owner);
   const html = (await (await request.get(`${baseURL}/${f.slug}/settings`)).text()).replace(/<!-- -->/g, "");
   expect(html).toContain("Connected");
   expect(html).toContain("081234567890");
   expect(html).not.toContain(GOOD);
+  expect(html).not.toContain("Fonnte token");
 
   // Replacing keeps one row and swaps the ciphertext.
   expect((await saveToken(request, baseURL!, f.slug, BAD)).ok()).toBeTruthy();
@@ -78,32 +89,15 @@ test("the token is stored encrypted, never shown again, and only the owner can t
   const replaced = await prisma.whatsappSenderConfig.findUniqueOrThrow({ where: { gymId: f.gym.id } });
   expect(decrypt(replaced.apiKeyEncrypted)).toBe(BAD);
 
-  // Staff can't save, test or remove it.
-  await request.post(`${baseURL}/api/${f.slug}/staff-logout`);
-  await login(request, baseURL!, f.slug, f.staff);
-  expect((await saveToken(request, baseURL!, f.slug, GOOD)).status()).toBe(403);
-  expect((await request.post(`${baseURL}/api/${f.slug}/whatsapp/test`, { data: { phone: "081200001111" } })).status()).toBe(403);
-  expect((await request.delete(`${baseURL}/api/${f.slug}/whatsapp`)).status()).toBe(403);
-  expect(decrypt((await prisma.whatsappSenderConfig.findUniqueOrThrow({ where: { gymId: f.gym.id } })).apiKeyEncrypted)).toBe(BAD);
+  // The gym's own owner session (and no session at all) can't reach the superadmin endpoints.
+  const gymId = f.gym.id;
+  expect((await request.post(`${baseURL}/api/superadmin/gyms/${gymId}/whatsapp`, { data: { token: GOOD, senderNumber: "0812 3456 7890" } })).status()).toBe(401);
+  expect((await request.delete(`${baseURL}/api/superadmin/gyms/${gymId}/whatsapp`)).status()).toBe(401);
+  expect((await request.post(`${baseURL}/api/superadmin/gyms/${gymId}/whatsapp/test`, { data: { phone: "081200001111" } })).status()).toBe(401);
+  expect(decrypt((await prisma.whatsappSenderConfig.findUniqueOrThrow({ where: { gymId } })).apiKeyEncrypted)).toBe(BAD);
 
-  // Logged out entirely: refused.
-  await request.post(`${baseURL}/api/${f.slug}/staff-logout`);
-  expect((await saveToken(request, baseURL!, f.slug, GOOD)).status()).toBe(401);
-});
-
-test("another gym's owner can't read, replace or remove a gym's token", async ({ request, baseURL }) => {
-  const a = await makeGym();
-  const b = await makeGym();
-  await login(request, baseURL!, a.slug, a.owner);
-  expect((await saveToken(request, baseURL!, a.slug, GOOD)).ok()).toBeTruthy();
-  await request.post(`${baseURL}/api/${a.slug}/staff-logout`);
-
-  await login(request, baseURL!, b.slug, b.owner);
-  expect((await saveToken(request, baseURL!, a.slug, BAD)).ok()).toBeFalsy();
-  expect((await request.delete(`${baseURL}/api/${a.slug}/whatsapp`)).ok()).toBeFalsy();
-  expect((await request.post(`${baseURL}/api/${a.slug}/whatsapp/test`, { data: { phone: "081200001111" } })).ok()).toBeFalsy();
-  expect(decrypt((await prisma.whatsappSenderConfig.findUniqueOrThrow({ where: { gymId: a.gym.id } })).apiKeyEncrypted)).toBe(GOOD);
-  expect(await prisma.whatsappSenderConfig.findUnique({ where: { gymId: b.gym.id } })).toBeNull();
+  // The old owner-facing endpoints are gone.
+  expect((await request.post(`${baseURL}/api/${f.slug}/whatsapp`, { data: { token: GOOD, senderNumber: "0812 3456 7890" } })).status()).toBe(404);
 });
 
 test("messages use the gym's own token, skip the plan allowance, and never fall back silently", async ({ request, baseURL }) => {
@@ -114,17 +108,17 @@ test("messages use the gym's own token, skip the plan allowance, and never fall 
   expect(await addMemberAndGetStatuses(request, baseURL!, f)).toEqual(["LIMIT"]);
 
   // Test send needs a saved token first.
-  expect((await request.post(`${baseURL}/api/${f.slug}/whatsapp/test`, { data: { phone: "081200001111" } })).status()).toBe(409);
+  expect((await testSend(baseURL!, f.slug)).status()).toBe(409);
 
   // Own token: sent, even though the plan allowance is zero.
   expect((await saveToken(request, baseURL!, f.slug, GOOD)).ok()).toBeTruthy();
   expect(await addMemberAndGetStatuses(request, baseURL!, f)).toEqual(["SENT"]);
-  expect((await request.post(`${baseURL}/api/${f.slug}/whatsapp/test`, { data: { phone: "081200001111" } })).ok()).toBeTruthy();
+  expect((await testSend(baseURL!, f.slug)).ok()).toBeTruthy();
 
   // A rejected token is reported as a failure, not hidden by falling back to the shared number.
   expect((await saveToken(request, baseURL!, f.slug, BAD)).ok()).toBeTruthy();
   expect(await addMemberAndGetStatuses(request, baseURL!, f)).toEqual(["FAILED"]);
-  const test = await request.post(`${baseURL}/api/${f.slug}/whatsapp/test`, { data: { phone: "081200001111" } });
+  const test = await testSend(baseURL!, f.slug);
   expect(test.status()).toBe(502);
   expect((await test.json()).error).toContain("Invalid token");
 
@@ -133,7 +127,7 @@ test("messages use the gym's own token, skip the plan allowance, and never fall 
   expect(await addMemberAndGetStatuses(request, baseURL!, f)).toEqual(["FAILED"]);
 
   // Disconnecting returns the gym to the shared number (and its allowance).
-  expect((await request.delete(`${baseURL}/api/${f.slug}/whatsapp`)).ok()).toBeTruthy();
+  expect((await removeToken(baseURL!, f.slug)).ok()).toBeTruthy();
   expect(await prisma.whatsappSenderConfig.findUnique({ where: { gymId: f.gym.id } })).toBeNull();
   expect(await addMemberAndGetStatuses(request, baseURL!, f)).toEqual(["LIMIT"]);
 });

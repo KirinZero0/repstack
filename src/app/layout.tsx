@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
+import "./backoffice.css";
 import { resolveTheme } from "@/lib/theme";
 import ThemeToggle from "@/components/ThemeToggle";
 

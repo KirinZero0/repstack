@@ -1,9 +1,12 @@
 import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { getMemberAttendance } from "@/lib/stats";
-import { findOpenCheckIn } from "@/lib/occupancy";
-import { getLeaderboard, leaderboardEnabled, rankOf } from "@/lib/leaderboard";
+import { findOpenCheckIn, getGymBoardForMember, whoIsInEnabled } from "@/lib/occupancy";
+import { dayKeyInTimezone } from "@/lib/date";
+import { checkinRules } from "@/lib/checkin";
+import { getLeaderboard, rankOf } from "@/lib/leaderboard";
 import CheckOutButton from "./CheckOutButton";
+import GymBoardToggle from "./GymBoardToggle";
 import { BarChart, Card, Heatmap, StatCard, StatusPill, rp } from "@/components/charts";
 import MemberLogout from "./MemberLogout";
 import DeleteAccount from "./DeleteAccount";
@@ -39,8 +42,8 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
     );
   }
 
-  const showBoard = leaderboardEnabled(member.gym.settings);
-  const [att, payments, openCheckIn, pendingRenewal, board] = await Promise.all([
+  const showWhoIsIn = whoIsInEnabled(member.gym.settings);
+  const [att, payments, openCheckIn, pendingRenewal, board, lastCheckIns, gymBoard] = await Promise.all([
     getMemberAttendance(db, member.id, member.gym.timezone),
     db.payment.findMany({
       where: { memberId: member.id, gymId: member.gymId },
@@ -50,8 +53,17 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
     }),
     findOpenCheckIn(db, member.gymId, member.id, member.gym.settings),
     db.memberSignup.findFirst({ where: { gymId: member.gymId, memberId: member.id, kind: "RENEWAL", status: "PENDING_REVIEW" } }),
-    showBoard ? getLeaderboard(db, member.gymId, member.gym.timezone) : Promise.resolve(null),
+    getLeaderboard(db, member.gymId, member.gym.timezone),
+    db.checkIn.findMany({ where: { gymId: member.gymId, memberId: member.id, result: "SUCCESS" }, orderBy: { checkedInAt: "desc" }, take: 12 }),
+    showWhoIsIn ? getGymBoardForMember(db, member.gymId, member.gym.settings, member.id) : Promise.resolve(null),
   ]);
+  const timeLabel = (d: Date) => d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: member.gym.timezone });
+  // The gym allows N check-ins per calendar day in its own timezone; the button turns yellow once they're used up.
+  const rules = checkinRules(member.gym.settings);
+  const todayKey = dayKeyInTimezone(new Date(), member.gym.timezone);
+  const todaysCheckIns = lastCheckIns.filter((c) => dayKeyInTimezone(c.checkedInAt, member.gym.timezone) === todayKey);
+  const lastCheckIn = lastCheckIns[0] ?? null;
+  const checkedInToday = todaysCheckIns.length >= rules.perDay;
 
   const mockId = isMockMode() ? searchParams["mock-invoice"] : undefined;
   const mockPayment = mockId
@@ -99,19 +111,40 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
           />
         )}
 
-        <a
-          href="/check-in"
-          className="group mb-3 flex items-center justify-between gap-4 rounded-2xl bg-plate-green px-6 py-6 text-[#ffffff] shadow-[0_12px_40px_-8px_rgba(46,158,91,0.65)] transition hover:brightness-110 active:scale-[0.99] sm:py-7"
-        >
-          <span>
-            <span className="block font-display text-2xl font-semibold sm:text-3xl">Check in</span>
-            <span className="mt-1 block text-sm text-[#ffffff]/85">Scan the code at the gym entrance</span>
-          </span>
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
-            <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" />
-            <path d="M8 12h8" />
-          </svg>
-        </a>
+        {checkedInToday ? (
+          <div
+            role="status"
+            className="mb-3 flex items-center justify-between gap-4 rounded-2xl bg-plate-yellow px-6 py-6 text-[#17130a] shadow-[0_12px_40px_-8px_rgba(232,185,35,0.55)] sm:py-7"
+          >
+            <span>
+              <span className="block font-display text-2xl font-semibold sm:text-3xl">You already checked in</span>
+              <span className="mt-1 block text-sm text-[#17130a]/80">
+                {lastCheckIn ? `Checked in at ${timeLabel(lastCheckIn.checkedInAt)}. ` : ""}
+                {rules.perDay > 1 ? `That's all ${rules.perDay} for today. ` : ""}See you tomorrow.
+              </span>
+            </span>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M8 12.5l2.7 2.7L16 9.5" />
+            </svg>
+          </div>
+        ) : (
+          <a
+            href="/check-in"
+            className="group mb-3 flex items-center justify-between gap-4 rounded-2xl bg-plate-green px-6 py-6 text-[#ffffff] shadow-[0_12px_40px_-8px_rgba(46,158,91,0.65)] transition hover:brightness-110 active:scale-[0.99] sm:py-7"
+          >
+            <span>
+              <span className="block font-display text-2xl font-semibold sm:text-3xl">Check in</span>
+              <span className="mt-1 block text-sm text-[#ffffff]/85">
+                {todaysCheckIns.length > 0 ? `Scan the code at the gym entrance. Check-in ${todaysCheckIns.length} of ${rules.perDay} used today.` : "Scan the code at the gym entrance"}
+              </span>
+            </span>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+              <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" />
+              <path d="M8 12h8" />
+            </svg>
+          </a>
+        )}
         {openCheckIn && (
           <CheckOutButton sinceLabel={openCheckIn.checkedInAt.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: member.gym.timezone })} />
         )}
@@ -170,6 +203,33 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
             <BarChart data={att.weekly} />
           </Card>
         </div>
+
+        {gymBoard && (
+          <div className="mb-6">
+            <Card title="Who's in the gym">
+              <p className="mb-3 text-sm text-neutral-300">
+                <span className="font-display text-2xl font-semibold tabular-nums">{gymBoard.total}</span>{" "}
+                <span className="text-neutral-400">{gymBoard.total === 1 ? "person is" : "people are"} training right now</span>
+              </p>
+              {gymBoard.others.length === 0 ? (
+                <p className="text-sm text-neutral-500">
+                  {gymBoard.total === 0 ? "Nobody yet. Be the first." : "Nobody else you can see right now."}
+                </p>
+              ) : (
+                <ul className="flex flex-wrap gap-2 text-sm">
+                  {gymBoard.others.map((o) => (
+                    <li key={o.memberId} className="flex items-center gap-2 rounded-full border border-neutral-700 bg-neutral-950 py-1 pl-1 pr-3">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-plate-green text-xs font-semibold text-[#ffffff]">{o.name[0]}</span>
+                      <span>{o.name}</span>
+                      <span className="text-xs text-neutral-500">since {timeLabel(o.since)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <GymBoardToggle hidden={member.hideFromGymBoard} />
+            </Card>
+          </div>
+        )}
 
         {board && (
           <div className="mb-6 grid gap-6 sm:grid-cols-2">

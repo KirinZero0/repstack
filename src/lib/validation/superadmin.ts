@@ -27,3 +27,16 @@ export const platformSettingsSchema = z.object({
   themeDefault: z.enum(["light", "dark", "system"]),
   allowUserOverride: z.boolean(),
 });
+
+export const platformBankSchema = z.object({
+  bankName: z.string().trim().min(2).max(60),
+  accountNumber: z.string().trim().min(4).max(40).regex(/^[\d\s-]+$/, "Digits only"),
+  accountHolder: z.string().trim().min(2).max(80),
+});
+
+export const rejectTransferSchema = z.object({ reason: z.string().trim().min(3, "Give a short reason").max(300) });
+
+export const confirmTransferSchema = z.object({
+  // Confirm a transfer that has no screenshot (cash deposit, bank-app transfer): the superadmin vouches for it.
+  withoutProof: z.boolean().optional(),
+});

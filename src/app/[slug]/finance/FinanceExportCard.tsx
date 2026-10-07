@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import DownloadButton from "@/components/DownloadButton";
 
 interface Props {
   slug: string;
@@ -13,8 +14,8 @@ interface Props {
 const inputCls = "rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-white";
 
 /**
- * Two downloads for the bookkeeper: every payment in a date range, or one line per month. Plain
- * links to the export route, so the browser saves the file and nothing here has to hold the data.
+ * Two downloads for the bookkeeper: every payment in a date range, or one line per month. Each button
+ * fetches the export route and saves the file under its proper .csv name.
  */
 export default function FinanceExportCard({ slug, monthStart, today, yearStart }: Props) {
   const [from, setFrom] = useState(monthStart);
@@ -47,20 +48,24 @@ export default function FinanceExportCard({ slug, monthStart, today, yearStart }
             <option value="all">Everything, incl. unpaid and voided</option>
           </select>
         </label>
-        <a
-          href={valid ? transactionsHref : undefined}
-          download
-          aria-disabled={!valid}
-          className={`rounded-md bg-white px-4 py-2 text-sm font-medium text-neutral-950 ${valid ? "hover:bg-neutral-200" : "pointer-events-none opacity-50"}`}
+        <DownloadButton
+          href={transactionsHref}
+          fallbackName={`finance-transactions-${slug}-${from}-to-${to}.csv`}
+          disabled={!valid}
+          className="rounded-md bg-white px-4 py-2 text-sm font-medium text-neutral-950 hover:bg-neutral-200"
         >
           Download transactions
-        </a>
+        </DownloadButton>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-neutral-800 pt-4">
-        <a href={monthlyHref} download className="rounded-md border border-neutral-600 px-4 py-2 text-sm text-white hover:bg-neutral-800">
+        <DownloadButton
+          href={monthlyHref}
+          fallbackName={`finance-monthly-${slug}-${yearStart}-to-${today}.csv`}
+          className="rounded-md border border-neutral-600 px-4 py-2 text-sm text-white hover:bg-neutral-800"
+        >
           Download monthly summary
-        </a>
+        </DownloadButton>
         <span className="text-xs text-neutral-500">Last 12 months, one row per month: membership and class revenue, cash vs online, voided entries.</span>
       </div>
     </div>

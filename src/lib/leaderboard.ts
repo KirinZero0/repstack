@@ -1,10 +1,6 @@
 import type { TenantDb } from "./prisma";
 import { dayKeyInTimezone } from "./date";
 
-export function leaderboardEnabled(settings: unknown): boolean {
-  return (settings as { leaderboardEnabled?: unknown } | null)?.leaderboardEnabled === true;
-}
-
 /** "Sari Dewi Lestari" → "Sari L." Members see each other on the board, so surnames stay private. */
 export function displayName(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
