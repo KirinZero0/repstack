@@ -266,3 +266,14 @@ export const updateDayPassPlanSchema = z.object(dayPassPlanFields).partial().ref
 
 /** Staff decides on a request, or re-sends an approved guest's ticket link. */
 export const guestPassActionSchema = z.object({ action: z.enum(["approve", "reject", "resend"]) });
+
+/** Front desk logs a walk-in who pays for a day pass on the spot. Phone is optional; amount defaults to the plan price. */
+export const walkInSchema = z.object({
+  dayPassPlanId: z.string().uuid(),
+  fullName: z.string().trim().min(2, "Enter a name").max(80),
+  phone: z.string().trim().max(30).optional(),
+  amount: z.number().int().min(0).max(100_000_000).optional(),
+});
+
+/** Front desk checks in a member by hand (forgot phone, QR won't scan). */
+export const manualCheckinSchema = z.object({ memberId: z.string().uuid() });

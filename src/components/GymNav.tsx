@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export type GymNavPage = "dashboard" | "members" | "classes" | "checkin-station" | "checkin" | "staff" | "plans" | "finance" | "billing" | "settings";
+export type GymNavPage = "dashboard" | "members" | "classes" | "checkin-station" | "checkin" | "attendance" | "staff" | "plans" | "finance" | "billing" | "settings";
 
 interface Props {
   slug: string;
@@ -29,6 +29,7 @@ const ITEMS: Item[] = [
   { page: "classes", label: "Classes", href: (s) => `/${s}/classes`, tone: "var(--plate-green)" },
   { page: "checkin-station", label: "Check-in poster", href: (s) => `/${s}/checkin-station`, tone: "var(--plate-yellow)" },
   { page: "checkin", label: "Staff scanner", href: (s) => `/${s}/checkin`, tone: "var(--plate-yellow)" },
+  { page: "attendance", label: "Attendance", href: (s) => `/${s}/attendance`, tone: "var(--plate-yellow)" },
   { page: "staff", label: "Staff", href: (s) => `/${s}/staff`, ownerOnly: true, tone: "var(--plate-blue)" },
   { page: "plans", label: "Plans", href: (s) => `/${s}/plans`, ownerOnly: true, tone: "var(--plate-green)" },
   { page: "finance", label: "Finance", href: (s) => `/${s}/finance`, ownerOnly: true, tone: "var(--plate-red)" },
