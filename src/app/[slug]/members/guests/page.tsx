@@ -4,12 +4,11 @@ import { decrypt, maskPhone } from "@/lib/crypto";
 import { dayKeyInTimezone } from "@/lib/date";
 import { passTitle, passWhen, ticketTokenFor, ticketUrl } from "@/lib/guestPass";
 import GymNav from "@/components/GymNav";
-import DayPassPlans from "./DayPassPlans";
 import GuestPassList, { type GuestPassRow } from "./GuestPassList";
 
 export const dynamic = "force-dynamic";
 
-/** Owner and staff review non-member requests for class spots; approving sends the one-time ticket. */
+/** Owner and staff review non-member requests (day passes and class spots); approving sends the one-time ticket. */
 export default async function GuestPassesPage({ params }: { params: { slug: string } }) {
   let session, gym, db;
   try {
@@ -32,8 +31,6 @@ export default async function GuestPassesPage({ params }: { params: { slug: stri
     include: { session: { include: { class: true } }, dayPassPlan: true },
   });
 
-  const dayPassPlans = await db.dayPassPlan.findMany({ where: { gymId: gym.id }, orderBy: [{ isActive: "desc" }, { price: "asc" }] });
-
   const rows: GuestPassRow[] = passes.map((p) => ({
     id: p.id,
     fullName: p.fullName,
@@ -50,20 +47,17 @@ export default async function GuestPassesPage({ params }: { params: { slug: stri
       <div className="mx-auto max-w-4xl">
         <div className="gym-head mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <a href={`/${params.slug}/classes`} className="text-sm text-neutral-400 hover:text-white">← Classes</a>
+            <a href={`/${params.slug}/members`} className="text-sm text-neutral-400 hover:text-white">← Members</a>
             <h1 className="mt-2 text-2xl font-semibold">Guest tickets</h1>
             <p className="text-sm text-neutral-400">
               Non-members asking for a class spot or a day pass. Approve to send their one-time QR ticket; scan it on the check-in scanner.
             </p>
           </div>
-          <GymNav slug={params.slug} role={session.role} current="classes" />
+          <GymNav slug={params.slug} role={session.role} current="members" />
         </div>
         <p className="mb-6 text-sm text-neutral-500">
-          Guests request at <span className="text-neutral-300">/{params.slug}/guest-pass</span>.
+          Guests request day passes at <span className="text-neutral-300">/{params.slug}/join/day-pass</span> and class spots at <span className="text-neutral-300">/{params.slug}/guest-pass</span>.
         </p>
-        {session.role === "OWNER" && (
-          <DayPassPlans slug={params.slug} plans={dayPassPlans.map((p) => ({ id: p.id, name: p.name, price: Number(p.price), isActive: p.isActive }))} />
-        )}
         <GuestPassList slug={params.slug} rows={rows} />
       </div>
     </main>

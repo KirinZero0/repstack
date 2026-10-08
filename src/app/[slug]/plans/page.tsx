@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import GymNav from "@/components/GymNav";
 import PlansManager from "./PlansManager";
+import DayPassPlans from "./DayPassPlans";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,8 @@ export default async function PlansPage({ params }: { params: { slug: string } }
     include: { _count: { select: { members: true } } },
   });
 
+  const dayPassPlans = await db.dayPassPlan.findMany({ where: { gymId: gym.id }, orderBy: [{ isActive: "desc" }, { price: "asc" }] });
+
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
       <div className="mx-auto max-w-7xl">
@@ -49,6 +52,9 @@ export default async function PlansPage({ params }: { params: { slug: string } }
             memberCount: p._count.members,
           }))}
         />
+        <div className="mt-10">
+          <DayPassPlans slug={params.slug} plans={dayPassPlans.map((p) => ({ id: p.id, name: p.name, price: Number(p.price), isActive: p.isActive }))} />
+        </div>
       </div>
     </main>
   );

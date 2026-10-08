@@ -19,7 +19,7 @@ export default async function MembersPage({ params }: { params: { slug: string }
     throw err;
   }
 
-  const [members, plans, saasPlan, seats, pendingCount] = await Promise.all([
+  const [members, plans, saasPlan, seats, pendingCount, guestPending] = await Promise.all([
     db.member.findMany({
       where: { gymId: gym.id, anonymizedAt: null },
       include: { plan: true },
@@ -29,6 +29,7 @@ export default async function MembersPage({ params }: { params: { slug: string }
     db.saasPlan.findUnique({ where: { id: gym.saasPlanId } }),
     countMemberSeats(db, gym.id),
     db.memberSignup.count({ where: { gymId: gym.id, status: "PENDING_REVIEW" } }),
+    db.guestPass.count({ where: { gymId: gym.id, status: "PENDING_REVIEW" } }),
   ]);
 
   const rows = members.map((m) => ({
@@ -69,6 +70,24 @@ export default async function MembersPage({ params }: { params: { slug: string }
               <strong>{pendingCount}</strong> pending join request{pendingCount === 1 ? "" : "s"} waiting for review
             </span>
             <span className="text-amber-400">Review →</span>
+          </a>
+        )}
+
+        {guestPending > 0 && (
+          <a
+            href={`/${params.slug}/members/guests`}
+            className="mb-6 flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm hover:bg-amber-500/20"
+          >
+            <span>
+              <strong>{guestPending}</strong> guest pass request{guestPending === 1 ? "" : "s"} waiting for review
+            </span>
+            <span className="text-amber-400">Review →</span>
+          </a>
+        )}
+
+        {guestPending === 0 && (
+          <a href={`/${params.slug}/members/guests`} className="mb-4 inline-block text-sm text-neutral-400 underline underline-offset-2 hover:text-white">
+            Guest passes (day passes and class tickets for non-members) →
           </a>
         )}
 

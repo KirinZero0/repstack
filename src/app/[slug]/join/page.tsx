@@ -21,11 +21,18 @@ export default async function JoinPage({ params }: { params: { slug: string } })
     ? await prisma.membershipPlan.findMany({ where: { gymId: gym.id, isActive: true }, orderBy: { price: "asc" } })
     : [];
 
+  const hasDayPass = gym.subscriptionStatus !== "SUSPENDED" && gym.subscriptionStatus !== "CANCELLED" && (await prisma.dayPassPlan.count({ where: { gymId: gym.id, isActive: true } })) > 0;
+
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-12 text-white">
       <div className="mx-auto max-w-2xl">
         <p className="text-sm text-neutral-400">{gym.name}</p>
         <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Become a member</h1>
+        {hasDayPass && (
+          <a href={`/${params.slug}/join/day-pass`} className="mt-6 block rounded-xl border border-neutral-800 bg-neutral-900 px-5 py-4 text-sm text-neutral-300 hover:border-neutral-600" data-testid="day-pass-link">
+            <strong className="text-white">Just visiting?</strong> Get a one-time day pass instead of a membership →
+          </a>
+        )}
 
         {!open || plans.length === 0 ? (
           <div className="mt-8 rounded-xl border border-neutral-800 bg-neutral-900 p-6">

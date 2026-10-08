@@ -2,8 +2,6 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { whenLabel } from "@/lib/classes";
-import { dayKeyInTimezone } from "@/lib/date";
-import { DAY_PASS_MAX_DAYS_AHEAD } from "@/lib/validation/tenant";
 import GuestPassForm from "./GuestPassForm";
 
 export const dynamic = "force-dynamic";
@@ -28,31 +26,23 @@ export default async function GuestPassPage({ params }: { params: { slug: string
       })
     : [];
 
-  const dayPasses = open
-    ? await prisma.dayPassPlan.findMany({ where: { gymId: gym.id, isActive: true }, orderBy: { price: "asc" } })
-    : [];
-  const today = dayKeyInTimezone(new Date(), gym.timezone);
-  const lastDay = dayKeyInTimezone(new Date(Date.now() + DAY_PASS_MAX_DAYS_AHEAD * 24 * 60 * 60 * 1000), gym.timezone);
-
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-12 text-white">
       <div className="mx-auto max-w-2xl">
         <p className="text-sm text-neutral-400">{gym.name}</p>
-        <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Visit as a guest</h1>
-        {sessions.length === 0 && dayPasses.length === 0 ? (
+        <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Try a class</h1>
+        {sessions.length === 0 ? (
           <p className="mt-8 rounded-xl border border-neutral-800 bg-neutral-900 p-6 text-neutral-300">
-            There are no classes or day passes open for guests right now. Please ask at the front desk.
+            There are no classes open for guests right now. Please ask at the front desk.
           </p>
         ) : (
           <>
             <p className="mt-3 max-w-md text-neutral-400">
-              Not a member? Ask for a class spot or a day pass. Once the gym approves, you get a one-time QR ticket on WhatsApp.
+              Not a member? Ask for a class spot. Once the gym approves, you get a one-time QR ticket on WhatsApp.
             </p>
             <div className="mt-10">
               <GuestPassForm
                 slug={params.slug}
-                dayPasses={dayPasses.map((p) => ({ id: p.id, name: p.name, price: Number(p.price) }))}
-                dateRange={{ min: today, max: lastDay }}
                 sessions={sessions.map((s) => ({ id: s.id, label: whenLabel(s.startsAt, gym.timezone), className: s.class.name, instructor: s.class.instructor }))}
               />
             </div>

@@ -87,7 +87,7 @@ export default async function ClassesPage({ params }: { params: { slug: string }
           </div>
           <GymNav slug={params.slug} role={session.role} current="classes" />
         </div>
-        <a href={`/${params.slug}/classes/guests`} className="mb-6 inline-block text-sm text-neutral-300 underline underline-offset-2 hover:text-white">
+        <a href={`/${params.slug}/members/guests`} className="mb-6 inline-block text-sm text-neutral-300 underline underline-offset-2 hover:text-white">
           Guest tickets (non-members) →
         </a>
         <ClassesManager slug={params.slug} classes={rows} isOwner={session.role === "OWNER"} timezone={gym.timezone} members={members} />

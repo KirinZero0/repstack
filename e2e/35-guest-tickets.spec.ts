@@ -156,9 +156,12 @@ test("day pass: owner sets it up, guest requests, staff approves, ticket scans o
   const { planId } = await created.json();
 
   const anon = await playwright.request.newContext();
-  // The public form offers the plan, and staff/owner see the manager and the request list.
-  expect(await (await anon.get(`${baseURL}/${f.slug}/guest-pass`)).text()).toContain("Single visit");
-  expect(await (await request.get(`${baseURL}/${f.slug}/classes/guests`)).text()).toContain("day-pass-plans");
+  // The plan shows up where visitors join, not under classes; the owner manages it with the membership plans.
+  expect(await (await anon.get(`${baseURL}/${f.slug}/join/day-pass`)).text()).toContain("Single visit");
+  expect(await (await anon.get(`${baseURL}/${f.slug}/join`)).text()).toContain("day-pass-link");
+  expect(await (await request.get(`${baseURL}/${f.slug}/plans`)).text()).toContain("day-pass-plans");
+  expect(await (await request.get(`${baseURL}/${f.slug}/classes`)).text()).not.toContain("day-pass-plans");
+  expect(await (await request.get(`${baseURL}/${f.slug}/members/guests`)).text()).toContain("Guest tickets");
   const visitDate = todayIn(f.gym.timezone);
   const phone = phoneN();
   const req1 = await anon.post(`${baseURL}/api/${f.slug}/guest-passes`, { data: { dayPassPlanId: planId, visitDate, fullName: "Day Dave", phone } });

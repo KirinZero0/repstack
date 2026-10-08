@@ -132,7 +132,7 @@ over WhatsApp. Scanning it with the normal check-in scanner marks them attended.
 - **Public** `/[slug]/guest-pass` (pick an upcoming session, name + WhatsApp number) →
   `POST /api/[slug]/guest-passes`. IP/gym throttled, one request per phone per session, session
   must belong to the gym. Linked from the gym's public page.
-- **Staff** `/[slug]/classes/guests` (owner and staff) → `POST /api/[slug]/guest-passes/[passId]`
+- **Staff** `/[slug]/members/guests` (owner and staff) → `POST /api/[slug]/guest-passes/[passId]`
   `{ action: "approve" | "reject" | "resend" }`. Approve checks capacity (approved guests hold a
   seat, same as bookings), sends the ticket link (`guest_ticket`), and is compare-and-set so two
   staff can't both decide.
@@ -144,17 +144,21 @@ over WhatsApp. Scanning it with the normal check-in scanner marks them attended.
   `CheckIn` row — guests aren't members.
 - **Not built:** guests are not charged online; the gym collects any fee itself. Tests: `e2e/35-guest-tickets.spec.ts`.
 
-### Day passes (same pipeline, no class)
+### Day passes (same ticket pipeline, no class)
 
-A gym can sell a one-visit ticket to non-members. It never creates a `Member`.
+A gym can sell a one-visit ticket to non-members. It never creates a `Member`. It lives with the
+membership side of the app, not under classes.
 
 - **Schema** `DayPassPlan` (name, price; RLS tenant table). A `GuestPass` is for a class session
   **or** a day pass (`sessionId` nullable, `dayPassPlanId` + `visitDate` "YYYY-MM-DD" in the gym's
   timezone; a DB check enforces exactly one). One request per phone, plan and day. Migration
   `20261009010000_day_passes`; run `npm run db:rls` after deploying it.
-- **Owner** sets plans up on `/[slug]/classes/guests` (`POST /api/[slug]/day-pass-plans`,
-  `PATCH …/[planId]` for rename / reprice / hide). Staff can review requests but not manage plans.
-- **Guest** picks a plan and a day (today up to 14 days ahead) on `/[slug]/guest-pass`; the price is
-  shown as "paid at the front desk". Day passes have no capacity limit.
+- **Owner** manages day passes on `/[slug]/plans`, under the membership plans
+  (`POST /api/[slug]/day-pass-plans`, `PATCH …/[planId]` for rename / reprice / hide). Staff can't.
+- **Visitor** finds it on the join page ("Just visiting?") and the gym's public page →
+  `/[slug]/join/day-pass`: pick a plan and a day (today up to 14 days ahead). The price is shown as
+  "paid at the front desk". Class spots stay on `/[slug]/guest-pass`.
+- **Review** both kinds of guest request on `/[slug]/members/guests`, linked from Members (with a
+  pending-count banner) and from Classes. Approve/reject/resend work the same for both.
 - **Ticket** is valid only on its visit day (gym timezone): earlier scans say "too early", later ones
-  "expired". Everything else — approve/reject/resend, WhatsApp, the one-time scan — is the class-ticket flow.
+  "expired". Day passes have no capacity limit.

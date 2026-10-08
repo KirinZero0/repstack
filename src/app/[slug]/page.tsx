@@ -74,7 +74,7 @@ export default async function GymProfilePage({ params }: { params: { slug: strin
                 </a>
               )}
               {live && hasDayPass && (
-                <a href={`/${params.slug}/guest-pass`} className="rounded-lg border border-neutral-700 px-6 py-3 text-sm font-semibold text-white hover:bg-neutral-900">
+                <a href={`/${params.slug}/join/day-pass`} className="rounded-lg border border-neutral-700 px-6 py-3 text-sm font-semibold text-white hover:bg-neutral-900">
                   Day pass for guests
                 </a>
               )}
@@ -122,7 +122,7 @@ export default async function GymProfilePage({ params }: { params: { slug: strin
                 <>
                   {" "}Not a member?{" "}
                   <a href={`/${params.slug}/guest-pass`} className="text-neutral-200 underline underline-offset-2 hover:text-white">
-                    Request a spot, or a day pass, as a guest
+                    Request a spot as a guest
                   </a>.
                 </>
               )}

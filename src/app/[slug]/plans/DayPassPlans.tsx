@@ -34,10 +34,10 @@ export default function DayPassPlans({ slug, plans }: { slug: string; plans: Day
   }
 
   return (
-    <section className="mb-10 rounded-xl border border-neutral-800 bg-neutral-900 p-5" data-testid="day-pass-plans">
+    <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-5" data-testid="day-pass-plans">
       <h2 className="text-lg font-semibold">Day passes</h2>
       <p className="mb-4 text-sm text-neutral-400">
-        A one-visit ticket for non-members. Guests pay at the desk and are never added as members.
+        For visitors who just want to try the gym. They request it from your join page, you approve, and they get a one-time QR ticket. Guests pay at the desk and are never added as members.
       </p>
       {plans.length > 0 && (
         <ul className="mb-4 divide-y divide-neutral-800">
