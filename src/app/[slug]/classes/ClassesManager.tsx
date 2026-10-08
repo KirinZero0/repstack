@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 export interface RegistrationRow {
   id: string;
+  memberId: string;
   memberName: string;
   status: "PENDING_PAYMENT" | "CONFIRMED" | "CANCELLED";
   paid: boolean;
@@ -187,8 +188,8 @@ function AddMember({ slug, session, members, onChanged }: { slug: string; sessio
   const [memberId, setMemberId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const booked = new Set(session.registrations.filter((r) => r.status !== "CANCELLED").map((r) => r.memberName));
-  const options = members.filter((m) => !booked.has(m.fullName));
+  const booked = new Set(session.registrations.filter((r) => r.status !== "CANCELLED").map((r) => r.memberId));
+  const options = members.filter((m) => !booked.has(m.id));
 
   return (
     <form

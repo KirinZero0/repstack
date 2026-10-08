@@ -66,6 +66,7 @@ export default async function ClassesPage({ params }: { params: { slug: string }
       attendanceOpen: s.status !== "CANCELLED" && s.startsAt.getTime() - now.getTime() <= ATTENDANCE_OPENS_BEFORE_MS,
       registrations: s.registrations.map((r) => ({
         id: r.id,
+        memberId: r.memberId,
         memberName: r.member.fullName,
         status: r.status,
         paid: r.payment?.status === "PAID",
