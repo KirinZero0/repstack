@@ -94,10 +94,11 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
         recordedBy: { select: { name: true } },
       },
     }),
-    // Day passes are paid at the desk and count once scanned; there are no unpaid or failed ones to list.
+    // Guest tickets (day passes, paid class spots) count once staff approve them, i.e. confirm the
+    // payment; there are no unpaid or failed ones to list.
     db.guestPass.findMany({
-      where: { gymId, status: "ATTENDED", dayPassPlanId: { not: null }, attendedAt: { gte: start, lte: end } },
-      include: { dayPassPlan: { select: { name: true } }, scannedBy: { select: { name: true } } },
+      where: { gymId, status: { in: ["APPROVED", "ATTENDED"] }, amount: { gt: 0 }, reviewedAt: { gte: start, lte: end } },
+      include: { dayPassPlan: { select: { name: true } }, session: { include: { class: { select: { name: true } } } }, reviewedBy: { select: { name: true } } },
     }),
   ]);
 
@@ -131,15 +132,17 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
       id: p.id,
     })),
     ...dayPasses.map((p) => ({
-      when: p.attendedAt ?? p.createdAt,
-      type: "Day pass" as const,
+      when: p.reviewedAt ?? p.createdAt,
+      type: p.session ? ("Class" as const) : ("Day pass" as const),
       member: `${p.fullName} (guest)`,
-      item: `${p.dayPassPlan?.name ?? "Day pass"}${p.visitDate ? ` (${p.visitDate})` : ""}`,
+      item: p.session
+        ? `${p.session.class.name} (${dayKeyInTimezone(p.session.startsAt, timezone)})`
+        : `${p.dayPassPlan?.name ?? "Day pass"}${p.visitDate ? ` (${p.visitDate})` : ""}`,
       amount: Number(p.amount ?? 0),
       currency: "IDR",
       status: "PAID",
       method: METHOD.CASH,
-      recordedBy: p.scannedBy?.name ?? "",
+      recordedBy: p.reviewedBy?.name ?? "",
       note: "",
       invoiceId: "",
       id: p.id,

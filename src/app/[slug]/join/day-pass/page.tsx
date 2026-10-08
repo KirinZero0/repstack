@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { dayKeyInTimezone } from "@/lib/date";
 import { DAY_PASS_MAX_DAYS_AHEAD } from "@/lib/validation/tenant";
+import { gymBank } from "@/lib/transferProof";
 import DayPassForm from "./DayPassForm";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,7 @@ export default async function DayPassPage({ params }: { params: { slug: string }
             <div className="mt-10">
               <DayPassForm
                 slug={params.slug}
+                bank={gymBank(gym)}
                 plans={plans.map((p) => ({ id: p.id, name: p.name, price: Number(p.price) }))}
                 dateRange={{
                   min: dayKeyInTimezone(new Date(now), gym.timezone),

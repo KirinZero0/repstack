@@ -10,6 +10,7 @@ export interface RegistrationRow {
   status: "PENDING_PAYMENT" | "CONFIRMED" | "CANCELLED";
   paid: boolean;
   amount: number | null;
+  hasProof: boolean;
   attendance: "ATTENDED" | "NO_SHOW" | null;
 }
 
@@ -343,6 +344,11 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
                 ) : (
                   <>
                     <span className="text-amber-400">Waiting for payment</span>
+                    {r.hasProof && (
+                      <a href={`/api/${slug}/class-registrations/${r.id}/proof`} target="_blank" rel="noreferrer" className="text-xs text-neutral-300 underline underline-offset-2 hover:text-white">
+                        View transfer proof
+                      </a>
+                    )}
                     {session.status === "SCHEDULED" && (
                       <button onClick={() => confirm(r)} disabled={busy === r.id} className={ghostCls}>
                         {busy === r.id ? "Saving…" : "Record payment"}

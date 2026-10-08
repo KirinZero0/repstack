@@ -175,13 +175,13 @@ test("the monthly summary has one row per month with revenue split by type and m
   const reg = await prisma.classRegistration.create({ data: { gymId: f.gym.id, sessionId: session.id, memberId: f.member.id, status: "CONFIRMED" } });
   await prisma.classPayment.create({ data: { gymId: f.gym.id, registrationId: reg.id, provider: "MIDTRANS", amount: 40000, status: "PAID", paidAt: now } });
 
-  // A scanned day pass (paid at the desk) counts too; one that was never scanned doesn't.
+  // An approved day pass (staff confirmed the payment) counts, scanned or not; one still waiting for review doesn't.
   const dayPlan = await prisma.dayPassPlan.create({ data: { gymId: f.gym.id, name: "Single visit", price: 30000 } });
   const dp = (status: "ATTENDED" | "APPROVED", n: number) => ({
     gymId: f.gym.id, dayPassPlanId: dayPlan.id, visitDate: dayKeyInTimezone(now, TZ), fullName: `Guest ${n}`, phoneWhatsapp: "v1:x", phoneWhatsappLookup: `dp-${n}-${f.slug}`,
-    status, amount: 30000, attendedAt: status === "ATTENDED" ? now : null,
+    status, amount: 30000, reviewedAt: now, attendedAt: status === "ATTENDED" ? now : null,
   });
-  await prisma.guestPass.createMany({ data: [dp("ATTENDED", 1), dp("APPROVED", 2)] });
+  await prisma.guestPass.createMany({ data: [dp("ATTENDED", 1), dp("APPROVED", 2), { ...dp("APPROVED", 3), status: "PENDING_REVIEW" as const, reviewedAt: null }] });
 
   await login(request, baseURL!, f.slug, f.owner);
   const { rows, disposition } = await fetchCsv(request, baseURL!, f.slug, `?report=monthly&from=${prevKey}-01&to=${dayKeyInTimezone(now, TZ)}`);
@@ -191,7 +191,7 @@ test("the monthly summary has one row per month with revenue split by type and m
   // Previous month: one cash payment, one voided entry.
   expect(rows[1].slice(1)).toEqual(["300000", "0", "0", "300000", "1", "300000", "0", "1"]);
   // This month: cash + online membership and an online class; the pending invoice isn't revenue.
-  expect(rows[2].slice(1)).toEqual(["450000", "40000", "30000", "520000", "4", "230000", "290000", "0"]);
+  expect(rows[2].slice(1)).toEqual(["450000", "40000", "60000", "550000", "5", "260000", "290000", "0"]);
   expect(rows[2][0]).toMatch(/^[A-Z][a-z]{2} \d{4}$/);
 
   // The default monthly range is twelve months, all present even when empty.

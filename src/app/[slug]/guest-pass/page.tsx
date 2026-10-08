@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { whenLabel } from "@/lib/classes";
+import { gymBank } from "@/lib/transferProof";
 import GuestPassForm from "./GuestPassForm";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +44,8 @@ export default async function GuestPassPage({ params }: { params: { slug: string
             <div className="mt-10">
               <GuestPassForm
                 slug={params.slug}
-                sessions={sessions.map((s) => ({ id: s.id, label: whenLabel(s.startsAt, gym.timezone), className: s.class.name, instructor: s.class.instructor }))}
+                bank={gymBank(gym)}
+                sessions={sessions.map((s) => ({ id: s.id, label: whenLabel(s.startsAt, gym.timezone), className: s.class.name, instructor: s.class.instructor, price: Number(s.class.price) }))}
               />
             </div>
           </>

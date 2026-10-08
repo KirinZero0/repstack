@@ -469,6 +469,8 @@ model ClassRegistration {
   status    ClassRegistrationStatus @default(PENDING_PAYMENT)
   attendance     String?   // "ATTENDED" | "NO_SHOW", marked by staff from the roster once the session has started; null = not marked
   attendanceAt   DateTime?
+  proofImageUrl    String? // member's bank-transfer screenshot (private blob) for staff to check before "Record payment"
+  proofSubmittedAt DateTime?
   reminderSentAt DateTime? // set by the class-reminders cron before the message goes out, so it's sent at most once
   createdAt DateTime                @default(now())
 
@@ -542,7 +544,9 @@ model GuestPass {
   dayPassPlanId       String?
   dayPassPlan         DayPassPlan?    @relation(fields: [dayPassPlanId], references: [id])
   visitDate           String? // "YYYY-MM-DD" in the gym's timezone; day passes only
-  amount              Decimal? // day passes: the plan price when requested; counted as revenue when the ticket is scanned (paid at the desk)
+  amount              Decimal? // the price when requested (day pass plan or class); counted as revenue when staff approve, i.e. confirm the payment
+  proofImageUrl       String? // optional bank-transfer screenshot (private blob), shown to staff before they approve
+  proofSubmittedAt    DateTime?
   fullName            String
   phoneWhatsapp       String // encrypted
   phoneWhatsappLookup String // HMAC blind index, one request per phone per session

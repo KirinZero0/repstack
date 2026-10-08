@@ -9,8 +9,9 @@ export interface GuestPassRow {
   phone: string;
   className: string;
   when: string;
-  /** Day passes only: what the guest pays at the desk. */
-  price: number | null;
+  /** What the guest owes (0 = free). Staff confirm the money arrived before approving. */
+  amount: number;
+  hasProof: boolean;
   status: "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "ATTENDED";
   ticketLink: string | null;
 }
@@ -62,13 +63,24 @@ export default function GuestPassList({ slug, rows }: { slug: string; rows: Gues
           <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-4" data-testid="guest-row" data-status={r.status}>
             <div>
               <p className="font-medium">{r.fullName} <span className="text-sm text-neutral-500">{r.phone}</span></p>
-              <p className="text-sm text-neutral-400">{r.className} · {r.when}{r.price !== null ? ` · Rp ${r.price.toLocaleString("id-ID")} at the desk` : ""}</p>
+              <p className="text-sm text-neutral-400">{r.className} · {r.when}{r.amount > 0 ? ` · Rp ${r.amount.toLocaleString("id-ID")}` : " · free"}</p>
+              {r.amount > 0 && r.status === "PENDING_REVIEW" && (
+                <p className="text-sm text-neutral-500">
+                  {r.hasProof ? (
+                    <a href={`/api/${slug}/guest-passes/${r.id}/proof`} target="_blank" rel="noreferrer" className="text-neutral-300 underline underline-offset-2 hover:text-white">
+                      View transfer proof
+                    </a>
+                  ) : (
+                    "No proof attached. Check your bank before approving."
+                  )}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-neutral-400">{LABEL[r.status]}</span>
               {r.status === "PENDING_REVIEW" && (
                 <>
-                  <button className={btn} disabled={busy === r.id} onClick={() => act(r.id, "approve")}>Approve</button>
+                  <button className={btn} disabled={busy === r.id} onClick={() => act(r.id, "approve")}>{r.amount > 0 ? "Payment received — approve" : "Approve"}</button>
                   <button className={btn} disabled={busy === r.id} onClick={() => act(r.id, "reject")}>Decline</button>
                 </>
               )}

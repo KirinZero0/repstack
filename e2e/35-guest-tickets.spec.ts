@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "./helpers";
 import { ticketTokenFor } from "../src/lib/guestPass";
 import { dayKeyInTimezone } from "../src/lib/date";
+import { encrypt, hmacLookup } from "../src/lib/crypto";
 
 const HOUR = 60 * 60 * 1000;
 let seq = 0;
@@ -26,6 +27,11 @@ async function requestSpot(request: APIRequestContext, baseURL: string, f: { slu
   return request.post(`${baseURL}/api/${f.slug}/guest-passes`, { data: { sessionId: f.session.id, fullName: name, phone } });
 }
 
+/** An anonymous visitor with their own IP, so the public form's per-IP rate limit doesn't couple the tests. */
+async function newVisitor(playwright: { request: { newContext(o?: object): Promise<APIRequestContext> } }, ip = `10.1.${seq++}.${Math.floor(Math.random() * 250)}`) {
+  return playwright.request.newContext({ extraHTTPHeaders: { "x-forwarded-for": ip } });
+}
+
 const phoneN = () => `0813${Date.now().toString().slice(-6)}${seq++}`;
 
 test("guest requests, staff approves, ticket scans once", async ({ request, baseURL, playwright }) => {
@@ -33,7 +39,7 @@ test("guest requests, staff approves, ticket scans once", async ({ request, base
   const phone = phoneN();
 
   // Public request: no login, and nothing is sent or issued yet.
-  const anon = await playwright.request.newContext();
+  const anon = await newVisitor(playwright);
   expect((await requestSpot(anon, baseURL!, f, phone)).status()).toBe(201);
   const pass = await prisma.guestPass.findFirstOrThrow({ where: { gymId: f.gym.id } });
   expect(pass.status).toBe("PENDING_REVIEW");
@@ -92,14 +98,14 @@ test("staff can't review another gym's request, and scans are staff-only", async
   expect((await request.post(`${baseURL}/api/${b.slug}/guest-passes/${pass.id}`, { data: { action: "approve" } })).status()).toBe(401);
   expect((await prisma.guestPass.findUniqueOrThrow({ where: { id: pass.id } })).status).toBe("PENDING_REVIEW");
 
-  const anon = await playwright.request.newContext();
+  const anon = await newVisitor(playwright);
   expect((await anon.post(`${baseURL}/api/checkin`, { data: { token: ticketTokenFor({ ...pass, ticketSecret: pass.ticketSecret }) } })).status()).toBe(401);
 });
 
 test("public request can't target another gym's session", async ({ baseURL, playwright }) => {
   const a = await makeGym();
   const b = await makeGym();
-  const anon = await playwright.request.newContext();
+  const anon = await newVisitor(playwright);
   const res = await requestSpot(anon, baseURL!, { slug: a.slug, session: b.session }, phoneN());
   expect(res.status()).toBe(400);
   expect(await prisma.guestPass.count({ where: { sessionId: b.session.id } })).toBe(0);
@@ -107,7 +113,7 @@ test("public request can't target another gym's session", async ({ baseURL, play
 
 test("approval respects capacity, and declining sends no ticket", async ({ request, baseURL, playwright }) => {
   const f = await makeGym({ capacity: 1 });
-  const anon = await playwright.request.newContext();
+  const anon = await newVisitor(playwright);
   await requestSpot(anon, baseURL!, f, phoneN(), "First");
   await requestSpot(anon, baseURL!, f, phoneN(), "Second");
   const [first, second] = await prisma.guestPass.findMany({ where: { gymId: f.gym.id }, orderBy: { createdAt: "asc" } });
@@ -155,7 +161,7 @@ test("day pass: owner sets it up, guest requests, staff approves, ticket scans o
   expect(created.status()).toBe(201);
   const { planId } = await created.json();
 
-  const anon = await playwright.request.newContext();
+  const anon = await newVisitor(playwright);
   // The plan shows up where visitors join, not under classes; the owner manages it with the membership plans.
   expect(await (await anon.get(`${baseURL}/${f.slug}/join/day-pass`)).text()).toContain("Single visit");
   expect(await (await anon.get(`${baseURL}/${f.slug}/join`)).text()).toContain("day-pass-link");
@@ -219,7 +225,7 @@ test("day pass requests are tenant-scoped and validated", async ({ baseURL, play
   const b = await makeGym();
   const planB = await makeDayPass(b.gym.id);
   const hidden = await prisma.dayPassPlan.create({ data: { gymId: a.gym.id, name: "Hidden", price: 1000, isActive: false } });
-  const anon = await playwright.request.newContext();
+  const anon = await newVisitor(playwright);
   const post = (slug: string, data: object) => anon.post(`${baseURL}/api/${slug}/guest-passes`, { data: { fullName: "Eve", phone: phoneN(), ...data } });
   const day = todayIn(a.gym.timezone);
 
@@ -231,4 +237,152 @@ test("day pass requests are tenant-scoped and validated", async ({ baseURL, play
   expect((await post(a.slug, { dayPassPlanId: own.id, visitDate: todayIn(a.gym.timezone, 60) })).status()).toBe(400); // too far
   expect((await post(a.slug, { dayPassPlanId: own.id, sessionId: a.session.id, visitDate: day })).status()).toBe(400); // both targets
   expect(await prisma.guestPass.count({ where: { gymId: { in: [a.gym.id, b.gym.id] } } })).toBe(0);
+});
+
+// ─── Bank-transfer payment ───────────────────────────────────
+
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+const proofFile = { name: "transfer.png", mimeType: "image/png", buffer: PNG };
+
+async function withBank(gymId: string) {
+  await prisma.gym.update({ where: { id: gymId }, data: { bankName: "BCA", bankAccountNumber: "1234567890", bankAccountHolder: "Gym Owner" } });
+}
+
+test("guest pays a day pass by transfer: proof attached, staff verify, approve, and it counts as revenue", async ({ request, baseURL, playwright }) => {
+  const f = await makeGym();
+  await withBank(f.gym.id);
+  const plan = await makeDayPass(f.gym.id, 50000);
+  const anon = await newVisitor(playwright);
+
+  // The form shows the price and where to transfer.
+  const page = await (await anon.get(`${baseURL}/${f.slug}/join/day-pass`)).text();
+  expect(page).toContain("transfer-payment");
+  expect(page).toContain("1234567890");
+
+  // A non-image proof is refused; a real one is stored (privately) and the price is snapshotted.
+  const bad = await anon.post(`${baseURL}/api/${f.slug}/guest-passes`, {
+    multipart: { dayPassPlanId: plan.id, visitDate: todayIn(f.gym.timezone), fullName: "Transfer Tina", phone: phoneN(), proof: { name: "x.txt", mimeType: "text/plain", buffer: Buffer.from("hi") } },
+  });
+  expect(bad.status()).toBe(400);
+  const ok = await anon.post(`${baseURL}/api/${f.slug}/guest-passes`, {
+    multipart: { dayPassPlanId: plan.id, visitDate: todayIn(f.gym.timezone), fullName: "Transfer Tina", phone: phoneN(), proof: proofFile },
+  });
+  expect(ok.status()).toBe(201);
+  const pass = await prisma.guestPass.findFirstOrThrow({ where: { gymId: f.gym.id } });
+  expect(pass.proofImageUrl).toBeTruthy();
+  expect(Number(pass.amount)).toBe(50000);
+
+  // Staff see the proof, and nothing is revenue until they approve.
+  await login(request, baseURL!, f.slug, f.staff);
+  const img = await request.get(`${baseURL}/api/${f.slug}/guest-passes/${pass.id}/proof`);
+  expect(img.status()).toBe(200);
+  expect(img.headers()["content-type"]).toContain("image/");
+  const review = await (await request.get(`${baseURL}/${f.slug}/members/guests`)).text();
+  expect(review).toContain("Payment received");
+  expect(review).toContain("View transfer proof");
+  const owner = { email: `owner-${f.slug}@test.local`, password: "owner-pass-123" };
+  await prisma.staffUser.create({ data: { gymId: f.gym.id, name: "Owner", email: owner.email, passwordHash: await bcrypt.hash(owner.password, 10), role: "OWNER" } });
+  const csv = async () => (await request.get(`${baseURL}/api/${f.slug}/finance/export?report=transactions`)).text();
+  await login(request, baseURL!, f.slug, owner);
+  expect(await csv()).not.toContain("Transfer Tina");
+
+  expect((await request.post(`${baseURL}/api/${f.slug}/guest-passes/${pass.id}`, { data: { action: "approve" } })).ok()).toBeTruthy();
+  const after = await csv();
+  expect(after).toContain("Transfer Tina (guest)");
+  expect(after).toContain(",50000,");
+  // Approved but not yet scanned still counts: the money has arrived.
+  expect((await prisma.guestPass.findUniqueOrThrow({ where: { id: pass.id } })).status).toBe("APPROVED");
+
+  // Another gym's staff can't see this proof.
+  const other = await makeGym();
+  await login(request, baseURL!, other.slug, other.staff);
+  expect((await request.get(`${baseURL}/api/${other.slug}/guest-passes/${pass.id}/proof`)).status()).toBe(404);
+});
+
+test("declined paid request is not revenue; free tickets take no proof; class guest tickets carry the class price", async ({ request, baseURL, playwright }) => {
+  const f = await makeGym();
+  await withBank(f.gym.id);
+  await prisma.gymClass.update({ where: { id: f.cls.id }, data: { price: 40000 } });
+  const free = await prisma.dayPassPlan.create({ data: { gymId: f.gym.id, name: "Free trial", price: 0 } });
+  const anon = await newVisitor(playwright);
+
+  const paid = await anon.post(`${baseURL}/api/${f.slug}/guest-passes`, { multipart: { sessionId: f.session.id, fullName: "Class Carl", phone: phoneN(), proof: proofFile } });
+  expect(paid.status()).toBe(201);
+  const freeReq = await anon.post(`${baseURL}/api/${f.slug}/guest-passes`, {
+    multipart: { dayPassPlanId: free.id, visitDate: todayIn(f.gym.timezone), fullName: "Free Fred", phone: phoneN(), proof: proofFile },
+  });
+  expect(freeReq.status()).toBe(201);
+  const carl = await prisma.guestPass.findFirstOrThrow({ where: { fullName: "Class Carl", gymId: f.gym.id } });
+  const fred = await prisma.guestPass.findFirstOrThrow({ where: { fullName: "Free Fred", gymId: f.gym.id } });
+  expect(Number(carl.amount)).toBe(40000);
+  expect(carl.proofImageUrl).toBeTruthy();
+  expect(Number(fred.amount)).toBe(0);
+  expect(fred.proofImageUrl).toBeNull(); // nothing to pay, so any upload is dropped
+
+  await login(request, baseURL!, f.slug, f.staff);
+  expect((await request.post(`${baseURL}/api/${f.slug}/guest-passes/${carl.id}`, { data: { action: "reject" } })).ok()).toBeTruthy();
+  expect((await request.post(`${baseURL}/api/${f.slug}/guest-passes/${fred.id}`, { data: { action: "approve" } })).ok()).toBeTruthy();
+  const owner = { email: `owner2-${f.slug}@test.local`, password: "owner-pass-123" };
+  await prisma.staffUser.create({ data: { gymId: f.gym.id, name: "Owner", email: owner.email, passwordHash: await bcrypt.hash(owner.password, 10), role: "OWNER" } });
+  await login(request, baseURL!, f.slug, owner);
+  const csv = await (await request.get(`${baseURL}/api/${f.slug}/finance/export?report=transactions`)).text();
+  expect(csv).not.toContain("Class Carl");
+  expect(csv).not.toContain("Free Fred");
+});
+
+test("member pays for a class by transfer: proof goes to the front desk, who confirm it", async ({ request, baseURL, playwright }) => {
+  const f = await makeGym();
+  await withBank(f.gym.id);
+  await prisma.gymClass.update({ where: { id: f.cls.id }, data: { price: 40000 } });
+  const plan = await prisma.membershipPlan.create({ data: { gymId: f.gym.id, name: "Monthly", durationDays: 30, price: 250000 } });
+  const mk = async (n: string) => {
+    const phone = phoneN();
+    const email = `m-${n}-${f.slug}@test.local`;
+    const row = await prisma.member.create({
+      data: {
+        gymId: f.gym.id, planId: plan.id, fullName: `Member ${n}`, email, phoneWhatsapp: encrypt(phone), phoneWhatsappLookup: hmacLookup(phone),
+        passwordHash: await bcrypt.hash("member-pass-123", 10), status: "ACTIVE", membershipExpiry: new Date(Date.now() + 30 * 24 * HOUR),
+      },
+    });
+    return { row, email };
+  };
+  const a = await mk("a");
+  const b = await mk("b");
+  const regA = await prisma.classRegistration.create({ data: { gymId: f.gym.id, sessionId: f.session.id, memberId: a.row.id, status: "PENDING_PAYMENT" } });
+
+  const memberCtx = await newVisitor(playwright);
+  await login(memberCtx, baseURL!, f.slug, { email: a.email, password: "member-pass-123" });
+  expect(await (await memberCtx.get(`${baseURL}/my/classes`)).text()).toContain("class-transfer");
+
+  // Nothing without a file, nothing for the wrong file type; then it's accepted.
+  expect((await memberCtx.post(`${baseURL}/api/my/classes/${regA.id}/proof`, { multipart: { note: "x" } })).status()).toBe(400);
+  expect((await memberCtx.post(`${baseURL}/api/my/classes/${regA.id}/proof`, { multipart: { proof: { name: "x.txt", mimeType: "text/plain", buffer: Buffer.from("hi") } } })).status()).toBe(400);
+  expect((await memberCtx.post(`${baseURL}/api/my/classes/${regA.id}/proof`, { multipart: { proof: proofFile } })).ok()).toBeTruthy();
+  expect((await prisma.classRegistration.findUniqueOrThrow({ where: { id: regA.id } })).proofImageUrl).toBeTruthy();
+
+  // Another member can't attach proof to this booking.
+  const otherCtx = await newVisitor(playwright);
+  await login(otherCtx, baseURL!, f.slug, { email: b.email, password: "member-pass-123" });
+  expect((await otherCtx.post(`${baseURL}/api/my/classes/${regA.id}/proof`, { multipart: { proof: proofFile } })).status()).toBe(404);
+
+  // Staff see it on the roster and confirm; the booking is then confirmed, and proof is no longer accepted.
+  await login(request, baseURL!, f.slug, f.staff);
+  expect((await request.get(`${baseURL}/api/${f.slug}/class-registrations/${regA.id}/proof`)).status()).toBe(200);
+  expect((await request.post(`${baseURL}/api/${f.slug}/class-registrations/${regA.id}/confirm`, { data: { amount: 40000 } })).ok()).toBeTruthy();
+  expect((await prisma.classRegistration.findUniqueOrThrow({ where: { id: regA.id } })).status).toBe("CONFIRMED");
+  expect((await memberCtx.post(`${baseURL}/api/my/classes/${regA.id}/proof`, { multipart: { proof: proofFile } })).status()).toBe(409);
+
+  // Another gym's staff can't view it.
+  const other = await makeGym();
+  await login(request, baseURL!, other.slug, other.staff);
+  expect((await request.get(`${baseURL}/api/${other.slug}/class-registrations/${regA.id}/proof`)).status()).toBe(404);
+});
+
+test("the public request form is rate limited per IP", async ({ baseURL, playwright }) => {
+  const f = await makeGym();
+  const anon = await newVisitor(playwright, "203.0.113.77");
+  const codes: number[] = [];
+  for (let i = 0; i < 7; i++) codes.push((await requestSpot(anon, baseURL!, f, phoneN(), `Spammer ${i}`)).status());
+  expect(codes.slice(0, 6)).toEqual([201, 201, 201, 201, 201, 201]);
+  expect(codes[6]).toBe(429);
 });

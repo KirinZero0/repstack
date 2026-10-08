@@ -43,10 +43,11 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       where: { gymId, status: "PAID", paidAt: { gte: since } },
       include: { registration: { select: { session: { select: { class: { select: { name: true } } } } } } },
     }),
-    // Day passes are paid at the desk, so a pass counts as revenue once its ticket has been scanned.
+    // Guest tickets (day passes and paid class spots) count as revenue once staff approve them, since
+    // approving is the moment they confirm the money (transfer or cash) arrived.
     db.guestPass.findMany({
-      where: { gymId, status: "ATTENDED", dayPassPlanId: { not: null }, attendedAt: { gte: since } },
-      include: { dayPassPlan: { select: { name: true } } },
+      where: { gymId, status: { in: ["APPROVED", "ATTENDED"] }, amount: { gt: 0 }, reviewedAt: { gte: since } },
+      include: { dayPassPlan: { select: { name: true } }, session: { select: { class: { select: { name: true } } } } },
     }),
     db.payment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
     db.classPayment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
@@ -77,10 +78,10 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       provider: p.provider,
     })),
     ...paidDayPasses.map((p) => ({
-      when: p.attendedAt ?? p.createdAt,
+      when: p.reviewedAt ?? p.createdAt,
       amount: Number(p.amount ?? 0),
-      item: `${p.dayPassPlan?.name ?? "Day pass"} (day pass)`,
-      kind: "daypass" as const,
+      item: p.session ? `${p.session.class.name} class (guest)` : `${p.dayPassPlan?.name ?? "Day pass"} (day pass)`,
+      kind: p.session ? ("class" as const) : ("daypass" as const),
       provider: "CASH",
     })),
   ];
@@ -114,8 +115,8 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
   for (const g of [...statusGroups, ...classStatusGroups]) statusCounts.set(g.status, (statusCounts.get(g.status) ?? 0) + g._count);
 
   const recentDayPasses = paidDayPasses
-    .filter((p) => p.attendedAt)
-    .sort((a, b) => b.attendedAt!.getTime() - a.attendedAt!.getTime())
+    .filter((p) => p.reviewedAt)
+    .sort((a, b) => b.reviewedAt!.getTime() - a.reviewedAt!.getTime())
     .slice(0, 10);
 
   const recentAll = [
@@ -131,10 +132,10 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     ...recentDayPasses.map((p) => ({
       id: p.id,
       member: `${p.fullName} (guest)`,
-      plan: `${p.dayPassPlan?.name ?? "Day pass"} (day pass)`,
+      plan: p.session ? `${p.session.class.name} class (guest)` : `${p.dayPassPlan?.name ?? "Day pass"} (day pass)`,
       amount: Number(p.amount ?? 0),
       status: "PAID" as string,
-      date: p.attendedAt!,
+      date: p.reviewedAt!,
     })),
   ]
     .sort((a, b) => b.date.getTime() - a.date.getTime())

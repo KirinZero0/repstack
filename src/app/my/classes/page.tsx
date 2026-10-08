@@ -3,7 +3,8 @@ import { getSession } from "@/lib/session";
 import { rp } from "@/components/charts";
 import { memberPaymentsAvailable } from "@/lib/gateway";
 import { GUEST_SEAT_HOLDING_STATUSES, SEAT_HOLDING_STATUSES, effectiveCapacity, whenLabel } from "@/lib/classes";
-import { BookButton, CancelBookingButton } from "./ClassActions";
+import { gymBank } from "@/lib/transferProof";
+import { BookButton, CancelBookingButton, TransferProofForm } from "./ClassActions";
 
 export const dynamic = "force-dynamic";
 
@@ -53,11 +54,12 @@ export default async function MyClassesPage() {
       where: { memberId: member.id, gymId: member.gymId },
       orderBy: { session: { startsAt: "desc" } },
       take: 30,
-      include: { session: { include: { class: true } }, payment: { select: { status: true, amount: true } } },
+      include: { session: { include: { class: true } }, payment: { select: { status: true, amount: true, externalInvoiceId: true } } },
     }),
   ]);
 
   const online = memberPaymentsAvailable(member.gym.settings);
+  const bank = gymBank(member.gym);
   const blocked = member.gym.subscriptionStatus === "SUSPENDED" || member.gym.subscriptionStatus === "CANCELLED" || member.status === "CANCELLED";
 
   // Group upcoming sessions by calendar day, in the gym's timezone.
@@ -97,10 +99,13 @@ export default async function MyClassesPage() {
                     {r.status === "CONFIRMED" ? (
                       <span className="text-emerald-400">Confirmed</span>
                     ) : (
-                      <span className="text-amber-400">{r.payment?.status === "PENDING" ? "Waiting for your payment" : "Pending — pay at the gym"}</span>
+                      <span className="text-amber-400">{r.payment?.status === "PENDING" ? "Waiting for your payment" : (bank ? "Pending — pay by transfer to confirm" : "Pending — pay at the gym")}</span>
                     )}
                     <CancelBookingButton registrationId={r.id} paid={r.payment?.status === "PAID"} />
                   </span>
+                  {r.status === "PENDING_PAYMENT" && !r.payment?.externalInvoiceId && Number(r.session.class.price) > 0 && (
+                    <TransferProofForm registrationId={r.id} amount={Number(r.session.class.price)} bank={bank} hasProof={Boolean(r.proofImageUrl)} />
+                  )}
                 </li>
               ))}
             </ul>

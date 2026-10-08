@@ -162,9 +162,27 @@ membership side of the app, not under classes.
   pending-count banner) and from Classes. Approve/reject/resend work the same for both.
 - **Ticket** is valid only on its visit day (gym timezone): earlier scans say "too early", later ones
   "expired". Day passes have no capacity limit.
-- **Revenue** `GuestPass.amount` snapshots the plan price when the guest requests (later price changes
-  don't rewrite history; migration `20261009020000_day_pass_amount`). Because day passes are paid at
-  the desk, a pass counts as revenue when its ticket is **scanned** (`ATTENDED`, dated by `attendedAt`),
-  not when approved. It shows on Finance ("from day passes", the 12-month chart, by plan, recent
-  payments as "(guest)") and in both CSV exports (type "Day pass"; the monthly report has a new
-  "Day pass revenue" column before "Total revenue"). Class guest tickets carry no price, so they add no revenue.
+- **Revenue** `GuestPass.amount` snapshots the price when the guest requests (day pass plan price, or
+  the class price; later price changes don't rewrite history). A guest ticket with a price counts as
+  revenue when staff **approve** it, because approving is the moment they confirm the money arrived;
+  declined or still-waiting requests don't count, scanned or not. It shows on Finance ("from day
+  passes", the 12-month chart, by plan, recent payments as "(guest)") and in both CSV exports (type
+  "Day pass", or "Class" for a paid class spot; the monthly report has a "Day pass revenue" column).
+
+### Paying by bank transfer (guests and members)
+
+Uses the gym's bank details from Settings (the same ones the join page shows); with none on file the
+forms say "pay at the front desk". Proof screenshots are optional, 2MB, JPEG/PNG/WebP, stored as
+private blobs, and only staff of the same gym can open them. Nothing is confirmed by the upload itself.
+
+- **Guests (class spot or day pass):** the request form shows the price, the bank account and a proof
+  upload (`POST /api/[slug]/guest-passes` now also accepts multipart). Free tickets ignore any upload.
+  Staff open `/[slug]/members/guests`, see the amount and "View transfer proof"
+  (`GET /api/[slug]/guest-passes/[passId]/proof`), check their bank, then press **Payment received —
+  approve**; that sends the ticket and counts the revenue. Decline if the money never came.
+- **Members (class booking):** an unpaid booking on `/my/classes` shows the bank account and a
+  screenshot upload (`POST /api/my/classes/[registrationId]/proof`; own booking, unpaid, session not
+  started, not already being paid online). The class roster shows "View transfer proof"
+  (`GET /api/[slug]/class-registrations/[registrationId]/proof`); staff then use the existing
+  **Record payment** to confirm, as before.
+- Migration `20261009030000_transfer_proofs` (proof columns on `GuestPass` and `ClassRegistration`).

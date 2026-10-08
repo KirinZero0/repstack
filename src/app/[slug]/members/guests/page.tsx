@@ -37,7 +37,8 @@ export default async function GuestPassesPage({ params }: { params: { slug: stri
     phone: maskPhone(decrypt(p.phoneWhatsapp)),
     className: passTitle(p),
     when: passWhen(p, gym.timezone),
-    price: p.dayPassPlan ? Number(p.dayPassPlan.price) : null,
+    amount: p.amount === null ? 0 : Number(p.amount),
+    hasProof: Boolean(p.proofImageUrl),
     status: p.status,
     ticketLink: p.status === "APPROVED" ? ticketUrl(ticketTokenFor(p)) : null,
   }));
