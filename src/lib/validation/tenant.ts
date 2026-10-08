@@ -225,6 +225,9 @@ export const confirmClassRegistrationSchema = z.object({
 /** Staff books a member into a session. */
 export const addClassRegistrationSchema = z.object({ memberId: z.string().uuid() });
 
+/** Staff sends a reminder: to one registration, or to everyone booked when omitted. */
+export const remindClassSessionSchema = z.object({ registrationId: z.string().uuid().optional() });
+
 export const registerForClassSchema = z.object({ sessionId: z.string().uuid() });
 
 export const transferProofSchema = z.object({

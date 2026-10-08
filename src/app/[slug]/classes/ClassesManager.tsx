@@ -226,6 +226,19 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function remind(r?: RegistrationRow) {
+    if (!r && !window.confirm(`Send a reminder to everyone booked (${session.taken})?`)) return;
+    setBusy(r ? `remind-${r.id}` : "remind-all");
+    setError(null);
+    setNotice(null);
+    const { error, data } = await call(`/api/${slug}/class-sessions/${session.id}/remind`, "POST", r ? { registrationId: r.id } : {});
+    setBusy(null);
+    if (error) return setError(error);
+    setNotice(`Reminder sent to ${data.reminded as number} ${data.reminded === 1 ? "member" : "members"}.`);
+  }
+
   async function removeBooking(r: RegistrationRow) {
     const deleting = r.status === "CANCELLED";
     if (!window.confirm(deleting ? `Delete ${r.memberName}'s cancelled booking for good?` : `Cancel ${r.memberName}'s unpaid booking?`)) return;
@@ -311,6 +324,11 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
                     </button>
                   </span>
                 )}
+                {r.status !== "CANCELLED" && session.status === "SCHEDULED" && !session.past && (
+                  <button onClick={() => remind(r)} disabled={busy === `remind-${r.id}`} className={ghostCls}>
+                    {busy === `remind-${r.id}` ? "Sending…" : "Remind"}
+                  </button>
+                )}
                 {r.status === "CANCELLED" ? (
                   <>
                     <span className="text-neutral-500">Cancelled</span>
@@ -340,6 +358,11 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
           ))}
         </ul>
       )}
+      {session.status === "SCHEDULED" && !session.past && session.taken > 0 && (
+        <button onClick={() => remind()} disabled={busy === "remind-all"} className={`${ghostCls} mt-3`}>
+          {busy === "remind-all" ? "Sending…" : "Remind everyone"}
+        </button>
+      )}
       {session.status === "SCHEDULED" && !session.past && <AddMember slug={slug} session={session} members={members} onChanged={onChanged} />}
       {isOwner && session.status === "SCHEDULED" && (
         <div className="mt-3 flex gap-4">
@@ -355,6 +378,7 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
           )}
         </div>
       )}
+      {notice && <p className="mt-2 text-sm text-emerald-400">{notice}</p>}
       {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
     </div>
   );

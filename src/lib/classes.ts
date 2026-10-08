@@ -52,6 +52,33 @@ export async function sendClassConfirmation(registrationId: string): Promise<voi
   }
 }
 
+/**
+ * Staff-triggered reminder for one booking. Confirmed → see-you-there nudge; unpaid → the seat is
+ * held but needs payment. Same caller rules as sendClassConfirmation. Never throws.
+ */
+export async function sendClassReminder(registrationId: string): Promise<void> {
+  try {
+    const reg = await prisma.classRegistration.findUnique({
+      where: { id: registrationId },
+      include: { member: true, session: { include: { class: true, gym: true } } },
+    });
+    if (!reg || reg.member.anonymizedAt || reg.status === "CANCELLED") return;
+    const { session } = reg;
+    const when = `${whenLabel(session.startsAt, session.gym.timezone)}${session.class.instructor ? ` with ${session.class.instructor}` : ""}`;
+    await notifyMember(reg.gymId, {
+      to: decrypt(reg.member.phoneWhatsapp),
+      message:
+        reg.status === "CONFIRMED"
+          ? `Reminder: ${session.class.name} at ${session.gym.name} is on ${when}. See you there!`
+          : `Hi ${reg.member.fullName}, your spot in ${session.class.name} at ${session.gym.name} on ${when} is waiting for payment. Please pay to keep it.`,
+      type: "class_reminder",
+      memberId: reg.memberId,
+    });
+  } catch (err) {
+    console.error("Class reminder failed", err);
+  }
+}
+
 /** Tells everyone booked on a session that it was cancelled. Never throws. */
 export async function sendClassCancellations(sessionId: string): Promise<void> {
   try {
