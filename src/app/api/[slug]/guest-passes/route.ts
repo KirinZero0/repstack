@@ -3,9 +3,8 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { putPrivateFile } from "@/lib/blob";
 import { proofFileError } from "@/lib/transferProof";
-import { DAY_PASS_MAX_DAYS_AHEAD, guestPassRequestSchema } from "@/lib/validation/tenant";
+import { guestPassRequestSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
-import { dayKeyInTimezone } from "@/lib/date";
 import { hashIp } from "@/lib/memberSignup";
 import { MAX_GUEST_REQUESTS_PER_GYM_HOUR, MAX_GUEST_REQUESTS_PER_IP_HOUR } from "@/lib/guestPass";
 
@@ -14,7 +13,7 @@ function clientIp(req: NextRequest): string {
 }
 
 /**
- * Public: a non-member asks for a spot in one class session, or a day pass for a chosen day. Files a request only — nothing is
+ * Public: a non-member asks for a spot in one class session, or a day pass (valid for the plan's number of days once approved). Files a request only — nothing is
  * sent and no seat is held until staff approves it. Unauthenticated, so the gym comes from the URL
  * slug and the session must belong to that gym.
  */
@@ -35,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const v = form.get(k);
       return typeof v === "string" && v !== "" ? v : undefined;
     };
-    raw = { sessionId: field("sessionId"), dayPassPlanId: field("dayPassPlanId"), visitDate: field("visitDate"), fullName: field("fullName"), phone: field("phone") };
+    raw = { sessionId: field("sessionId"), dayPassPlanId: field("dayPassPlanId"), fullName: field("fullName"), phone: field("phone") };
     const f = form.get("proof");
     const bad = proofFileError(f);
     if (bad) return bad;
@@ -65,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     { status: 409 },
   );
 
-  let target: { sessionId: string; amount: Prisma.Decimal } | { dayPassPlanId: string; visitDate: string; amount: Prisma.Decimal };
+  let target: { sessionId: string; amount: Prisma.Decimal } | { dayPassPlanId: string; amount: Prisma.Decimal };
   if (d.sessionId) {
     // Tenant isolation: only an upcoming, scheduled session of this gym's active class.
     const cs = await prisma.classSession.findUnique({ where: { id: d.sessionId }, include: { class: true } });
@@ -76,19 +75,17 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     if (await prisma.guestPass.findUnique({ where: { sessionId_phoneWhatsappLookup: { sessionId: cs.id, phoneWhatsappLookup: lookup } } })) return alreadyAsked;
     target = { sessionId: cs.id, amount: cs.class.price };
   } else {
-    // Tenant isolation: only an active day-pass plan of this gym, for today or a near-future day in the gym's timezone.
+    // Tenant isolation: only an active day-pass plan of this gym.
     const plan = await prisma.dayPassPlan.findUnique({ where: { id: d.dayPassPlanId! } });
     if (!plan || plan.gymId !== gym.id || !plan.isActive) {
       return NextResponse.json({ error: "That day pass isn't available. Pick another." }, { status: 400 });
     }
-    const today = dayKeyInTimezone(new Date(), gym.timezone);
-    const last = dayKeyInTimezone(new Date(Date.now() + DAY_PASS_MAX_DAYS_AHEAD * 24 * 60 * 60 * 1000), gym.timezone);
-    const visitDate = d.visitDate!;
-    if (visitDate < today || visitDate > last || Number.isNaN(Date.parse(visitDate))) {
-      return NextResponse.json({ error: "Pick a day from today up to two weeks ahead." }, { status: 400 });
-    }
-    if (await prisma.guestPass.findUnique({ where: { dayPassPlanId_visitDate_phoneWhatsappLookup: { dayPassPlanId: plan.id, visitDate, phoneWhatsappLookup: lookup } } })) return alreadyAsked;
-    target = { dayPassPlanId: plan.id, visitDate, amount: plan.price };
+    // One open request or unused ticket per phone and plan; once it's used or declined they can ask again.
+    const open = await prisma.guestPass.findFirst({
+      where: { dayPassPlanId: plan.id, phoneWhatsappLookup: lookup, status: { in: ["PENDING_REVIEW", "APPROVED"] } },
+    });
+    if (open) return alreadyAsked;
+    target = { dayPassPlanId: plan.id, amount: plan.price };
   }
 
   // Proof is optional and only means something when there is something to pay; a storage hiccup must not block the request.

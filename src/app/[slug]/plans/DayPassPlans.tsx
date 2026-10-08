@@ -7,6 +7,7 @@ export interface DayPassPlanRow {
   id: string;
   name: string;
   price: number;
+  validityDays: number | null;
   isActive: boolean;
 }
 
@@ -19,6 +20,7 @@ export default function DayPassPlans({ slug, plans }: { slug: string; plans: Day
   const router = useRouter();
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
+  const [validity, setValidity] = useState("30");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -37,13 +39,13 @@ export default function DayPassPlans({ slug, plans }: { slug: string; plans: Day
     <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-5" data-testid="day-pass-plans">
       <h2 className="text-lg font-semibold">Day passes</h2>
       <p className="mb-4 text-sm text-neutral-400">
-        For visitors who just want to try the gym. They request it from your join page, you approve, and they get a one-time QR ticket. Guests pay at the desk and are never added as members.
+        For visitors who just want to try the gym. They request it from your join page, you approve, and they get a one-time QR ticket that works any day until it expires (the days you set below, counted from approval). Guests pay at the desk and are never added as members.
       </p>
       {plans.length > 0 && (
         <ul className="mb-4 divide-y divide-neutral-800">
           {plans.map((p) => (
             <li key={p.id} className="flex items-center justify-between gap-3 py-2">
-              <span className={p.isActive ? "" : "text-neutral-500"}>{p.name} · {rp(p.price)}{p.isActive ? "" : " (hidden)"}</span>
+              <span className={p.isActive ? "" : "text-neutral-500"}>{p.name} · {rp(p.price)} · {p.validityDays ? `valid ${p.validityDays} days` : "never expires"}{p.isActive ? "" : " (hidden)"}</span>
               <button className={btn} disabled={busy} onClick={() => call(`/api/${slug}/day-pass-plans/${p.id}`, "PATCH", { isActive: !p.isActive })}>
                 {p.isActive ? "Hide" : "Show"}
               </button>
@@ -52,17 +54,19 @@ export default function DayPassPlans({ slug, plans }: { slug: string; plans: Day
         </ul>
       )}
       <form
-        className="grid gap-3 sm:grid-cols-[1.4fr_1fr_auto]"
+        className="grid gap-3 sm:grid-cols-[1.4fr_1fr_1fr_auto]"
         onSubmit={async (e) => {
           e.preventDefault();
-          if (await call(`/api/${slug}/day-pass-plans`, "POST", { name, price: Number(price) })) {
+          if (await call(`/api/${slug}/day-pass-plans`, "POST", { name, price: Number(price), validityDays: validity.trim() === "" ? null : Number(validity) })) {
             setName("");
             setPrice("");
+            setValidity("30");
           }
         }}
       >
         <input required minLength={2} maxLength={60} placeholder="Name, e.g. Single visit" value={name} onChange={(e) => setName(e.target.value)} className={input} aria-label="Day pass name" />
         <input required type="number" min={0} step={1000} placeholder="Price (Rp)" value={price} onChange={(e) => setPrice(e.target.value)} className={input} aria-label="Day pass price" />
+        <input type="number" min={1} max={730} placeholder="Valid for (days)" value={validity} onChange={(e) => setValidity(e.target.value)} className={input} aria-label="Valid for days, empty means never expires" title="How many days the ticket works after you approve it. Leave empty for no expiry." />
         <button disabled={busy} className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-neutral-950 hover:bg-neutral-200 disabled:opacity-50">Add day pass</button>
       </form>
       {error && <p className="mt-2 text-sm text-red-400" role="alert">{error}</p>}

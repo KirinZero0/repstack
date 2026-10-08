@@ -7,15 +7,16 @@ export interface DayPassOption {
   id: string;
   name: string;
   price: number;
+  /** Days the ticket works after approval; null = no expiry. */
+  validityDays: number | null;
 }
 
 const input =
   "w-full rounded-lg border border-neutral-700 bg-neutral-950 px-4 py-2.5 text-white outline-none placeholder:text-neutral-500 focus:border-plate-blue";
 const rp = (n: number) => (n === 0 ? "Free" : `Rp ${n.toLocaleString("id-ID")}`);
 
-export default function DayPassForm({ slug, plans, dateRange, bank }: { slug: string; plans: DayPassOption[]; dateRange: { min: string; max: string }; bank: BankInfo | null }) {
+export default function DayPassForm({ slug, plans, bank }: { slug: string; plans: DayPassOption[]; bank: BankInfo | null }) {
   const [dayPassPlanId, setDayPassPlanId] = useState(plans[0].id);
-  const [visitDate, setVisitDate] = useState(dateRange.min);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [proof, setProof] = useState<File | null>(null);
@@ -32,7 +33,6 @@ export default function DayPassForm({ slug, plans, dateRange, bank }: { slug: st
     try {
       const fd = new FormData();
       fd.set("dayPassPlanId", dayPassPlanId);
-      fd.set("visitDate", visitDate);
       fd.set("fullName", fullName);
       fd.set("phone", phone);
       if (proof && price > 0) fd.set("proof", proof);
@@ -67,16 +67,12 @@ export default function DayPassForm({ slug, plans, dateRange, bank }: { slug: st
               <input type="radio" name="dayPassPlanId" value={p.id} checked={dayPassPlanId === p.id} onChange={() => setDayPassPlanId(p.id)} />
               <span>
                 <span className="block font-medium">{p.name}</span>
-                <span className="block text-sm text-neutral-400">{rp(p.price)}</span>
+                <span className="block text-sm text-neutral-400">{rp(p.price)} · {p.validityDays ? `use it any day within ${p.validityDays} day${p.validityDays === 1 ? "" : "s"} of approval` : "use it any day"}</span>
               </span>
             </label>
           ))}
         </div>
       </fieldset>
-      <label className="block text-sm text-neutral-300">
-        <span className="mb-1 block">Day you&apos;re coming</span>
-        <input required type="date" min={dateRange.min} max={dateRange.max} value={visitDate} onChange={(e) => setVisitDate(e.target.value)} className={input} />
-      </label>
       <label className="block text-sm text-neutral-300">
         <span className="mb-1 block">Your name</span>
         <input required minLength={2} maxLength={80} value={fullName} onChange={(e) => setFullName(e.target.value)} className={input} />

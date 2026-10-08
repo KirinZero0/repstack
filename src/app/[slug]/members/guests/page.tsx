@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { decrypt, maskPhone } from "@/lib/crypto";
-import { dayKeyInTimezone } from "@/lib/date";
 import { passTitle, passWhen, ticketTokenFor, ticketUrl } from "@/lib/guestPass";
 import GymNav from "@/components/GymNav";
 import GuestPassList, { type GuestPassRow } from "./GuestPassList";
@@ -23,7 +22,7 @@ export default async function GuestPassesPage({ params }: { params: { slug: stri
       gymId: gym.id,
       OR: [
         { session: { startsAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } } },
-        { dayPassPlanId: { not: null }, visitDate: { gte: dayKeyInTimezone(new Date(Date.now() - 24 * 60 * 60 * 1000), gym.timezone) } },
+        { dayPassPlanId: { not: null }, createdAt: { gte: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000) } },
       ],
     },
     orderBy: { createdAt: "asc" },

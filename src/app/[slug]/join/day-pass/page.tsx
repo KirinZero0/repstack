@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
-import { dayKeyInTimezone } from "@/lib/date";
-import { DAY_PASS_MAX_DAYS_AHEAD } from "@/lib/validation/tenant";
 import { gymBank } from "@/lib/transferProof";
 import DayPassForm from "./DayPassForm";
 
@@ -20,7 +18,6 @@ export default async function DayPassPage({ params }: { params: { slug: string }
 
   const open = gym.subscriptionStatus !== "SUSPENDED" && gym.subscriptionStatus !== "CANCELLED";
   const plans = open ? await prisma.dayPassPlan.findMany({ where: { gymId: gym.id, isActive: true }, orderBy: { price: "asc" } }) : [];
-  const now = Date.now();
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-12 text-white">
@@ -34,17 +31,13 @@ export default async function DayPassPage({ params }: { params: { slug: string }
         ) : (
           <>
             <p className="mt-3 max-w-md text-neutral-400">
-              Just visiting? No membership needed. Ask for a day pass; once the gym approves, you get a one-time QR ticket on WhatsApp.
+              Just visiting? No membership needed. Ask for a day pass; once the gym approves, you get a one-time QR ticket on WhatsApp that you can use any day before it expires.
             </p>
             <div className="mt-10">
               <DayPassForm
                 slug={params.slug}
                 bank={gymBank(gym)}
-                plans={plans.map((p) => ({ id: p.id, name: p.name, price: Number(p.price) }))}
-                dateRange={{
-                  min: dayKeyInTimezone(new Date(now), gym.timezone),
-                  max: dayKeyInTimezone(new Date(now + DAY_PASS_MAX_DAYS_AHEAD * 24 * 60 * 60 * 1000), gym.timezone),
-                }}
+                plans={plans.map((p) => ({ id: p.id, name: p.name, price: Number(p.price), validityDays: p.validityDays }))}
               />
             </div>
           </>

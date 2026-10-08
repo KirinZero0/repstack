@@ -528,6 +528,7 @@ model DayPassPlan {
   price       Decimal
   currency    String   @default("IDR")
   isActive    Boolean  @default(true)
+  validityDays Int?    @default(30) // how many days a ticket stays usable after staff approve it; null = never expires
   createdAt   DateTime @default(now())
 
   guestPasses GuestPass[]
@@ -543,7 +544,8 @@ model GuestPass {
   session             ClassSession?   @relation(fields: [sessionId], references: [id])
   dayPassPlanId       String?
   dayPassPlan         DayPassPlan?    @relation(fields: [dayPassPlanId], references: [id])
-  visitDate           String? // "YYYY-MM-DD" in the gym's timezone; day passes only
+  visitDate           String? // "YYYY-MM-DD" in the gym's timezone. Only passes issued before day passes became flexible have one; they are valid on that day alone
+  expiresAt           DateTime? // flexible day passes: set when staff approve (approval + plan.validityDays); null = never expires
   amount              Decimal? // the price when requested (day pass plan or class); counted as revenue when staff approve, i.e. confirm the payment
   proofImageUrl       String? // optional bank-transfer screenshot (private blob), shown to staff before they approve
   proofSubmittedAt    DateTime?

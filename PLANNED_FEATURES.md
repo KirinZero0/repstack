@@ -149,19 +149,23 @@ over WhatsApp. Scanning it with the normal check-in scanner marks them attended.
 A gym can sell a one-visit ticket to non-members. It never creates a `Member`. It lives with the
 membership side of the app, not under classes.
 
-- **Schema** `DayPassPlan` (name, price; RLS tenant table). A `GuestPass` is for a class session
-  **or** a day pass (`sessionId` nullable, `dayPassPlanId` + `visitDate` "YYYY-MM-DD" in the gym's
-  timezone; a DB check enforces exactly one). One request per phone, plan and day. Migration
-  `20261009010000_day_passes`; run `npm run db:rls` after deploying it.
+- **Schema** `DayPassPlan` (name, price, `validityDays`; RLS tenant table). A `GuestPass` is for a class
+  session **or** a day pass (`sessionId` nullable, `dayPassPlanId`; a DB check enforces exactly one).
+  Migration `20261009010000_day_passes`; run `npm run db:rls` after deploying it.
 - **Owner** manages day passes on `/[slug]/plans`, under the membership plans
-  (`POST /api/[slug]/day-pass-plans`, `PATCH …/[planId]` for rename / reprice / hide). Staff can't.
+  (`POST /api/[slug]/day-pass-plans`, `PATCH …/[planId]` for rename / reprice / validity / hide).
+  Staff can't. **Validity** is the number of days a ticket works after staff approve it (default 30,
+  1–730); leave it empty for a plan whose tickets never expire.
 - **Visitor** finds it on the join page ("Just visiting?") and the gym's public page →
-  `/[slug]/join/day-pass`: pick a plan and a day (today up to 14 days ahead). The price is shown as
-  "paid at the front desk". Class spots stay on `/[slug]/guest-pass`.
+  `/[slug]/join/day-pass`: pick a plan, no date. One open request or unused ticket per phone and plan;
+  after a ticket is used (or declined) they can ask again. Class spots stay on `/[slug]/guest-pass`.
 - **Review** both kinds of guest request on `/[slug]/members/guests`, linked from Members (with a
   pending-count banner) and from Classes. Approve/reject/resend work the same for both.
-- **Ticket** is valid only on its visit day (gym timezone): earlier scans say "too early", later ones
-  "expired". Day passes have no capacity limit.
+- **Ticket** is single-use and works any day until `expiresAt` (set when staff approve:
+  approval time + the plan's `validityDays`; none for a never-expiring plan). After that a scan says
+  "Day pass has expired". Day passes have no capacity limit. Passes issued before this change keep
+  their fixed `visitDate` and are still valid on that day only (migration
+  `20261009040000_day_pass_validity` adds `validityDays` and `expiresAt`).
 - **Revenue** `GuestPass.amount` snapshots the price when the guest requests (day pass plan price, or
   the class price; later price changes don't rewrite history). A guest ticket with a price counts as
   revenue when staff **approve** it, because approving is the moment they confirm the money arrived;

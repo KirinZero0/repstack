@@ -3,7 +3,7 @@ import { tenantTransaction } from "@/lib/prisma";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { guestPassActionSchema } from "@/lib/validation/tenant";
 import { countSeatsTaken, effectiveCapacity } from "@/lib/classes";
-import { passIsCancelled, passWindow, sendGuestRejection, sendGuestTicket } from "@/lib/guestPass";
+import { dayPassExpiry, passIsCancelled, passWindow, sendGuestRejection, sendGuestTicket } from "@/lib/guestPass";
 
 class FullError extends Error {}
 class StateError extends Error {}
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   if (pass.status !== "PENDING_REVIEW") return NextResponse.json({ error: "This request was already reviewed." }, { status: 409 });
   if (action === "approve" && (passIsCancelled(pass) || passWindow(pass, gym.timezone) === "OVER")) {
-    return NextResponse.json({ error: pass.session ? "That session is cancelled or over." : "That visit date has passed." }, { status: 409 });
+    return NextResponse.json({ error: pass.session ? "That session is cancelled or over." : "That day pass has expired." }, { status: 409 });
   }
 
   try {
@@ -53,7 +53,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       // Compare-and-set on the status so two staff clicking at once can't both decide.
       const res = await tx.guestPass.updateMany({
         where: { id: pass.id, gymId: gym.id, status: "PENDING_REVIEW" },
-        data: { status: action === "approve" ? "APPROVED" : "REJECTED", reviewedById: session.staffUserId, reviewedAt: new Date() },
+        data: {
+          status: action === "approve" ? "APPROVED" : "REJECTED",
+          reviewedById: session.staffUserId,
+          reviewedAt: new Date(),
+          // A flexible day pass starts its clock when staff approve it.
+          ...(action === "approve" && pass.dayPassPlan && !pass.visitDate ? { expiresAt: dayPassExpiry(pass.dayPassPlan) } : {}),
+        },
       });
       if (res.count !== 1) throw new StateError();
     });

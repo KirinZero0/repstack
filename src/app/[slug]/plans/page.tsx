@@ -53,7 +53,7 @@ export default async function PlansPage({ params }: { params: { slug: string } }
           }))}
         />
         <div className="mt-10">
-          <DayPassPlans slug={params.slug} plans={dayPassPlans.map((p) => ({ id: p.id, name: p.name, price: Number(p.price), isActive: p.isActive }))} />
+          <DayPassPlans slug={params.slug} plans={dayPassPlans.map((p) => ({ id: p.id, name: p.name, price: Number(p.price), validityDays: p.validityDays, isActive: p.isActive }))} />
         </div>
       </div>
     </main>
