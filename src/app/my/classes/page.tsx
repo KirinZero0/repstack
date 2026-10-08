@@ -2,7 +2,7 @@ import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { rp } from "@/components/charts";
 import { memberPaymentsAvailable } from "@/lib/gateway";
-import { SEAT_HOLDING_STATUSES, effectiveCapacity, whenLabel } from "@/lib/classes";
+import { GUEST_SEAT_HOLDING_STATUSES, SEAT_HOLDING_STATUSES, effectiveCapacity, whenLabel } from "@/lib/classes";
 import { BookButton, CancelBookingButton } from "./ClassActions";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +40,12 @@ export default async function MyClassesPage() {
       take: 60,
       include: {
         class: true,
-        _count: { select: { registrations: { where: { status: { in: [...SEAT_HOLDING_STATUSES] } } } } },
+        _count: {
+          select: {
+            registrations: { where: { status: { in: [...SEAT_HOLDING_STATUSES] } } },
+            guestPasses: { where: { status: { in: [...GUEST_SEAT_HOLDING_STATUSES] } } },
+          },
+        },
         registrations: { where: { memberId: member.id }, include: { payment: { select: { status: true, invoiceUrl: true } } } },
       },
     }),
@@ -116,7 +121,7 @@ export default async function MyClassesPage() {
                   <ul className="space-y-2">
                     {sessions.map((s) => {
                       const cap = effectiveCapacity(s, s.class);
-                      const taken = s._count.registrations;
+                      const taken = s._count.registrations + s._count.guestPasses;
                       const full = cap !== null && taken >= cap;
                       const own = s.registrations[0];
                       const price = Number(s.class.price);

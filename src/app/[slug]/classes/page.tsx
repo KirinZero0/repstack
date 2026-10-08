@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
-import { SEAT_HOLDING_STATUSES, effectiveCapacity, whenLabel } from "@/lib/classes";
+import { GUEST_SEAT_HOLDING_STATUSES, SEAT_HOLDING_STATUSES, effectiveCapacity, whenLabel } from "@/lib/classes";
 import { ATTENDANCE_OPENS_BEFORE_MS } from "@/lib/validation/tenant";
 import GymNav from "@/components/GymNav";
 import ClassesManager, { type ClassRow } from "./ClassesManager";
@@ -30,6 +30,7 @@ export default async function ClassesPage({ params }: { params: { slug: string }
         orderBy: { startsAt: "asc" },
         take: 40,
         include: {
+          _count: { select: { guestPasses: { where: { status: { in: [...GUEST_SEAT_HOLDING_STATUSES] } } } } },
           registrations: {
             orderBy: { createdAt: "asc" },
             include: { member: { select: { fullName: true } }, payment: { select: { status: true, amount: true, provider: true } } },
@@ -61,7 +62,7 @@ export default async function ClassesPage({ params }: { params: { slug: string }
       label: whenLabel(s.startsAt, gym.timezone),
       status: s.status,
       capacity: effectiveCapacity(s, c),
-      taken: s.registrations.filter((r) => (SEAT_HOLDING_STATUSES as readonly string[]).includes(r.status)).length,
+      taken: s.registrations.filter((r) => (SEAT_HOLDING_STATUSES as readonly string[]).includes(r.status)).length + s._count.guestPasses,
       past: s.startsAt.getTime() <= now.getTime(),
       attendanceOpen: s.status !== "CANCELLED" && s.startsAt.getTime() - now.getTime() <= ATTENDANCE_OPENS_BEFORE_MS,
       registrations: s.registrations.map((r) => ({
@@ -86,6 +87,9 @@ export default async function ClassesPage({ params }: { params: { slug: string }
           </div>
           <GymNav slug={params.slug} role={session.role} current="classes" />
         </div>
+        <a href={`/${params.slug}/classes/guests`} className="mb-6 inline-block text-sm text-neutral-300 underline underline-offset-2 hover:text-white">
+          Guest tickets (non-members) →
+        </a>
         <ClassesManager slug={params.slug} classes={rows} isOwner={session.role === "OWNER"} timezone={gym.timezone} members={members} />
       </div>
     </main>

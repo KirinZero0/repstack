@@ -14,7 +14,8 @@ GRANT USAGE ON SCHEMA public TO {{ROLE}};
 -- MagicLink, PasswordReset, AppConfig, LoginAttempt) is deliberately not granted at all. MemberSignup holds the
 -- manual join/bank-transfer requests staff review on /[slug]/members and act on via approve/reject.
 -- GymClass, ClassSession, ClassRegistration and ClassPayment are the classes feature (/[slug]/classes, /my/classes).
-GRANT SELECT, INSERT, UPDATE, DELETE ON "Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup", "GymClass", "ClassSession", "ClassRegistration", "ClassPayment" TO {{ROLE}};
+-- GuestPass holds non-member class ticket requests (/[slug]/classes/guests); the public request form writes it with the owner client.
+GRANT SELECT, INSERT, UPDATE, DELETE ON "Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup", "GymClass", "ClassSession", "ClassRegistration", "ClassPayment", "GuestPass" TO {{ROLE}};
 -- The plan catalog is not tenant data; gyms read their own plan's limits.
 GRANT SELECT ON "SaasPlan" TO {{ROLE}};
 
@@ -73,3 +74,7 @@ CREATE POLICY tenant_isolation ON "ClassRegistration" USING ("gymId" = current_s
 ALTER TABLE "ClassPayment" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON "ClassPayment";
 CREATE POLICY tenant_isolation ON "ClassPayment" USING ("gymId" = current_setting('app.current_gym_id', true)) WITH CHECK ("gymId" = current_setting('app.current_gym_id', true));
+
+ALTER TABLE "GuestPass" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "GuestPass";
+CREATE POLICY tenant_isolation ON "GuestPass" USING ("gymId" = current_setting('app.current_gym_id', true)) WITH CHECK ("gymId" = current_setting('app.current_gym_id', true));

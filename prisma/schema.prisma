@@ -79,6 +79,7 @@ model Gym {
   classSessions      ClassSession[]
   classRegistrations ClassRegistration[]
   classPayments      ClassPayment[]
+  guestPasses        GuestPass[]
 
   @@index([subscriptionStatus])
 }
@@ -140,6 +141,8 @@ model StaffUser {
   checkins              CheckIn[]
   recordedPayments      Payment[]
   recordedClassPayments ClassPayment[]
+  reviewedGuestPasses   GuestPass[] @relation("GuestPassReviewer")
+  scannedGuestPasses    GuestPass[] @relation("GuestPassScanner")
 
   @@index([gymId])
 }
@@ -269,8 +272,8 @@ model NotificationLog {
   id       String   @id @default(uuid())
   gymId    String
   gym      Gym      @relation(fields: [gymId], references: [id])
-  memberId String
-  member   Member   @relation(fields: [memberId], references: [id])
+  memberId String? // null for messages to non-members (guest class tickets)
+  member   Member?  @relation(fields: [memberId], references: [id])
   type     String
   channel  String   @default("whatsapp")
   status   String
@@ -443,6 +446,7 @@ model ClassSession {
   createdAt DateTime           @default(now())
 
   registrations ClassRegistration[]
+  guestPasses   GuestPass[]
 
   @@index([gymId, startsAt])
 }
@@ -493,6 +497,45 @@ model ClassPayment {
   recordedBy        StaffUser?        @relation(fields: [recordedById], references: [id])
 
   @@index([gymId])
+}
+
+// ─── Guest class tickets ────────────────────────────────────
+// A non-member asks for a spot in one class session from the gym's public page. Staff approves
+// (or rejects) the request; approval sends the guest a WhatsApp link to a one-time QR ticket. The
+// ticket is scanned at the front desk with the normal check-in scanner, which flips the pass to
+// ATTENDED — after that the same QR is dead. Guests have no account, so the phone number is the
+// only identity (encrypted + blind-indexed like Member's).
+
+enum GuestPassStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  ATTENDED
+}
+
+model GuestPass {
+  id                  String          @id @default(uuid())
+  gymId               String
+  gym                 Gym             @relation(fields: [gymId], references: [id])
+  sessionId           String
+  session             ClassSession    @relation(fields: [sessionId], references: [id])
+  fullName            String
+  phoneWhatsapp       String // encrypted
+  phoneWhatsappLookup String // HMAC blind index, one request per phone per session
+  ticketSecret        String          @default(uuid()) // signs the ticket QR; rotating it voids the ticket
+  status              GuestPassStatus @default(PENDING_REVIEW)
+  ipHash              String?
+  reviewedById        String?
+  reviewedBy          StaffUser?      @relation("GuestPassReviewer", fields: [reviewedById], references: [id])
+  reviewedAt          DateTime?
+  attendedAt          DateTime?
+  scannedById         String?
+  scannedBy           StaffUser?      @relation("GuestPassScanner", fields: [scannedById], references: [id])
+  createdAt           DateTime        @default(now())
+
+  @@unique([sessionId, phoneWhatsappLookup])
+  @@index([gymId, status])
+  @@index([ipHash, createdAt])
 }
 
 // ─── Password reset / staff invite ──────────────────────────

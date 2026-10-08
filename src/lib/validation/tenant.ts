@@ -234,3 +234,15 @@ export const transferProofSchema = z.object({
   senderName: z.string().trim().min(2, "Enter the name on the sending account").max(80),
   transferDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid date").optional(),
 });
+
+// ─── Guest class tickets ────────────────────────────────────
+
+/** A non-member asks for a spot in one class session. The phone number is where the ticket is sent. */
+export const guestPassRequestSchema = z.object({
+  sessionId: z.string().uuid(),
+  fullName: z.string().trim().min(2, "Enter your name").max(80),
+  phone: z.string().trim().min(6, "Enter a valid WhatsApp number").max(30),
+});
+
+/** Staff decides on a request, or re-sends an approved guest's ticket link. */
+export const guestPassActionSchema = z.object({ action: z.enum(["approve", "reject", "resend"]) });

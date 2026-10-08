@@ -119,3 +119,27 @@ Nothing here changes how the current version works; the notes say where each pie
   in on another member's membership.
 - **Hardware** (turnstiles, readers) is per-device integration and support work; treat it as a later paid
   add-on.
+
+## 3. Guest class tickets (non-members)
+
+A non-member asks for one class session, staff approves, and the guest gets a one-time QR ticket
+over WhatsApp. Scanning it with the normal check-in scanner marks them attended.
+
+- **Schema** `GuestPass` (status `PENDING_REVIEW → APPROVED → ATTENDED`, or `REJECTED`; phone
+  encrypted + HMAC blind index; `ticketSecret` signs the QR). `NotificationLog.memberId` is now
+  nullable so messages to guests can be logged. Migration `20261009000000_guest_class_tickets`;
+  run `npm run db:rls` after deploying it (new tenant table).
+- **Public** `/[slug]/guest-pass` (pick an upcoming session, name + WhatsApp number) →
+  `POST /api/[slug]/guest-passes`. IP/gym throttled, one request per phone per session, session
+  must belong to the gym. Linked from the gym's public page.
+- **Staff** `/[slug]/classes/guests` (owner and staff) → `POST /api/[slug]/guest-passes/[passId]`
+  `{ action: "approve" | "reject" | "resend" }`. Approve checks capacity (approved guests hold a
+  seat, same as bookings), sends the ticket link (`guest_ticket`), and is compare-and-set so two
+  staff can't both decide.
+- **Ticket** `/ticket/[token]` shows the QR while the pass is approved and unused. The token is
+  `ticket.<payload>.<hmac>` (`src/lib/qr.ts`), signed with the pass's `ticketSecret`.
+- **Scan** `/api/checkin` routes `ticket.` tokens to the ticket handler: right gym, valid
+  signature, approved, session scheduled, within 1h before start → end of class. `APPROVED →
+  ATTENDED` is one atomic update, so a second scan (or two scanners) gets `DUPLICATE`. No
+  `CheckIn` row — guests aren't members.
+- **Not built:** guests are not charged; the gym collects any fee itself. Tests: `e2e/35-guest-tickets.spec.ts`.

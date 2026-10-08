@@ -11,11 +11,21 @@ export function effectiveCapacity(session: { capacity: number | null }, cls: { c
   return session.capacity ?? cls.capacity;
 }
 
-/** A small client shape both the tenant client and a transaction client satisfy. */
-type Counter = { classRegistration: { count(args: { where: Prisma.ClassRegistrationWhereInput }): Promise<number> } };
+/** Approved guest tickets (used or not) hold a seat too; requests still waiting on review do not. */
+export const GUEST_SEAT_HOLDING_STATUSES = ["APPROVED", "ATTENDED"] as const;
 
-export function countSeatsTaken(db: Counter, sessionId: string): Promise<number> {
-  return db.classRegistration.count({ where: { sessionId, status: { in: [...SEAT_HOLDING_STATUSES] } } });
+/** A small client shape both the tenant client and a transaction client satisfy. */
+type Counter = {
+  classRegistration: { count(args: { where: Prisma.ClassRegistrationWhereInput }): Promise<number> };
+  guestPass: { count(args: { where: Prisma.GuestPassWhereInput }): Promise<number> };
+};
+
+export async function countSeatsTaken(db: Counter, sessionId: string): Promise<number> {
+  const [members, guests] = await Promise.all([
+    db.classRegistration.count({ where: { sessionId, status: { in: [...SEAT_HOLDING_STATUSES] } } }),
+    db.guestPass.count({ where: { sessionId, status: { in: [...GUEST_SEAT_HOLDING_STATUSES] } } }),
+  ]);
+  return members + guests;
 }
 
 export function whenLabel(startsAt: Date, timezone: string): string {

@@ -105,7 +105,7 @@ async function gymGateway(gymId: string): Promise<{ provider: GatewayProvider; a
  */
 export async function sendGymWhatsapp(
   gymId: string,
-  opts: { to: string; message: string; type: string; memberId: string },
+  opts: { to: string; message: string; type: string; memberId?: string },
 ): Promise<SendResult> {
   const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, saasPlan: { select: { maxWhatsappPerMonth: true } } } });
   const own = gym ? await gymGateway(gymId) : null;
@@ -137,7 +137,7 @@ export async function sendGymWhatsapp(
   }
 
   await prisma.notificationLog.create({
-    data: { gymId, memberId: opts.memberId, type: opts.type, channel: "whatsapp", status },
+    data: { gymId, memberId: opts.memberId ?? null, type: opts.type, channel: "whatsapp", status },
   });
 
   return result;

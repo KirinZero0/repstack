@@ -110,7 +110,17 @@ export default async function GymProfilePage({ params }: { params: { slug: strin
         {classes.length > 0 && (
           <section className="mt-14">
             <h2 className="text-2xl font-semibold">Classes</h2>
-            <p className="mt-1 text-sm text-neutral-400">Members book and pay for classes from their dashboard.</p>
+            <p className="mt-1 text-sm text-neutral-400">
+              Members book and pay for classes from their dashboard.
+              {live && (
+                <>
+                  {" "}Not a member?{" "}
+                  <a href={`/${params.slug}/guest-pass`} className="text-neutral-200 underline underline-offset-2 hover:text-white">
+                    Request a spot as a guest
+                  </a>.
+                </>
+              )}
+            </p>
             <ul className="mt-6 divide-y divide-neutral-800 border-y border-neutral-800">
               {classes.map((c) => (
                 <li key={c.id} className="grid gap-1 py-4 sm:grid-cols-[1fr_auto] sm:items-baseline sm:gap-6">
