@@ -308,7 +308,8 @@ model AuditLog {
 model Invoice {
   id          String    @id @default(uuid())
   number      String    @unique // "INV-2026-0001"
-  billToName  String
+  gymName     String    @default("") // the gym being billed, typed freely (not tied to a Gym row)
+  billToName  String // the person who pays
   billToInfo  String    @default("") // address / contact lines, shown under the name
   currency    String    @default("IDR")
   items       Json // [{ description, quantity, unitPrice }]

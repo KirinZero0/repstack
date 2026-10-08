@@ -48,7 +48,14 @@ export default async function InvoicePage({ params }: { params: { invoiceId: str
           <section className="mt-8 grid grid-cols-2 gap-6 text-sm">
             <div>
               <p className="text-xs uppercase tracking-wide text-neutral-500">Billed to</p>
-              <p className="mt-1 font-medium">{invoice.billToName}</p>
+              {invoice.gymName ? (
+                <>
+                  <p className="mt-1 font-medium">{invoice.gymName}</p>
+                  <p className="text-neutral-600">Attn: {invoice.billToName}</p>
+                </>
+              ) : (
+                <p className="mt-1 font-medium">{invoice.billToName}</p>
+              )}
               {invoice.billToInfo && <p className="whitespace-pre-line text-neutral-600">{invoice.billToInfo}</p>}
             </div>
             <div className="text-right">

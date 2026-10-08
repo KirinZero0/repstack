@@ -17,6 +17,7 @@ const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString(
 
 export default function InvoiceForm({ gyms, plans }: { gyms: string[]; plans: { name: string; price: number }[] }) {
   const router = useRouter();
+  const [gymName, setGymName] = useState("");
   const [billToName, setBillToName] = useState("");
   const [billToInfo, setBillToInfo] = useState("");
   const [issueDate, setIssueDate] = useState(today());
@@ -45,6 +46,7 @@ export default function InvoiceForm({ gyms, plans }: { gyms: string[]; plans: { 
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        gymName,
         billToName,
         billToInfo,
         issueDate,
@@ -63,13 +65,17 @@ export default function InvoiceForm({ gyms, plans }: { gyms: string[]; plans: { 
     <form onSubmit={submit} className="space-y-6 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="text-sm text-neutral-300">
-          <span className="mb-1 block">Billed to</span>
-          <input required minLength={2} maxLength={120} list="invoice-gyms" value={billToName} onChange={(e) => setBillToName(e.target.value)} className={input} placeholder="Gym or owner name" />
+          <span className="mb-1 block">Gym name</span>
+          <input required minLength={2} maxLength={120} list="invoice-gyms" value={gymName} onChange={(e) => setGymName(e.target.value)} className={input} placeholder="Type any gym name" />
           <datalist id="invoice-gyms">
             {gyms.map((g) => (
               <option key={g} value={g} />
             ))}
           </datalist>
+        </label>
+        <label className="text-sm text-neutral-300">
+          <span className="mb-1 block">Who will pay (name)</span>
+          <input required minLength={2} maxLength={120} value={billToName} onChange={(e) => setBillToName(e.target.value)} className={input} placeholder="Owner or whoever pays the invoice" />
         </label>
         <label className="text-sm text-neutral-300">
           <span className="mb-1 block">Address / contact (optional)</span>

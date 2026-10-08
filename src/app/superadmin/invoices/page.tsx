@@ -57,7 +57,16 @@ export default async function InvoicesPage() {
                   <td className="whitespace-nowrap px-4 py-3">
                     <a href={`/superadmin/invoices/${i.id}`} className="font-medium underline-offset-2 hover:underline">{i.number}</a>
                   </td>
-                  <td className="px-4 py-3">{i.billToName}</td>
+                  <td className="px-4 py-3">
+                    {i.gymName ? (
+                      <>
+                        <span className="block">{i.gymName}</span>
+                        <span className="block text-xs text-neutral-500">{i.billToName}</span>
+                      </>
+                    ) : (
+                      i.billToName
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 text-neutral-400">{day(i.issueDate)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-neutral-400">{i.dueDate ? day(i.dueDate) : "—"}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">{rp(Number(i.total))}</td>

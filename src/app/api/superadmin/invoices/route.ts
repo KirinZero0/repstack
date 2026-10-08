@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
   const issueDate = dateFromInput(d.issueDate);
   const invoice = await createInvoice(
     {
+      gymName: d.gymName,
       billToName: d.billToName,
       billToInfo: d.billToInfo,
       items: d.items,

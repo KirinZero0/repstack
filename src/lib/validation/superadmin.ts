@@ -48,7 +48,8 @@ const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid date");
 
 export const createInvoiceSchema = z
   .object({
-    billToName: z.string().trim().min(2).max(120),
+    gymName: z.string().trim().min(2, "Enter the gym name").max(120),
+    billToName: z.string().trim().min(2, "Enter who will pay").max(120),
     billToInfo: z.string().trim().max(500).default(""),
     issueDate: dateOnly,
     dueDate: dateOnly.optional(),
