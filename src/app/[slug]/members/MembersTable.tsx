@@ -3,6 +3,7 @@
 import { StatusPill } from "@/components/charts";
 import { useEffect, useMemo, useState } from "react";
 import ResendFallbackButton from "./ResendFallbackButton";
+import RemindButton from "./RemindButton";
 
 export interface MemberRow {
   id: string;
@@ -94,12 +95,19 @@ export default function MembersTable({ slug, isOwner, rows }: { slug: string; is
                 </td>
                 <td className="px-4 py-3">{m.activated ? "Yes" : "Pending"}</td>
                 <td className="px-4 py-3">
+                  <div className="flex items-start gap-2">
                   <a
                     href={`/${slug}/members/${m.id}`}
                     className="whitespace-nowrap rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-300 hover:bg-neutral-800"
                   >
                     Record payment
                   </a>
+                  {(m.status === "ACTIVE" || m.status === "EXPIRED" || m.status === "PENDING_PAYMENT") && (
+                    <div>
+                      <RemindButton slug={slug} memberId={m.id} name={m.fullName} />
+                    </div>
+                  )}
+                  </div>
                 </td>
                 {isOwner && (
                   <td className="px-4 py-3">
