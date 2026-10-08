@@ -178,9 +178,63 @@ function ScheduleForm({ slug, classId, defaultCapacity, onDone }: { slug: string
   );
 }
 
-function Roster({ slug, session, isOwner, price, onChanged }: { slug: string; session: SessionRow; isOwner: boolean; price: number; onChanged: () => void }) {
+export interface MemberOption {
+  id: string;
+  fullName: string;
+}
+
+function AddMember({ slug, session, members, onChanged }: { slug: string; session: SessionRow; members: MemberOption[]; onChanged: () => void }) {
+  const [memberId, setMemberId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const booked = new Set(session.registrations.filter((r) => r.status !== "CANCELLED").map((r) => r.memberName));
+  const options = members.filter((m) => !booked.has(m.fullName));
+
+  return (
+    <form
+      className="mt-3 flex flex-wrap items-center gap-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!memberId) return;
+        setBusy(true);
+        setError(null);
+        const { error } = await call(`/api/${slug}/class-sessions/${session.id}/registrations`, "POST", { memberId });
+        setBusy(false);
+        if (error) return setError(error);
+        setMemberId("");
+        onChanged();
+      }}
+    >
+      <select value={memberId} onChange={(e) => setMemberId(e.target.value)} className={`${inputCls} max-w-xs`} aria-label="Member to add">
+        <option value="">Add a member…</option>
+        {options.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.fullName}
+          </option>
+        ))}
+      </select>
+      <button type="submit" disabled={busy || !memberId} className={ghostCls}>
+        {busy ? "Adding…" : "Add to class"}
+      </button>
+      {error && <p className="w-full text-sm text-red-400">{error}</p>}
+    </form>
+  );
+}
+
+function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: string; session: SessionRow; isOwner: boolean; price: number; members: MemberOption[]; onChanged: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function removeBooking(r: RegistrationRow) {
+    const deleting = r.status === "CANCELLED";
+    if (!window.confirm(deleting ? `Delete ${r.memberName}'s cancelled booking for good?` : `Cancel ${r.memberName}'s unpaid booking?`)) return;
+    setBusy(r.id);
+    setError(null);
+    const { error } = await call(`/api/${slug}/class-registrations/${r.id}`, "DELETE");
+    setBusy(null);
+    if (error) return setError(error);
+    onChanged();
+  }
 
   async function confirm(r: RegistrationRow) {
     const raw = window.prompt(`Amount received from ${r.memberName} (Rp)`, String(price));
@@ -256,7 +310,16 @@ function Roster({ slug, session, isOwner, price, onChanged }: { slug: string; se
                     </button>
                   </span>
                 )}
-                {r.status === "CONFIRMED" ? (
+                {r.status === "CANCELLED" ? (
+                  <>
+                    <span className="text-neutral-500">Cancelled</span>
+                    {!r.paid && (
+                      <button onClick={() => removeBooking(r)} disabled={busy === r.id} className={`${ghostCls} hover:border-red-800 hover:text-red-400`}>
+                        {busy === r.id ? "Deleting…" : "Delete"}
+                      </button>
+                    )}
+                  </>
+                ) : r.status === "CONFIRMED" ? (
                   <span className="text-emerald-400">Confirmed{r.amount !== null ? ` · ${rp(r.amount)}` : " · free"}</span>
                 ) : (
                   <>
@@ -266,6 +329,9 @@ function Roster({ slug, session, isOwner, price, onChanged }: { slug: string; se
                         {busy === r.id ? "Saving…" : "Record payment"}
                       </button>
                     )}
+                    <button onClick={() => removeBooking(r)} disabled={busy === r.id} className={`${ghostCls} hover:border-red-800 hover:text-red-400`}>
+                      Cancel booking
+                    </button>
                   </>
                 )}
               </span>
@@ -273,6 +339,7 @@ function Roster({ slug, session, isOwner, price, onChanged }: { slug: string; se
           ))}
         </ul>
       )}
+      {session.status === "SCHEDULED" && !session.past && <AddMember slug={slug} session={session} members={members} onChanged={onChanged} />}
       {isOwner && session.status === "SCHEDULED" && (
         <div className="mt-3 flex gap-4">
           {!session.past && (
@@ -362,7 +429,7 @@ function ViewToggle({ view, onChange }: { view: "grid" | "list"; onChange: (v: "
   );
 }
 
-export default function ClassesManager({ slug, classes, isOwner, timezone }: { slug: string; classes: ClassRow[]; isOwner: boolean; timezone: string }) {
+export default function ClassesManager({ slug, classes, isOwner, timezone, members }: { slug: string; classes: ClassRow[]; isOwner: boolean; timezone: string; members: MemberOption[] }) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -499,7 +566,7 @@ export default function ClassesManager({ slug, classes, isOwner, timezone }: { s
                         <span aria-hidden="true">{openSession === s.id ? "▾" : "▸"}</span>
                       </span>
                     </button>
-                    {openSession === s.id && <Roster slug={slug} session={s} isOwner={isOwner} price={c.price} onChanged={refresh} />}
+                    {openSession === s.id && <Roster slug={slug} session={s} isOwner={isOwner} price={c.price} members={members} onChanged={refresh} />}
                   </li>
                 ))}
               </ul>

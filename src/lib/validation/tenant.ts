@@ -222,6 +222,9 @@ export const confirmClassRegistrationSchema = z.object({
   note: z.string().trim().max(200).optional(),
 });
 
+/** Staff books a member into a session. */
+export const addClassRegistrationSchema = z.object({ memberId: z.string().uuid() });
+
 export const registerForClassSchema = z.object({ sessionId: z.string().uuid() });
 
 export const transferProofSchema = z.object({

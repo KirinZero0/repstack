@@ -31,13 +31,19 @@ export default async function ClassesPage({ params }: { params: { slug: string }
         take: 40,
         include: {
           registrations: {
-            where: { status: { not: "CANCELLED" } },
             orderBy: { createdAt: "asc" },
             include: { member: { select: { fullName: true } }, payment: { select: { status: true, amount: true, provider: true } } },
           },
         },
       },
     },
+  });
+
+  const members = await db.member.findMany({
+    where: { gymId: gym.id, anonymizedAt: null, status: { not: "CANCELLED" } },
+    orderBy: { fullName: "asc" },
+    select: { id: true, fullName: true },
+    take: 1000,
   });
 
   const rows: ClassRow[] = classes.map((c) => ({
@@ -79,7 +85,7 @@ export default async function ClassesPage({ params }: { params: { slug: string }
           </div>
           <GymNav slug={params.slug} role={session.role} current="classes" />
         </div>
-        <ClassesManager slug={params.slug} classes={rows} isOwner={session.role === "OWNER"} timezone={gym.timezone} />
+        <ClassesManager slug={params.slug} classes={rows} isOwner={session.role === "OWNER"} timezone={gym.timezone} members={members} />
       </div>
     </main>
   );
