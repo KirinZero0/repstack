@@ -16,18 +16,25 @@ async function createGym(request: APIRequestContext, baseURL: string, extra: Rec
   return (await res.json()).gymId as string;
 }
 
-test("a new gym starts a 30-day trial, a lifetime gym doesn't, and the first payment makes it active", async ({ request, baseURL }) => {
+test("a new gym starts a trial (14 days unless the superadmin picks another length), a lifetime gym doesn't, and the first payment makes it active", async ({ request, baseURL }) => {
   expect((await request.post(`${baseURL}/api/superadmin/login`, { data: { email: "superadmin@test.local", password: "superadmin-pass-123" } })).ok()).toBeTruthy();
 
   const gymId = await createGym(request, baseURL!);
   const gym = await prisma.gym.findUniqueOrThrow({ where: { id: gymId } });
   expect(gym.subscriptionStatus).toBe("TRIALING");
   const days = (gym.nextBillingDate!.getTime() - Date.now()) / DAY;
-  expect(days).toBeGreaterThan(29.9);
-  expect(days).toBeLessThanOrEqual(30);
+  expect(days).toBeGreaterThan(13.9);
+  expect(days).toBeLessThanOrEqual(14);
+
+  // The superadmin can pick another length.
+  const longId = await createGym(request, baseURL!, { trialDays: 30 });
+  const longDays = ((await prisma.gym.findUniqueOrThrow({ where: { id: longId } })).nextBillingDate!.getTime() - Date.now()) / DAY;
+  expect(longDays).toBeGreaterThan(29.9);
+  expect(longDays).toBeLessThanOrEqual(30);
 
   // The superadmin list says how long the trial has left.
   const html = (await (await request.get(`${baseURL}/superadmin/gyms`)).text()).replace(/<!-- -->/g, "");
+  expect(html).toContain("trial ends in 14 days");
   expect(html).toContain("trial ends in 30 days");
 
   // A lifetime gym is never billed, so it has no trial.

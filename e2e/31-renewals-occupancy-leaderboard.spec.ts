@@ -73,7 +73,8 @@ const renew = (ctx: APIRequestContext, baseURL: string, planId: string, withProo
   });
 
 /** The "in the gym now" card's HTML, without the leaderboard card that follows it (both list member names). */
-const occupancyCard = (html: string) => html.slice(html.indexOf("In the gym now"), html.indexOf("Most visits this month"));
+// Anchor on the card's own heading: "In the gym now" is also a stat tile label higher up, above the "Checked in today" list.
+const occupancyCard = (html: string) => html.slice(html.indexOf("In the gym now</h2>"), html.indexOf("Most visits this month"));
 
 async function checkIn(f: Awaited<ReturnType<typeof makeGym>>, memberId: string, at: Date, over: { checkedOutAt?: Date } = {}) {
   return prisma.checkIn.create({ data: { gymId: f.gym.id, memberId, result: "SUCCESS", checkedInAt: at, checkedOutAt: over.checkedOutAt ?? null } });
