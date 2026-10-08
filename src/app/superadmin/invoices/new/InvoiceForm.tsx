@@ -74,8 +74,8 @@ export default function InvoiceForm({ gyms, plans }: { gyms: string[]; plans: { 
           </datalist>
         </label>
         <label className="text-sm text-neutral-300">
-          <span className="mb-1 block">Who will pay (name)</span>
-          <input required minLength={2} maxLength={120} value={billToName} onChange={(e) => setBillToName(e.target.value)} className={input} placeholder="Owner or whoever pays the invoice" />
+          <span className="mb-1 block">Billed to</span>
+          <input required minLength={2} maxLength={120} value={billToName} onChange={(e) => setBillToName(e.target.value)} className={input} placeholder="Name of the person you are billing" />
         </label>
         <label className="text-sm text-neutral-300">
           <span className="mb-1 block">Address / contact (optional)</span>
