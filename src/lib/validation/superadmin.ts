@@ -43,3 +43,28 @@ export const confirmTransferSchema = z.object({
   // Confirm a transfer that has no screenshot (cash deposit, bank-app transfer): the superadmin vouches for it.
   withoutProof: z.boolean().optional(),
 });
+
+const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid date");
+
+export const createInvoiceSchema = z
+  .object({
+    billToName: z.string().trim().min(2).max(120),
+    billToInfo: z.string().trim().max(500).default(""),
+    issueDate: dateOnly,
+    dueDate: dateOnly.optional(),
+    notes: z.string().trim().max(1000).default(""),
+    items: z
+      .array(
+        z.object({
+          description: z.string().trim().min(1).max(200),
+          quantity: z.number().int().min(1).max(10_000),
+          // Whole rupiah. 0 is allowed so a free line (e.g. training) can show on the invoice.
+          unitPrice: z.number().int().min(0).max(10_000_000_000),
+        }),
+      )
+      .min(1)
+      .max(30),
+  })
+  .refine((v) => !v.dueDate || v.dueDate >= v.issueDate, { message: "Due date can't be before the issue date", path: ["dueDate"] });
+
+export const invoiceActionSchema = z.object({ action: z.enum(["paid", "unpaid", "void"]) });

@@ -303,6 +303,27 @@ model AuditLog {
 
 // ─── Platform config ────────────────────────────────────────
 
+/// Hand-made invoices the superadmin issues to gyms (setup, training, packages) and prints or saves as PDF.
+/// Platform-level, not tenant data: no gymId, and the restricted app role is never granted it.
+model Invoice {
+  id          String    @id @default(uuid())
+  number      String    @unique // "INV-2026-0001"
+  billToName  String
+  billToInfo  String    @default("") // address / contact lines, shown under the name
+  currency    String    @default("IDR")
+  items       Json // [{ description, quantity, unitPrice }]
+  total       Decimal
+  notes       String    @default("")
+  status      String    @default("UNPAID") // "UNPAID" | "PAID" | "VOID"
+  issueDate   DateTime
+  dueDate     DateTime?
+  paidAt      DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  @@index([createdAt])
+}
+
 model AppConfig {
   key       String   @id // e.g. "theme.default", "theme.allowUserOverride"
   value     Json

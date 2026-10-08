@@ -25,6 +25,7 @@ export default async function SuperadminSettingsPage() {
           <nav className="flex gap-4 text-sm">
             <a href="/superadmin/dashboard" className="text-neutral-300 hover:text-white">Dashboard</a>
             <a href="/superadmin/gyms" className="text-neutral-300 hover:text-white">Gyms</a>
+            <a href="/superadmin/invoices" className="text-neutral-300 hover:text-white">Invoices</a>
           </nav>
         </div>
         <Card title="Bank account for subscriptions">

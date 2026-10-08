@@ -10,7 +10,7 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 
 const TENANT_TABLES = ["Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup", "GymClass", "ClassSession", "ClassRegistration", "ClassPayment"];
-const NOT_GRANTED = ["Superadmin", "AuditLog", "GymSignup", "MagicLink", "PasswordReset", "AppConfig"];
+const NOT_GRANTED = ["Superadmin", "AuditLog", "GymSignup", "MagicLink", "PasswordReset", "AppConfig", "Invoice"];
 
 let failures = 0;
 function check(ok: boolean, label: string, detail?: string) {
