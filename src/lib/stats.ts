@@ -34,7 +34,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
   const months = lastMonthKeys(12, timezone);
   const since = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
 
-  const [paid, paidClasses, pendingAgg, pendingClassAgg, statusGroups, classStatusGroups, recent, recentClasses] = await Promise.all([
+  const [paid, paidClasses, paidDayPasses, pendingAgg, pendingClassAgg, statusGroups, classStatusGroups, recent, recentClasses] = await Promise.all([
     db.payment.findMany({
       where: { gymId, status: "PAID", paidAt: { gte: since } },
       include: { plan: { select: { name: true } } },
@@ -42,6 +42,11 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     db.classPayment.findMany({
       where: { gymId, status: "PAID", paidAt: { gte: since } },
       include: { registration: { select: { session: { select: { class: { select: { name: true } } } } } } },
+    }),
+    // Day passes are paid at the desk, so a pass counts as revenue once its ticket has been scanned.
+    db.guestPass.findMany({
+      where: { gymId, status: "ATTENDED", dayPassPlanId: { not: null }, attendedAt: { gte: since } },
+      include: { dayPassPlan: { select: { name: true } } },
     }),
     db.payment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
     db.classPayment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
@@ -61,7 +66,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     }),
   ]);
 
-  type PaidRow = { when: Date; amount: number; item: string; kind: "membership" | "class"; provider: string };
+  type PaidRow = { when: Date; amount: number; item: string; kind: "membership" | "class" | "daypass"; provider: string };
   const rows: PaidRow[] = [
     ...paid.map((p) => ({ when: p.paidAt ?? p.createdAt, amount: Number(p.amount), item: p.plan.name, kind: "membership" as const, provider: p.provider })),
     ...paidClasses.map((p) => ({
@@ -71,10 +76,18 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       kind: "class" as const,
       provider: p.provider,
     })),
+    ...paidDayPasses.map((p) => ({
+      when: p.attendedAt ?? p.createdAt,
+      amount: Number(p.amount ?? 0),
+      item: `${p.dayPassPlan?.name ?? "Day pass"} (day pass)`,
+      kind: "daypass" as const,
+      provider: "CASH",
+    })),
   ];
 
   const byMonth = new Map<string, number>(months.map((k) => [k, 0]));
   const byMonthClasses = new Map<string, number>(months.map((k) => [k, 0]));
+  const byMonthDayPasses = new Map<string, number>(months.map((k) => [k, 0]));
   const byPlan = new Map<string, number>();
   const byMethod = new Map<string, number>();
   for (const p of rows) {
@@ -82,6 +95,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     if (byMonth.has(key)) {
       byMonth.set(key, (byMonth.get(key) ?? 0) + p.amount);
       if (p.kind === "class") byMonthClasses.set(key, (byMonthClasses.get(key) ?? 0) + p.amount);
+      if (p.kind === "daypass") byMonthDayPasses.set(key, (byMonthDayPasses.get(key) ?? 0) + p.amount);
     }
     if (key === months[months.length - 1]) {
       byPlan.set(p.item, (byPlan.get(p.item) ?? 0) + p.amount);
@@ -93,10 +107,16 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
   const monthly = months.map((k) => ({ key: k, label: monthLabel(k), value: byMonth.get(k) ?? 0 }));
   const thisMonth = monthly[monthly.length - 1].value;
   const thisMonthClasses = byMonthClasses.get(months[months.length - 1]) ?? 0;
+  const thisMonthDayPasses = byMonthDayPasses.get(months[months.length - 1]) ?? 0;
   const lastMonth = monthly[monthly.length - 2]?.value ?? 0;
 
   const statusCounts = new Map<string, number>();
   for (const g of [...statusGroups, ...classStatusGroups]) statusCounts.set(g.status, (statusCounts.get(g.status) ?? 0) + g._count);
+
+  const recentDayPasses = paidDayPasses
+    .filter((p) => p.attendedAt)
+    .sort((a, b) => b.attendedAt!.getTime() - a.attendedAt!.getTime())
+    .slice(0, 10);
 
   const recentAll = [
     ...recent.map((p) => ({ id: p.id, member: p.member.fullName, plan: p.plan.name, amount: Number(p.amount), status: p.status, date: p.createdAt })),
@@ -108,6 +128,14 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       status: p.status,
       date: p.createdAt,
     })),
+    ...recentDayPasses.map((p) => ({
+      id: p.id,
+      member: `${p.fullName} (guest)`,
+      plan: `${p.dayPassPlan?.name ?? "Day pass"} (day pass)`,
+      amount: Number(p.amount ?? 0),
+      status: "PAID" as string,
+      date: p.attendedAt!,
+    })),
   ]
     .sort((a, b) => b.date.getTime() - a.date.getTime())
     .slice(0, 10);
@@ -116,6 +144,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     monthly,
     thisMonth,
     thisMonthClasses,
+    thisMonthDayPasses,
     lastMonth,
     changePct: lastMonth > 0 ? ((thisMonth - lastMonth) / lastMonth) * 100 : null,
     yearTotal: monthly.reduce((s, m) => s + m.value, 0),

@@ -162,3 +162,9 @@ membership side of the app, not under classes.
   pending-count banner) and from Classes. Approve/reject/resend work the same for both.
 - **Ticket** is valid only on its visit day (gym timezone): earlier scans say "too early", later ones
   "expired". Day passes have no capacity limit.
+- **Revenue** `GuestPass.amount` snapshots the plan price when the guest requests (later price changes
+  don't rewrite history; migration `20261009020000_day_pass_amount`). Because day passes are paid at
+  the desk, a pass counts as revenue when its ticket is **scanned** (`ATTENDED`, dated by `attendedAt`),
+  not when approved. It shows on Finance ("from day passes", the 12-month chart, by plan, recent
+  payments as "(guest)") and in both CSV exports (type "Day pass"; the monthly report has a new
+  "Day pass revenue" column before "Total revenue"). Class guest tickets carry no price, so they add no revenue.

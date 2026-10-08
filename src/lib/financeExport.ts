@@ -53,7 +53,7 @@ export const TRANSACTION_COLUMNS = [
 
 interface Txn {
   when: Date;
-  type: "Membership" | "Class";
+  type: "Membership" | "Class" | "Day pass";
   member: string;
   item: string;
   amount: number;
@@ -82,7 +82,7 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
         ],
       };
 
-  const [memberships, classes] = await Promise.all([
+  const [memberships, classes, dayPasses] = await Promise.all([
     db.payment.findMany({
       where: { gymId, ...inRange },
       include: { member: { select: { fullName: true } }, plan: { select: { name: true } }, recordedBy: { select: { name: true } } },
@@ -93,6 +93,11 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
         registration: { include: { member: { select: { fullName: true } }, session: { include: { class: { select: { name: true } } } } } },
         recordedBy: { select: { name: true } },
       },
+    }),
+    // Day passes are paid at the desk and count once scanned; there are no unpaid or failed ones to list.
+    db.guestPass.findMany({
+      where: { gymId, status: "ATTENDED", dayPassPlanId: { not: null }, attendedAt: { gte: start, lte: end } },
+      include: { dayPassPlan: { select: { name: true } }, scannedBy: { select: { name: true } } },
     }),
   ]);
 
@@ -125,6 +130,20 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
       invoiceId: p.externalInvoiceId ?? "",
       id: p.id,
     })),
+    ...dayPasses.map((p) => ({
+      when: p.attendedAt ?? p.createdAt,
+      type: "Day pass" as const,
+      member: `${p.fullName} (guest)`,
+      item: `${p.dayPassPlan?.name ?? "Day pass"}${p.visitDate ? ` (${p.visitDate})` : ""}`,
+      amount: Number(p.amount ?? 0),
+      currency: "IDR",
+      status: "PAID",
+      method: METHOD.CASH,
+      recordedBy: p.scannedBy?.name ?? "",
+      note: "",
+      invoiceId: "",
+      id: p.id,
+    })),
   ];
   return rows.sort((a, b) => a.when.getTime() - b.when.getTime());
 }
@@ -150,7 +169,7 @@ export async function transactionsReport(db: TenantDb, gymId: string, range: Dat
   ];
 }
 
-export const MONTHLY_COLUMNS = ["Month", "Membership revenue", "Class revenue", "Total revenue", "Paid payments", "Cash / transfer", "Online", "Voided"] as const;
+export const MONTHLY_COLUMNS = ["Month", "Membership revenue", "Class revenue", "Day pass revenue", "Total revenue", "Paid payments", "Cash / transfer", "Online", "Voided"] as const;
 
 /** Month keys (YYYY-MM) from the month of `from` to the month of `to`, inclusive. */
 function monthsIn(range: DateRange): string[] {
@@ -171,8 +190,8 @@ function monthsIn(range: DateRange): string[] {
 /** One row per month: what came in, split by membership vs class and by how it was paid. Paid money only, plus a count of voided entries. */
 export async function monthlyReport(db: TenantDb, gymId: string, range: DateRange, timezone: string): Promise<CsvCell[][]> {
   const rows = await loadTransactions(db, gymId, range, timezone, false);
-  type Bucket = { membership: number; classes: number; count: number; cash: number; online: number; voided: number };
-  const buckets = new Map<string, Bucket>(monthsIn(range).map((k) => [k, { membership: 0, classes: 0, count: 0, cash: 0, online: 0, voided: 0 }]));
+  type Bucket = { membership: number; classes: number; dayPasses: number; count: number; cash: number; online: number; voided: number };
+  const buckets = new Map<string, Bucket>(monthsIn(range).map((k) => [k, { membership: 0, classes: 0, dayPasses: 0, count: 0, cash: 0, online: 0, voided: 0 }]));
   for (const r of rows) {
     const b = buckets.get(monthKey(r.when, timezone));
     if (!b) continue;
@@ -183,7 +202,8 @@ export async function monthlyReport(db: TenantDb, gymId: string, range: DateRang
     if (r.status !== "PAID") continue;
     b.count++;
     if (r.type === "Membership") b.membership += r.amount;
-    else b.classes += r.amount;
+    else if (r.type === "Class") b.classes += r.amount;
+    else b.dayPasses += r.amount;
     if (r.method === METHOD.CASH) b.cash += r.amount;
     else b.online += r.amount;
   }
@@ -193,7 +213,8 @@ export async function monthlyReport(db: TenantDb, gymId: string, range: DateRang
       `${monthLabel(key)} ${key.slice(0, 4)}`,
       String(b.membership),
       String(b.classes),
-      String(b.membership + b.classes),
+      String(b.dayPasses),
+      String(b.membership + b.classes + b.dayPasses),
       String(b.count),
       String(b.cash),
       String(b.online),

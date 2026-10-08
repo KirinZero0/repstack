@@ -542,6 +542,7 @@ model GuestPass {
   dayPassPlanId       String?
   dayPassPlan         DayPassPlan?    @relation(fields: [dayPassPlanId], references: [id])
   visitDate           String? // "YYYY-MM-DD" in the gym's timezone; day passes only
+  amount              Decimal? // day passes: the plan price when requested; counted as revenue when the ticket is scanned (paid at the desk)
   fullName            String
   phoneWhatsapp       String // encrypted
   phoneWhatsappLookup String // HMAC blind index, one request per phone per session

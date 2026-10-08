@@ -181,6 +181,16 @@ test("day pass: owner sets it up, guest requests, staff approves, ticket scans o
   expect((await (await request.post(`${baseURL}/api/checkin`, { data: { token } })).json()).result).toBe("DUPLICATE");
   expect((await prisma.guestPass.findUniqueOrThrow({ where: { id: pass.id } })).status).toBe("ATTENDED");
 
+  // Paid at the desk, so the money shows up on Finance once the ticket is scanned, at the price it was requested at.
+  await prisma.dayPassPlan.update({ where: { id: planId }, data: { price: 99000 } });
+  const finance = await (await request.get(`${baseURL}/${f.slug}/finance`)).text();
+  expect(finance).toContain("from day passes");
+  const csv = await (await request.get(`${baseURL}/api/${f.slug}/finance/export?report=transactions`)).text();
+  expect(csv).toContain("Day pass");
+  expect(csv).toContain("Day Dave (guest)");
+  expect(csv).toContain(",50000,");
+  expect(csv).not.toContain("99000");
+
   // Never a member, never a check-in row.
   expect(await prisma.member.count({ where: { gymId: f.gym.id } })).toBe(0);
   expect(await prisma.checkIn.count({ where: { gymId: f.gym.id } })).toBe(0);

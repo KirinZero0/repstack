@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { DAY_PASS_MAX_DAYS_AHEAD, guestPassRequestSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     { status: 409 },
   );
 
-  let target: { sessionId: string } | { dayPassPlanId: string; visitDate: string };
+  let target: { sessionId: string } | { dayPassPlanId: string; visitDate: string; amount: Prisma.Decimal };
   if (d.sessionId) {
     // Tenant isolation: only an upcoming, scheduled session of this gym's active class.
     const cs = await prisma.classSession.findUnique({ where: { id: d.sessionId }, include: { class: true } });
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       return NextResponse.json({ error: "Pick a day from today up to two weeks ahead." }, { status: 400 });
     }
     if (await prisma.guestPass.findUnique({ where: { dayPassPlanId_visitDate_phoneWhatsappLookup: { dayPassPlanId: plan.id, visitDate, phoneWhatsappLookup: lookup } } })) return alreadyAsked;
-    target = { dayPassPlanId: plan.id, visitDate };
+    target = { dayPassPlanId: plan.id, visitDate, amount: plan.price };
   }
 
   await prisma.guestPass.create({
