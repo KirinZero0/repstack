@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   return NextResponse.json({ ok: true, cancelledRegistrations: cs.registrations.filter((r) => r.status !== "CANCELLED").length });
 }
 
-/** Owner deletes a session nobody booked. One with bookings, past or present, is cancelled instead so the history stays. */
+/** Owner deletes a session with no active or paid bookings (cancelled unpaid ones are removed with it). Anything else is cancelled instead so the history stays. */
 export async function DELETE(_req: NextRequest, { params }: { params: { slug: string; sessionId: string } }) {
   let session, gym, db;
   try {
@@ -69,12 +69,19 @@ export async function DELETE(_req: NextRequest, { params }: { params: { slug: st
     return NextResponse.json({ error: "Only the owner can manage class sessions" }, { status: 403 });
   }
 
-  const cs = await db.classSession.findUnique({ where: { id: params.sessionId }, include: { _count: { select: { registrations: true } } } });
+  const cs = await db.classSession.findUnique({ where: { id: params.sessionId }, include: { registrations: { include: { payment: true } } } });
   if (!cs || cs.gymId !== gym.id) return NextResponse.json({ error: "Session not found" }, { status: 404 });
-  if (cs._count.registrations > 0) {
+  // Cancelled, unpaid bookings are dead weight and go with the session; anything active or paid keeps it.
+  if (cs.registrations.some((r) => r.status !== "CANCELLED" || r.payment?.status === "PAID")) {
     return NextResponse.json({ error: "This session has bookings on record. Cancel it instead so everyone is told." }, { status: 409 });
   }
 
-  await db.classSession.delete({ where: { id: cs.id } });
+  await tenantTransaction(gym.id, async (tx) => {
+    for (const r of cs.registrations) {
+      if (r.payment) await tx.classPayment.delete({ where: { id: r.payment.id } });
+      await tx.classRegistration.delete({ where: { id: r.id } });
+    }
+    await tx.classSession.delete({ where: { id: cs.id } });
+  });
   return NextResponse.json({ ok: true });
 }

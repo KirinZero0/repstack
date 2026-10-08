@@ -261,7 +261,7 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
   }
 
   async function deleteSession() {
-    if (!window.confirm("Delete this session? Nobody has booked it, so nothing else changes.")) return;
+    if (!window.confirm("Delete this session? It has no active or paid bookings; any cancelled ones are removed with it.")) return;
     setBusy("session");
     setError(null);
     const { error } = await call(`/api/${slug}/class-sessions/${session.id}`, "DELETE");
@@ -348,7 +348,7 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
               Cancel this session
             </button>
           )}
-          {session.registrations.length === 0 && (
+          {session.registrations.every((r) => r.status === "CANCELLED" && !r.paid) && (
             <button onClick={deleteSession} disabled={busy === "session"} className="text-xs text-neutral-400 hover:text-red-400 hover:underline disabled:opacity-50">
               Delete this session
             </button>
