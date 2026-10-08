@@ -23,9 +23,28 @@ const display = Bricolage_Grotesque({
   display: "swap",
 });
 
+const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
+const DESCRIPTION =
+  "Gym management software for independent gyms: memberships, QR door check-in, payments, classes and WhatsApp reminders in one dashboard. Know who trained and who paid.";
+
 export const metadata: Metadata = {
-  title: "Liftmora",
-  description: "Memberships, door check-ins and billing for independent gyms. Know who trained and who paid.",
+  metadataBase: new URL(SITE_URL),
+  title: "Liftmora: gym membership, check-in and billing software",
+  description: DESCRIPTION,
+  applicationName: "Liftmora",
+  keywords: ["gym management software", "gym membership software", "QR check-in gym", "aplikasi manajemen gym", "software gym Indonesia", "Liftmora"],
+  openGraph: {
+    type: "website",
+    siteName: "Liftmora",
+    title: "Liftmora: gym membership, check-in and billing software",
+    description: DESCRIPTION,
+    locale: "en_ID",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Liftmora: gym membership, check-in and billing software",
+    description: DESCRIPTION,
+  },
 };
 
 export default async function RootLayout({

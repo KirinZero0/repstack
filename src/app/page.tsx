@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import HeroLedger from "@/components/landing/HeroLedger";
 import Pricing, { type Tier } from "@/components/landing/Pricing";
 import { SiteFooter, SiteHeader } from "@/components/landing/SiteChrome";
@@ -6,6 +7,38 @@ import { PlateGlyph } from "@/components/BrandMark";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+  openGraph: { url: "/" },
+};
+
+const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
+
+// Structured data so search engines know what Liftmora is. No prices here: they live in the database and change.
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "Liftmora",
+      url: SITE_URL,
+      logo: `${SITE_URL}/icon.svg`,
+      email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || undefined,
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Liftmora",
+      url: SITE_URL,
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      description:
+        "Gym management software for independent gyms: memberships, QR door check-in, payments, classes and WhatsApp reminders.",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
+  ],
+};
 
 async function loadTiers(): Promise<Tier[]> {
   try {
@@ -92,6 +125,7 @@ export default async function Home() {
 
   return (
     <div className="bg-neutral-950 text-white">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }} />
       <SiteHeader current="home" />
 
       <main>
