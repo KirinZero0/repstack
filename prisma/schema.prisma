@@ -80,6 +80,7 @@ model Gym {
   classRegistrations ClassRegistration[]
   classPayments      ClassPayment[]
   guestPasses        GuestPass[]
+  dayPassPlans       DayPassPlan[]
 
   @@index([subscriptionStatus])
 }
@@ -513,12 +514,34 @@ enum GuestPassStatus {
   ATTENDED
 }
 
+// A day pass is the same ticket for a visit to the gym itself instead of one class: a DayPassPlan
+// (name + price, never creates a Member) and a GuestPass with dayPassPlanId + visitDate set instead
+// of sessionId. Exactly one of sessionId / dayPassPlanId is set on a pass. Valid on visitDate, a
+// calendar day in the gym's timezone.
+model DayPassPlan {
+  id          String   @id @default(uuid())
+  gymId       String
+  gym         Gym      @relation(fields: [gymId], references: [id])
+  name        String
+  price       Decimal
+  currency    String   @default("IDR")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  guestPasses GuestPass[]
+
+  @@index([gymId])
+}
+
 model GuestPass {
   id                  String          @id @default(uuid())
   gymId               String
   gym                 Gym             @relation(fields: [gymId], references: [id])
-  sessionId           String
-  session             ClassSession    @relation(fields: [sessionId], references: [id])
+  sessionId           String?
+  session             ClassSession?   @relation(fields: [sessionId], references: [id])
+  dayPassPlanId       String?
+  dayPassPlan         DayPassPlan?    @relation(fields: [dayPassPlanId], references: [id])
+  visitDate           String? // "YYYY-MM-DD" in the gym's timezone; day passes only
   fullName            String
   phoneWhatsapp       String // encrypted
   phoneWhatsappLookup String // HMAC blind index, one request per phone per session
@@ -534,6 +557,7 @@ model GuestPass {
   createdAt           DateTime        @default(now())
 
   @@unique([sessionId, phoneWhatsappLookup])
+  @@unique([dayPassPlanId, visitDate, phoneWhatsappLookup])
   @@index([gymId, status])
   @@index([ipHash, createdAt])
 }

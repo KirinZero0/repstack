@@ -142,4 +142,19 @@ over WhatsApp. Scanning it with the normal check-in scanner marks them attended.
   signature, approved, session scheduled, within 1h before start → end of class. `APPROVED →
   ATTENDED` is one atomic update, so a second scan (or two scanners) gets `DUPLICATE`. No
   `CheckIn` row — guests aren't members.
-- **Not built:** guests are not charged; the gym collects any fee itself. Tests: `e2e/35-guest-tickets.spec.ts`.
+- **Not built:** guests are not charged online; the gym collects any fee itself. Tests: `e2e/35-guest-tickets.spec.ts`.
+
+### Day passes (same pipeline, no class)
+
+A gym can sell a one-visit ticket to non-members. It never creates a `Member`.
+
+- **Schema** `DayPassPlan` (name, price; RLS tenant table). A `GuestPass` is for a class session
+  **or** a day pass (`sessionId` nullable, `dayPassPlanId` + `visitDate` "YYYY-MM-DD" in the gym's
+  timezone; a DB check enforces exactly one). One request per phone, plan and day. Migration
+  `20261009010000_day_passes`; run `npm run db:rls` after deploying it.
+- **Owner** sets plans up on `/[slug]/classes/guests` (`POST /api/[slug]/day-pass-plans`,
+  `PATCH …/[planId]` for rename / reprice / hide). Staff can review requests but not manage plans.
+- **Guest** picks a plan and a day (today up to 14 days ahead) on `/[slug]/guest-pass`; the price is
+  shown as "paid at the front desk". Day passes have no capacity limit.
+- **Ticket** is valid only on its visit day (gym timezone): earlier scans say "too early", later ones
+  "expired". Everything else — approve/reject/resend, WhatsApp, the one-time scan — is the class-ticket flow.

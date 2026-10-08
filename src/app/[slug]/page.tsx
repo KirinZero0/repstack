@@ -39,6 +39,7 @@ export default async function GymProfilePage({ params }: { params: { slug: strin
     select: { id: true, name: true, instructor: true, durationMinutes: true, description: true },
   });
 
+  const hasDayPass = (await prisma.dayPassPlan.count({ where: { gymId: gym.id, isActive: true } })) > 0;
   const live = gym.subscriptionStatus !== "SUSPENDED" && gym.subscriptionStatus !== "CANCELLED";
   const canJoin = live && gymAcceptsSignups(gym.settings);
   const [hero, ...rest] = gym.photoUrls;
@@ -70,6 +71,11 @@ export default async function GymProfilePage({ params }: { params: { slug: strin
               {canJoin && (
                 <a href={`/${params.slug}/join`} className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-neutral-950 hover:bg-neutral-200">
                   Join {gym.name}
+                </a>
+              )}
+              {live && hasDayPass && (
+                <a href={`/${params.slug}/guest-pass`} className="rounded-lg border border-neutral-700 px-6 py-3 text-sm font-semibold text-white hover:bg-neutral-900">
+                  Day pass for guests
                 </a>
               )}
               <a href={`/${params.slug}/login`} className="rounded-lg border border-neutral-700 px-6 py-3 text-sm font-semibold text-white hover:bg-neutral-900">
@@ -116,7 +122,7 @@ export default async function GymProfilePage({ params }: { params: { slug: strin
                 <>
                   {" "}Not a member?{" "}
                   <a href={`/${params.slug}/guest-pass`} className="text-neutral-200 underline underline-offset-2 hover:text-white">
-                    Request a spot as a guest
+                    Request a spot, or a day pass, as a guest
                   </a>.
                 </>
               )}

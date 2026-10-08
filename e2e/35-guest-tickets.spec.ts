@@ -2,6 +2,7 @@ import { test, expect, type APIRequestContext } from "@playwright/test";
 import bcrypt from "bcryptjs";
 import { prisma } from "./helpers";
 import { ticketTokenFor } from "../src/lib/guestPass";
+import { dayKeyInTimezone } from "../src/lib/date";
 
 const HOUR = 60 * 60 * 1000;
 let seq = 0;
@@ -132,4 +133,89 @@ test("ticket is not valid long before the class", async ({ request, baseURL }) =
   expect(body.result).toBe("INVALID");
   expect(body.message).toContain("Too early");
   expect((await prisma.guestPass.findUniqueOrThrow({ where: { id: pass.id } })).status).toBe("APPROVED");
+});
+
+// ─── Day passes ──────────────────────────────────────────────
+
+async function makeDayPass(slugGymId: string, price = 50000) {
+  return prisma.dayPassPlan.create({ data: { gymId: slugGymId, name: "Single visit", price } });
+}
+const todayIn = (tz: string, plusDays = 0) => dayKeyInTimezone(new Date(Date.now() + plusDays * 24 * 60 * 60 * 1000), tz);
+
+test("day pass: owner sets it up, guest requests, staff approves, ticket scans once and no member is created", async ({ request, baseURL, playwright }) => {
+  const f = await makeGym();
+  const owner = { email: `owner-${f.slug}@test.local`, password: "owner-pass-123" };
+  await prisma.staffUser.create({ data: { gymId: f.gym.id, name: "Owner", email: owner.email, passwordHash: await bcrypt.hash(owner.password, 10), role: "OWNER" } });
+
+  // Staff can't manage plans; the owner can.
+  await login(request, baseURL!, f.slug, f.staff);
+  expect((await request.post(`${baseURL}/api/${f.slug}/day-pass-plans`, { data: { name: "Single visit", price: 50000 } })).status()).toBe(403);
+  await login(request, baseURL!, f.slug, owner);
+  const created = await request.post(`${baseURL}/api/${f.slug}/day-pass-plans`, { data: { name: "Single visit", price: 50000 } });
+  expect(created.status()).toBe(201);
+  const { planId } = await created.json();
+
+  const anon = await playwright.request.newContext();
+  // The public form offers the plan, and staff/owner see the manager and the request list.
+  expect(await (await anon.get(`${baseURL}/${f.slug}/guest-pass`)).text()).toContain("Single visit");
+  expect(await (await request.get(`${baseURL}/${f.slug}/classes/guests`)).text()).toContain("day-pass-plans");
+  const visitDate = todayIn(f.gym.timezone);
+  const phone = phoneN();
+  const req1 = await anon.post(`${baseURL}/api/${f.slug}/guest-passes`, { data: { dayPassPlanId: planId, visitDate, fullName: "Day Dave", phone } });
+  expect(req1.status()).toBe(201);
+  // Same phone, plan and day can't be filed twice; another day can.
+  expect((await anon.post(`${baseURL}/api/${f.slug}/guest-passes`, { data: { dayPassPlanId: planId, visitDate, fullName: "Day Dave", phone } })).status()).toBe(409);
+  expect((await anon.post(`${baseURL}/api/${f.slug}/guest-passes`, { data: { dayPassPlanId: planId, visitDate: todayIn(f.gym.timezone, 1), fullName: "Day Dave", phone } })).status()).toBe(201);
+
+  const pass = await prisma.guestPass.findFirstOrThrow({ where: { gymId: f.gym.id, visitDate }, });
+  expect(pass.sessionId).toBeNull();
+  const token = ticketTokenFor(pass);
+  expect((await request.post(`${baseURL}/api/${f.slug}/guest-passes/${pass.id}`, { data: { action: "approve" } })).ok()).toBeTruthy();
+  expect(await prisma.notificationLog.count({ where: { gymId: f.gym.id, type: "guest_ticket", memberId: null } })).toBe(1);
+  expect(await (await anon.get(`${baseURL}/ticket/${token}`)).text()).toContain("ticket-qr");
+
+  expect((await (await request.post(`${baseURL}/api/checkin`, { data: { token } })).json()).result).toBe("SUCCESS");
+  expect((await (await request.post(`${baseURL}/api/checkin`, { data: { token } })).json()).result).toBe("DUPLICATE");
+  expect((await prisma.guestPass.findUniqueOrThrow({ where: { id: pass.id } })).status).toBe("ATTENDED");
+
+  // Never a member, never a check-in row.
+  expect(await prisma.member.count({ where: { gymId: f.gym.id } })).toBe(0);
+  expect(await prisma.checkIn.count({ where: { gymId: f.gym.id } })).toBe(0);
+});
+
+test("day pass is only valid on its day", async ({ request, baseURL }) => {
+  const f = await makeGym();
+  const plan = await makeDayPass(f.gym.id);
+  await login(request, baseURL!, f.slug, f.staff);
+  const mk = (visitDate: string) =>
+    prisma.guestPass.create({
+      data: { gymId: f.gym.id, dayPassPlanId: plan.id, visitDate, fullName: "D", phoneWhatsapp: "v1:x", phoneWhatsappLookup: `l-${seq++}`, status: "APPROVED" },
+    });
+  const future = await mk(todayIn(f.gym.timezone, 3));
+  const past = await mk(todayIn(f.gym.timezone, -2));
+  const early = await (await request.post(`${baseURL}/api/checkin`, { data: { token: ticketTokenFor(future) } })).json();
+  expect(early.result).toBe("INVALID");
+  expect(early.message).toContain("Too early");
+  const late = await (await request.post(`${baseURL}/api/checkin`, { data: { token: ticketTokenFor(past) } })).json();
+  expect(late.result).toBe("EXPIRED");
+  expect((await prisma.guestPass.findUniqueOrThrow({ where: { id: future.id } })).status).toBe("APPROVED");
+});
+
+test("day pass requests are tenant-scoped and validated", async ({ baseURL, playwright }) => {
+  const a = await makeGym();
+  const b = await makeGym();
+  const planB = await makeDayPass(b.gym.id);
+  const hidden = await prisma.dayPassPlan.create({ data: { gymId: a.gym.id, name: "Hidden", price: 1000, isActive: false } });
+  const anon = await playwright.request.newContext();
+  const post = (slug: string, data: object) => anon.post(`${baseURL}/api/${slug}/guest-passes`, { data: { fullName: "Eve", phone: phoneN(), ...data } });
+  const day = todayIn(a.gym.timezone);
+
+  expect((await post(a.slug, { dayPassPlanId: planB.id, visitDate: day })).status()).toBe(400); // another gym's plan
+  expect((await post(a.slug, { dayPassPlanId: hidden.id, visitDate: day })).status()).toBe(400); // hidden plan
+  const own = await makeDayPass(a.gym.id);
+  expect((await post(a.slug, { dayPassPlanId: own.id })).status()).toBe(400); // no date
+  expect((await post(a.slug, { dayPassPlanId: own.id, visitDate: todayIn(a.gym.timezone, -1) })).status()).toBe(400); // past
+  expect((await post(a.slug, { dayPassPlanId: own.id, visitDate: todayIn(a.gym.timezone, 60) })).status()).toBe(400); // too far
+  expect((await post(a.slug, { dayPassPlanId: own.id, sessionId: a.session.id, visitDate: day })).status()).toBe(400); // both targets
+  expect(await prisma.guestPass.count({ where: { gymId: { in: [a.gym.id, b.gym.id] } } })).toBe(0);
 });

@@ -237,12 +237,31 @@ export const transferProofSchema = z.object({
 
 // ─── Guest class tickets ────────────────────────────────────
 
-/** A non-member asks for a spot in one class session. The phone number is where the ticket is sent. */
-export const guestPassRequestSchema = z.object({
-  sessionId: z.string().uuid(),
-  fullName: z.string().trim().min(2, "Enter your name").max(80),
-  phone: z.string().trim().min(6, "Enter a valid WhatsApp number").max(30),
-});
+/** How many days ahead a guest can pick a day-pass visit date. */
+export const DAY_PASS_MAX_DAYS_AHEAD = 14;
+
+/**
+ * A non-member asks for a spot in one class session, or for a day pass on a chosen day. Exactly one
+ * of sessionId / dayPassPlanId. The phone number is where the ticket is sent.
+ */
+export const guestPassRequestSchema = z
+  .object({
+    sessionId: z.string().uuid().optional(),
+    dayPassPlanId: z.string().uuid().optional(),
+    visitDate: ymd.optional(),
+    fullName: z.string().trim().min(2, "Enter your name").max(80),
+    phone: z.string().trim().min(6, "Enter a valid WhatsApp number").max(30),
+  })
+  .refine((v) => Boolean(v.sessionId) !== Boolean(v.dayPassPlanId), "Pick a class or a day pass")
+  .refine((v) => !v.dayPassPlanId || Boolean(v.visitDate), "Pick the day you're coming");
+
+const dayPassPlanFields = {
+  name: z.string().trim().min(2).max(60),
+  price: z.number().int().min(0).max(100_000_000),
+  isActive: z.boolean(),
+};
+export const createDayPassPlanSchema = z.object({ ...dayPassPlanFields, isActive: dayPassPlanFields.isActive.default(true) });
+export const updateDayPassPlanSchema = z.object(dayPassPlanFields).partial().refine((v) => Object.keys(v).length > 0, "Nothing to update");
 
 /** Staff decides on a request, or re-sends an approved guest's ticket link. */
 export const guestPassActionSchema = z.object({ action: z.enum(["approve", "reject", "resend"]) });

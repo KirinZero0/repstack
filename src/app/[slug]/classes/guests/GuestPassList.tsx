@@ -9,6 +9,8 @@ export interface GuestPassRow {
   phone: string;
   className: string;
   when: string;
+  /** Day passes only: what the guest pays at the desk. */
+  price: number | null;
   status: "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "ATTENDED";
   ticketLink: string | null;
 }
@@ -60,7 +62,7 @@ export default function GuestPassList({ slug, rows }: { slug: string; rows: Gues
           <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-4" data-testid="guest-row" data-status={r.status}>
             <div>
               <p className="font-medium">{r.fullName} <span className="text-sm text-neutral-500">{r.phone}</span></p>
-              <p className="text-sm text-neutral-400">{r.className} · {r.when}</p>
+              <p className="text-sm text-neutral-400">{r.className} · {r.when}{r.price !== null ? ` · Rp ${r.price.toLocaleString("id-ID")} at the desk` : ""}</p>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-neutral-400">{LABEL[r.status]}</span>

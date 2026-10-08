@@ -3,13 +3,13 @@ import { tenantTransaction } from "@/lib/prisma";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { guestPassActionSchema } from "@/lib/validation/tenant";
 import { countSeatsTaken, effectiveCapacity } from "@/lib/classes";
-import { sendGuestRejection, sendGuestTicket } from "@/lib/guestPass";
+import { passIsCancelled, passWindow, sendGuestRejection, sendGuestTicket } from "@/lib/guestPass";
 
 class FullError extends Error {}
 class StateError extends Error {}
 
 /**
- * Owner or staff decides on a guest's request. Approve → seat held, one-time ticket link sent over
+ * Owner or staff decides on a guest's request (class spot or day pass). Approve → seat held, one-time ticket link sent over
  * WhatsApp. Reject → guest told. Resend → same ticket link again (approved, not yet used).
  */
 export async function POST(req: NextRequest, { params }: { params: { slug: string; passId: string } }) {
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const { action } = parsed.data;
 
   // Tenant isolation: the pass must belong to the session's gym.
-  const pass = await db.guestPass.findUnique({ where: { id: params.passId }, include: { session: { include: { class: true } } } });
+  const pass = await db.guestPass.findUnique({ where: { id: params.passId }, include: { session: { include: { class: true } }, dayPassPlan: true } });
   if (!pass || pass.gymId !== gym.id) return NextResponse.json({ error: "Request not found" }, { status: 404 });
 
   if (action === "resend") {
@@ -39,13 +39,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   if (pass.status !== "PENDING_REVIEW") return NextResponse.json({ error: "This request was already reviewed." }, { status: 409 });
-  if (action === "approve" && (pass.session.status !== "SCHEDULED" || pass.session.startsAt.getTime() + pass.session.class.durationMinutes * 60_000 < Date.now())) {
-    return NextResponse.json({ error: "That session is cancelled or over." }, { status: 409 });
+  if (action === "approve" && (passIsCancelled(pass) || passWindow(pass, gym.timezone) === "OVER")) {
+    return NextResponse.json({ error: pass.session ? "That session is cancelled or over." : "That visit date has passed." }, { status: 409 });
   }
 
   try {
     await tenantTransaction(gym.id, async (tx) => {
-      if (action === "approve") {
+      // Only class passes hold a seat; a day pass has no capacity.
+      if (action === "approve" && pass.session && pass.sessionId) {
         const cap = effectiveCapacity(pass.session, pass.session.class);
         if (cap !== null && (await countSeatsTaken(tx, pass.sessionId)) >= cap) throw new FullError();
       }

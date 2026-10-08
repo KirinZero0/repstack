@@ -3,7 +3,7 @@ import { z } from "zod";
 import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { isTicketToken, parseQrToken, parseTicketToken, verifyQrToken, verifyTicketToken } from "@/lib/qr";
-import { ticketWindow } from "@/lib/guestPass";
+import { passIsCancelled, passTitle, passWindow } from "@/lib/guestPass";
 import { evaluateAndLogCheckin } from "@/lib/checkin";
 
 const checkinSchema = z.object({ token: z.string().min(1) });
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (isTicketToken(parsed.data.token)) {
-    return handleTicketScan(db, session.gymId, session.staffUserId, parsed.data.token);
+    return handleTicketScan(db, gym, session.staffUserId, parsed.data.token);
   }
 
   const unverifiedPayload = parseQrToken(parsed.data.token);
@@ -67,12 +67,13 @@ export async function POST(req: NextRequest) {
 type TicketReply = { result: ResultCode; message?: string; member?: { fullName: string; photoUrl: string | null } };
 
 /**
- * Staff scans a guest's one-time class ticket. Same gates as a member scan (right gym, valid
+ * Staff scans a guest's one-time ticket (class or day pass). Same gates as a member scan (right gym, valid
  * signature), then the pass flips APPROVED → ATTENDED in a single compare-and-set so a second scan
  * — or two scanners at once — can never admit the same ticket twice. Guests aren't members, so
  * nothing is written to CheckIn.
  */
-async function handleTicketScan(db: ReturnType<typeof tenantDb>, gymId: string, staffUserId: string, token: string) {
+async function handleTicketScan(db: ReturnType<typeof tenantDb>, gym: { id: string; timezone: string }, staffUserId: string, token: string) {
+  const gymId = gym.id;
   const reply = (body: TicketReply, status = 200) => NextResponse.json(body, { status });
 
   const unverified = parseTicketToken(token);
@@ -81,23 +82,24 @@ async function handleTicketScan(db: ReturnType<typeof tenantDb>, gymId: string, 
 
   const pass = await db.guestPass.findUnique({
     where: { id: unverified.passId },
-    include: { session: { include: { class: true } } },
+    include: { session: { include: { class: true } }, dayPassPlan: true },
   });
   if (!pass || pass.gymId !== gymId || !verifyTicketToken(token, pass.ticketSecret)) return reply({ result: "INVALID" });
 
   const who = { fullName: pass.fullName, photoUrl: null };
   if (pass.status === "ATTENDED") return reply({ result: "DUPLICATE", message: "Ticket already used", member: who });
   if (pass.status !== "APPROVED") return reply({ result: "INVALID", message: "Ticket not approved", member: who });
-  if (pass.session.status !== "SCHEDULED") return reply({ result: "EXPIRED", message: "Class was cancelled", member: who });
+  if (passIsCancelled(pass)) return reply({ result: "EXPIRED", message: "Class was cancelled", member: who });
 
-  const window = ticketWindow(pass.session, pass.session.class.durationMinutes);
-  if (window === "EARLY") return reply({ result: "INVALID", message: "Too early — class isn't open yet", member: who });
-  if (window === "OVER") return reply({ result: "EXPIRED", message: "Class has ended", member: who });
+  const window = passWindow(pass, gym.timezone);
+  const isClass = Boolean(pass.session);
+  if (window === "EARLY") return reply({ result: "INVALID", message: isClass ? "Too early — class isn't open yet" : "Too early — pass is for a later day", member: who });
+  if (window === "OVER") return reply({ result: "EXPIRED", message: isClass ? "Class has ended" : "Day pass has expired", member: who });
 
   const res = await db.guestPass.updateMany({
     where: { id: pass.id, gymId, status: "APPROVED" },
     data: { status: "ATTENDED", attendedAt: new Date(), scannedById: staffUserId },
   });
   if (res.count !== 1) return reply({ result: "DUPLICATE", message: "Ticket already used", member: who });
-  return reply({ result: "SUCCESS", message: `Class ticket: ${pass.session.class.name}`, member: who });
+  return reply({ result: "SUCCESS", message: `${isClass ? "Class ticket" : "Ticket"}: ${passTitle(pass)}`, member: who });
 }
