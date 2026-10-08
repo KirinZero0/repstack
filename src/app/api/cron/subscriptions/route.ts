@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAuthorizedCronRequest } from "@/lib/cronAuth";
-import { isMockMode, onlinePaymentsEnabled } from "@/lib/gateway";
 import { openPlatformInvoice } from "@/lib/platformBilling";
+import { getPlatformBank, manualPlatformBilling } from "@/lib/platformBank";
 import { withSuspensionReason } from "@/lib/suspension";
 import { sendPlatformWhatsapp } from "@/lib/whatsapp";
 
@@ -13,12 +13,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Online payments are off: don't create renewal invoices nobody can pay, and don't suspend
-  // gyms for non-payment when they have no way to pay their way out. Mock mode (dev/test) keeps
-  // working, the same as every other invoice path in src/lib/gateway.ts.
-  if (!onlinePaymentsEnabled() && !isMockMode()) {
-    return NextResponse.json({ invoicesCreated: 0, gymsSuspended: 0, paymentsDisabled: true });
+  // Bank-transfer mode (no online provider yet): owners pay by transfer and the superadmin confirms it, so the same
+  // overdue and suspension rules apply. But a gym can only be held to them if it can see where to pay, so with no
+  // bank account on file nothing is invoiced or suspended.
+  if (manualPlatformBilling() && !(await getPlatformBank())) {
+    return NextResponse.json({ invoicesCreated: 0, gymsSuspended: 0, bankNotConfigured: true });
   }
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const manual = manualPlatformBilling();
 
   const now = new Date();
 
@@ -43,9 +45,14 @@ export async function GET(req: NextRequest) {
 
       const owner = gym.staff[0];
       if (owner?.phone) {
+        const payUrl = url.startsWith("/") ? `${appUrl}${url}` : url;
+        // Same date the Billing page shows: suspension comes GRACE_PERIOD_MS after the due date.
+        const graceEnds = new Date((gym.nextBillingDate ?? now).getTime() + GRACE_PERIOD_MS).toLocaleDateString("id-ID");
         await sendPlatformWhatsapp({
           to: owner.phone,
-          message: `Your Liftmora subscription for "${gym.name}" is due. Pay here: ${url.startsWith("/") ? `${process.env.NEXT_PUBLIC_APP_URL}${url}` : url}`,
+          message: manual
+            ? `Your Liftmora subscription for "${gym.name}" is due. Pay by bank transfer and upload the proof here: ${payUrl}. Please pay before ${graceEnds}, or the gym will be suspended.`
+            : `Your Liftmora subscription for "${gym.name}" is due. Pay here: ${payUrl}`,
         });
       }
       invoicesCreated++;
@@ -57,6 +64,7 @@ export async function GET(req: NextRequest) {
   // Grace period over: suspend, and remember why so the owner can still get in to pay.
   const pastDueGyms = await prisma.gym.findMany({
     where: { subscriptionStatus: "PAST_DUE", isLifetime: false },
+    include: { staff: { where: { role: "OWNER" } } },
   });
   const cutoff = new Date(now.getTime() - GRACE_PERIOD_MS);
   const toSuspend = pastDueGyms.filter((g) => g.nextBillingDate && g.nextBillingDate < cutoff);
@@ -65,6 +73,13 @@ export async function GET(req: NextRequest) {
       where: { id: g.id },
       data: { subscriptionStatus: "SUSPENDED", settings: withSuspensionReason(g.settings, "non_payment") },
     });
+    const owner = g.staff[0];
+    if (owner?.phone) {
+      await sendPlatformWhatsapp({
+        to: owner.phone,
+        message: `Your Liftmora subscription for "${g.name}" was not paid, so the gym is suspended: staff and members can't log in or check in. Pay here to switch it back on right away: ${appUrl}/${g.slug}/billing`,
+      });
+    }
   }
 
   return NextResponse.json({
