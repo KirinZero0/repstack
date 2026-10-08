@@ -20,7 +20,9 @@ async function makeGym(over: { capacity?: number | null; startsInMs?: number } =
 }
 
 async function login(request: APIRequestContext, baseURL: string, slug: string, who: { email: string; password: string }) {
-  expect((await request.post(`${baseURL}/api/${slug}/login`, { data: who })).ok()).toBeTruthy();
+  // Own forwarded IP per login: the whole suite shares one address, and the login throttle (200/hour per IP) would otherwise run dry this late in a full run.
+  const headers = { "x-forwarded-for": `10.9.${seq++ % 250}.${Math.floor(Math.random() * 250)}` };
+  expect((await request.post(`${baseURL}/api/${slug}/login`, { data: who, headers })).ok()).toBeTruthy();
 }
 
 async function requestSpot(request: APIRequestContext, baseURL: string, f: { slug: string; session: { id: string } }, phone: string, name = "Guest Gina") {
