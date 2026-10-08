@@ -50,7 +50,7 @@ export default function GuestPassForm({ slug, sessions, bank }: { slug: string; 
       <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6" data-testid="guest-request-sent">
         <p className="text-lg font-medium">Request sent</p>
         <p className="mt-2 text-neutral-400">
-          The gym will review it (and check your payment, if the class isn't free). Your one-time QR ticket then arrives on WhatsApp — show it at the front desk.
+          The gym will review it (and check your payment, if the class isn&apos;t free). Your one-time QR ticket then arrives on WhatsApp — show it at the front desk.
         </p>
       </div>
     );
