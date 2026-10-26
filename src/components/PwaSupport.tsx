@@ -2,12 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-
-/** Chrome and Android's install prompt event, which TypeScript's DOM types don't include. */
-interface InstallEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
+import { useInstall } from "@/lib/pwaInstall";
 
 const DISMISSED_KEY = "liftmora.install.dismissed";
 const SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
@@ -28,10 +23,6 @@ function snoozed(): boolean {
   }
 }
 
-function alreadyInstalled(): boolean {
-  return window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
-}
-
 /**
  * Registers the service worker (production only, so local development and tests aren't confused by a
  * cache) and, inside the app, offers to install it: a button on Chrome and Android, and the
@@ -39,38 +30,20 @@ function alreadyInstalled(): boolean {
  */
 export default function PwaSupport() {
   const pathname = usePathname();
-  const [event, setEvent] = useState<InstallEvent | null>(null);
-  const [ios, setIos] = useState(false);
+  const { kind, install } = useInstall();
   const [hidden, setHidden] = useState(true);
 
   useEffect(() => {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch((err) => console.warn("Service worker not registered", err));
     }
-
-    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent) && !("MSStream" in window);
-    setIos(isIos);
-    setHidden(alreadyInstalled() || snoozed());
-
-    const onPrompt = (e: Event) => {
-      e.preventDefault(); // keep the browser's own mini-bar away; we show our own, at a better moment
-      setEvent(e as InstallEvent);
-    };
-    const onInstalled = () => {
-      setEvent(null);
-      setHidden(true);
-    };
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    window.addEventListener("appinstalled", onInstalled);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onPrompt);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
+    setHidden(snoozed());
   }, []);
 
   const first = pathname.split("/")[1] ?? "";
   const inApp = APP_PATH.test(pathname) && !(first !== "my" && first !== "superadmin" && NOT_A_GYM.has(first));
-  if (hidden || !inApp || (!event && !ios)) return null;
+  // The banner is for the cases where we can say something useful right there: one tap, or the Safari steps.
+  if (hidden || !inApp || !(kind === "native" || kind === "ios-safari" || kind === "ios-other")) return null;
 
   function dismiss() {
     try {
@@ -81,12 +54,9 @@ export default function PwaSupport() {
     setHidden(true);
   }
 
-  async function install() {
-    if (!event) return;
-    await event.prompt();
-    const choice = await event.userChoice.catch(() => null);
-    setEvent(null);
-    if (choice?.outcome === "dismissed") dismiss();
+  async function onInstall() {
+    const outcome = await install();
+    if (outcome === "dismissed") dismiss();
     else setHidden(true);
   }
 
@@ -100,11 +70,15 @@ export default function PwaSupport() {
     >
       <p className="font-medium">Install Liftmora</p>
       <p className="mt-1 text-neutral-400">
-        {event ? "Add it to your home screen to open it like an app, full screen." : "On iPhone: tap the Share button, then “Add to Home Screen”."}
+        {kind === "native"
+          ? "Add it to your home screen to open it like an app, full screen."
+          : kind === "ios-safari"
+            ? "Tap the Share button, then “Add to Home Screen”."
+            : "iPhones can only install from Safari. Open this page in Safari, then tap Share and “Add to Home Screen”."}
       </p>
       <div className="mt-3 flex gap-2">
-        {event && (
-          <button onClick={install} className="rounded-lg bg-white px-4 py-2 font-semibold text-neutral-950 hover:bg-neutral-200">
+        {kind === "native" && (
+          <button onClick={onInstall} className="rounded-lg bg-white px-4 py-2 font-semibold text-neutral-950 hover:bg-neutral-200">
             Install
           </button>
         )}

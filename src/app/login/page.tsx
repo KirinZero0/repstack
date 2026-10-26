@@ -35,7 +35,7 @@ export default function GlobalLoginPage() {
   }
 
   return (
-    <AuthShell tagline="Your members, your check-ins, your revenue.">
+    <AuthShell installApp tagline="Your members, your check-ins, your revenue.">
       <form onSubmit={handleSubmit} className="w-full">
         <h1 className="mb-1 text-2xl font-semibold text-white">Log in</h1>
         <p className="mb-6 text-sm text-neutral-400">Staff and members both sign in here — no gym address to type.</p>

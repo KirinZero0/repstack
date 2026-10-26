@@ -34,7 +34,7 @@ export default function GymLoginPage({ params }: { params: { slug: string } }) {
   }
 
   return (
-    <AuthShell tagline="Your members, your check-ins, your revenue.">
+    <AuthShell installApp tagline="Your members, your check-ins, your revenue.">
       <form onSubmit={handleSubmit} className="w-full">
         <h1 className="mb-1 text-2xl font-semibold text-white">Log in</h1>
         <p className="mb-6 text-sm text-neutral-400">{params.slug}</p>

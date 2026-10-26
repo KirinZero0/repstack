@@ -241,6 +241,16 @@ at the door, members showing their QR, owners checking the dashboard). One insta
   Liftmora" banner inside the app only (not on the marketing site, login, legal pages or one-off links
   like a guest ticket). Chrome/Android get an Install button; iPhone, which has no install prompt,
   gets "Share → Add to Home Screen". "Not now" snoozes it for 14 days; nothing shows once installed.
+- **"Install the app" button** (`src/components/InstallAppButton.tsx`) on the login pages (`/login` and a
+  gym's own login, which the member entry redirects to). It decides what to do per device
+  (`detectInstallKind` in `src/lib/pwaInstall.ts`): where the browser offers its install prompt, one tap
+  installs; otherwise it opens a short guide for that device. **iPhone/iPad Safari:** Share → Add to Home
+  Screen. **iPhone in Chrome, Firefox or an in-app browser** (WhatsApp, Instagram): says only Safari can
+  install and gives a *Copy link* button. **Mac Safari:** File → Add to Dock. **Android / Chrome or Edge on
+  a computer** without a prompt yet: the menu or address-bar icon. Hidden once installed and on Firefox
+  for computers. Newer iPads (which report themselves as a Mac but have a touch screen) are recognised.
+  The in-app banner uses the same detection and also says "open in Safari" where that's the only way.
+  Tests: `e2e/40-install-button.spec.ts`.
 - **Not included, on purpose:** offline check-in or offline member QR. Those need member data stored on
   the phone, which is a privacy and fraud trade-off worth deciding separately. Push notifications
   also aren't included (reminders go out by WhatsApp).

@@ -1,7 +1,8 @@
 import BrandMark, { PlateGlyph } from "./BrandMark";
+import InstallAppButton from "./InstallAppButton";
 
 /** Split layout for login screens: brand panel on the left (hidden on small screens), form on the right. */
-export default function AuthShell({ children, tagline }: { children: React.ReactNode; tagline: string }) {
+export default function AuthShell({ children, tagline, installApp = false }: { children: React.ReactNode; tagline: string; installApp?: boolean }) {
   return (
     <main className="grid min-h-screen bg-neutral-950 lg:grid-cols-[0.9fr_1.1fr]">
       <aside className="relative hidden flex-col justify-between overflow-hidden border-r border-neutral-800 bg-neutral-900 p-10 lg:flex">
@@ -20,6 +21,7 @@ export default function AuthShell({ children, tagline }: { children: React.React
         <div className="w-full max-w-sm">
           <div className="mb-8 lg:hidden"><BrandMark /></div>
           {children}
+          {installApp && <InstallAppButton />}
         </div>
       </section>
     </main>
