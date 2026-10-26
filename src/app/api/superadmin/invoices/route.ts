@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSuperadminSession, SessionError } from "@/lib/session";
 import { createInvoiceSchema } from "@/lib/validation/superadmin";
 import { createInvoice, dateFromInput, invoiceTotals } from "@/lib/invoices";
+import { lineDiscountAmount } from "@/lib/invoiceMath";
 import { writeAuditLog } from "@/lib/audit";
 
-/** Superadmin issues an invoice. The subtotal, discount and total are computed here from the line items, never taken from the client. */
+/** Superadmin issues an invoice. Each line's discount, the subtotal and the total are computed here from the line items, never taken from the client. */
 export async function POST(req: NextRequest) {
   let session;
   try {
@@ -21,14 +22,16 @@ export async function POST(req: NextRequest) {
   }
   const d = parsed.data;
 
-  const totals = invoiceTotals(d.items, d.discount);
+  // A line discount that comes to Rp 0 (a percentage of a free line) isn't kept, so no empty discount column is printed.
+  const items = d.items.map((i) => (lineDiscountAmount(i) > 0 ? i : { description: i.description, quantity: i.quantity, unitPrice: i.unitPrice }));
+  const totals = invoiceTotals(items, d.discount);
   const issueDate = dateFromInput(d.issueDate);
   const invoice = await createInvoice(
     {
       gymName: d.gymName,
       billToName: d.billToName,
       billToInfo: d.billToInfo,
-      items: d.items,
+      items,
       subtotal: totals.subtotal,
       discountType: totals.discountAmount > 0 ? d.discount!.type : null,
       discountValue: totals.discountAmount > 0 ? d.discount!.value : 0,
@@ -43,6 +46,6 @@ export async function POST(req: NextRequest) {
     issueDate.getUTCFullYear(),
   );
 
-  await writeAuditLog({ superadminId: session.superadminId, action: "INVOICE_CREATED", metadata: { invoiceId: invoice.id, number: invoice.number, subtotal: totals.subtotal, discount: totals.discountAmount, total: Number(invoice.total) } });
+  await writeAuditLog({ superadminId: session.superadminId, action: "INVOICE_CREATED", metadata: { invoiceId: invoice.id, number: invoice.number, gross: totals.gross, itemDiscounts: totals.itemDiscounts, subtotal: totals.subtotal, discount: totals.discountAmount, total: Number(invoice.total) } });
   return NextResponse.json({ id: invoice.id, number: invoice.number }, { status: 201 });
 }

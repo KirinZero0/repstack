@@ -57,12 +57,21 @@ export const createInvoiceSchema = z
     notes: z.string().trim().max(1000).default(""),
     items: z
       .array(
-        z.object({
-          description: z.string().trim().min(1).max(200),
-          quantity: z.number().int().min(1).max(10_000),
-          // Whole rupiah. 0 is allowed so a free line (e.g. training) can show on the invoice.
-          unitPrice: z.number().int().min(0).max(10_000_000_000),
-        }),
+        z
+          .object({
+            description: z.string().trim().min(1).max(200),
+            quantity: z.number().int().min(1).max(10_000),
+            // Whole rupiah. 0 is allowed so a free line (e.g. training) can show on the invoice.
+            unitPrice: z.number().int().min(0).max(10_000_000_000),
+            // Optional discount on just this line.
+            discount: z.object({ type: z.enum(["PERCENT", "AMOUNT"]), value: z.number().positive("Enter a discount greater than 0") }).optional(),
+          })
+          .refine((i) => !i.discount || i.discount.type !== "PERCENT" || i.discount.value <= 100, { message: "A discount can't be more than 100%", path: ["discount"] })
+          .refine((i) => !i.discount || i.discount.type !== "AMOUNT" || Number.isInteger(i.discount.value), { message: "Enter the discount in whole rupiah", path: ["discount"] })
+          .refine((i) => !i.discount || i.discount.type !== "AMOUNT" || i.discount.value <= i.quantity * i.unitPrice, {
+            message: "An item's discount can't be more than that item's price",
+            path: ["discount"],
+          }),
       )
       .min(1)
       .max(30),

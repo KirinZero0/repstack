@@ -259,21 +259,26 @@ at the door, members showing their QR, owners checking the dashboard). One insta
 
 ## 6. Invoice discounts (superadmin invoice maker)
 
-An invoice can carry one discount, taken off the subtotal: a **percentage** (0–100%) or a **fixed
-rupiah amount**, with an optional reason printed next to it ("Early bird").
+**Each line item can have its own discount**: a percentage (0–100%) or a fixed rupiah amount off that
+line (price × quantity). Items without one are charged in full.
 
-- **Form** `/superadmin/invoices/new`: a "Discount (optional)" block under the items. A live preview
-  shows Subtotal, Discount and Total as you type, using the same maths as the server
-  (`src/lib/invoiceMath.ts`, no server code in it so the browser can share it).
-- **Server is the authority** (`POST /api/superadmin/invoices`): subtotal, discount and total are always
-  recomputed from the line items; a total sent by the client is ignored. Percentages are rounded to the
-  nearest whole rupiah; a fixed amount must be whole rupiah and no more than the subtotal; a 100%
-  discount (total Rp 0) is allowed. Anything invalid is a 400 with a plain message.
-- **Data** `Invoice.subtotal`, `discountType`, `discountValue` (as typed), `discountLabel`,
-  `discountAmount` (rupiah actually deducted). **`total` is still what is payable**, so the invoice list,
-  the "outstanding" figure and everything else that reads `total` need no change. Migration
-  `20261026010000_invoice_discount` backfills `subtotal = total` for invoices made before discounts.
-- **Printed invoice**: with a discount it shows Subtotal, "Discount (Early bird, 10%)" and **Total due**;
-  without one it looks exactly as before.
-- Tests: `e2e/39-invoice-discount.spec.ts` (maths and rounding, server-side totals, validation limits,
-  the printed sheet, an old invoice, and the form's live preview in a browser).
+- **Form** `/superadmin/invoices/new`: every item has a "No discount / % off / Rp off" control under it.
+  The item shows what it comes to (the full price struck through, the discounted amount, and what was
+  taken off), and a summary shows Items, Item discounts and Total, live, using the same maths as the
+  server (`src/lib/invoiceMath.ts`, no server code in it so the browser can share it).
+- **Server is the authority** (`POST /api/superadmin/invoices`): line amounts, the subtotal and the total
+  are always recomputed; a total sent by the client is ignored. Percentages round to the nearest whole
+  rupiah; a fixed amount must be whole rupiah and no more than that line's price; a line can be 100% off.
+  A line discount that comes to Rp 0 (e.g. a percentage of a free line) is dropped. Invalid input is a
+  400 with a plain message.
+- **Data**: the discount is stored on each item inside `Invoice.items` (no new columns for it).
+  `Invoice.subtotal` is the sum of the lines **after** their discounts, and `total` is still what is
+  payable, so the invoice list, "outstanding" and everything else that reads `total` need no change.
+- **Printed invoice**: a Discount column appears only when some line has one, each line's Amount is
+  after its discount, and the foot reads **Total due**, "Items before discounts", and "You save".
+  Invoices with no discounts look exactly as before.
+- **Also still supported (server only):** one discount on the *whole* invoice (`discount` with `type`,
+  `value`, optional `label`), applied after the line discounts. The form no longer offers it; invoices that
+  used it (from `20261026010000_invoice_discount`) still print correctly, with Subtotal and Discount rows.
+- Tests: `e2e/39-invoice-discount.spec.ts` (maths and rounding, per-line and stacked discounts, validation
+  limits, the printed sheet, an old invoice, and the form's live updates in a browser).

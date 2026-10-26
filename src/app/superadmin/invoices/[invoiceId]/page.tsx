@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireSuperadminSession, SessionError } from "@/lib/session";
 import { getPlatformBank } from "@/lib/platformBank";
-import { discountText, type InvoiceItem } from "@/lib/invoices";
+import { discountText, lineDiscountAmount, lineNet, type InvoiceItem } from "@/lib/invoices";
 import InvoiceControls from "./InvoiceControls";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +23,10 @@ export default async function InvoicePage({ params }: { params: { invoiceId: str
   const bank = await getPlatformBank();
   const items = invoice.items as unknown as InvoiceItem[];
   const discountAmount = Number(invoice.discountAmount);
+  // Older invoices have no line discounts, and then the table looks exactly as it always did.
+  const hasLineDiscounts = items.some((i) => lineDiscountAmount(i) > 0);
+  const lineSavings = items.reduce((sum, i) => sum + lineDiscountAmount(i), 0);
+  const lineGrossTotal = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white print:bg-white print:p-0">
@@ -71,6 +75,7 @@ export default async function InvoicePage({ params }: { params: { invoiceId: str
                 <th className="py-2">Description</th>
                 <th className="py-2 text-right">Qty</th>
                 <th className="py-2 text-right">Price</th>
+                {hasLineDiscounts && <th className="py-2 text-right">Discount</th>}
                 <th className="py-2 text-right">Amount</th>
               </tr>
             </thead>
@@ -80,7 +85,16 @@ export default async function InvoicePage({ params }: { params: { invoiceId: str
                   <td className="py-2">{i.description}</td>
                   <td className="py-2 text-right">{i.quantity}</td>
                   <td className="py-2 text-right">{i.unitPrice === 0 ? "Free" : rp(i.unitPrice)}</td>
-                  <td className="py-2 text-right">{i.unitPrice === 0 ? "Free" : rp(i.quantity * i.unitPrice)}</td>
+                  {hasLineDiscounts && (
+                    <td className="py-2 text-right text-neutral-600" data-testid="line-discount">
+                      {lineDiscountAmount(i) > 0 && i.discount
+                        ? i.discount.type === "PERCENT"
+                          ? `${discountText("PERCENT", i.discount.value)} (− ${rp(lineDiscountAmount(i))})`
+                          : `− ${rp(lineDiscountAmount(i))}`
+                        : ""}
+                    </td>
+                  )}
+                  <td className="py-2 text-right">{i.unitPrice === 0 ? "Free" : rp(lineNet(i))}</td>
                 </tr>
               ))}
             </tbody>
@@ -88,11 +102,11 @@ export default async function InvoicePage({ params }: { params: { invoiceId: str
               {discountAmount > 0 && (
                 <>
                   <tr>
-                    <td colSpan={3} className="pt-4 text-right text-neutral-600">Subtotal</td>
+                    <td colSpan={hasLineDiscounts ? 4 : 3} className="pt-4 text-right text-neutral-600">Subtotal</td>
                     <td className="pt-4 text-right" data-testid="invoice-subtotal">{rp(Number(invoice.subtotal))}</td>
                   </tr>
                   <tr>
-                    <td colSpan={3} className="pt-1 text-right text-neutral-600">
+                    <td colSpan={hasLineDiscounts ? 4 : 3} className="pt-1 text-right text-neutral-600">
                       Discount ({invoice.discountLabel ? `${invoice.discountLabel}, ` : ""}{discountText(invoice.discountType, Number(invoice.discountValue))})
                     </td>
                     <td className="pt-1 text-right" data-testid="invoice-discount">− {rp(discountAmount)}</td>
@@ -100,9 +114,15 @@ export default async function InvoicePage({ params }: { params: { invoiceId: str
                 </>
               )}
               <tr>
-                <td colSpan={3} className="pt-4 text-right font-semibold">{discountAmount > 0 ? "Total due" : "Total"}</td>
+                <td colSpan={hasLineDiscounts ? 4 : 3} className="pt-4 text-right font-semibold">{discountAmount > 0 || hasLineDiscounts ? "Total due" : "Total"}</td>
                 <td className="pt-4 text-right text-lg font-bold">{rp(Number(invoice.total))}</td>
               </tr>
+              {hasLineDiscounts && (
+                <tr>
+                  <td colSpan={4} className="pt-1 text-right text-xs text-neutral-500">Items before discounts {rp(lineGrossTotal)}</td>
+                  <td className="pt-1 text-right text-xs text-emerald-700" data-testid="invoice-savings">You save {rp(lineSavings + discountAmount)}</td>
+                </tr>
+              )}
             </tfoot>
           </table>
 

@@ -2,13 +2,26 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { discountText, invoiceTotals, type InvoiceDiscount } from "@/lib/invoiceMath";
+import { discountText, invoiceTotals, lineDiscountAmount, lineGross, lineNet, type InvoiceItem } from "@/lib/invoiceMath";
 
 interface Line {
   description: string;
   quantity: string;
   unitPrice: string;
+  /** This line's own discount. */
+  dType: "NONE" | "PERCENT" | "AMOUNT";
+  dValue: string;
 }
+
+const newLine = (description = "", unitPrice = ""): Line => ({ description, quantity: "1", unitPrice, dType: "NONE", dValue: "" });
+
+/** The form's text fields as the numbers the shared invoice maths works with. */
+const toItem = (l: Line): InvoiceItem => ({
+  description: l.description,
+  quantity: Number(l.quantity) || 0,
+  unitPrice: Number(l.unitPrice) || 0,
+  discount: l.dType !== "NONE" && Number(l.dValue) > 0 ? { type: l.dType, value: Number(l.dValue) } : undefined,
+});
 
 const input = "w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-white outline-none focus:border-neutral-500";
 const ghost = "whitespace-nowrap rounded-lg border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800";
@@ -24,27 +37,18 @@ export default function InvoiceForm({ gyms, plans }: { gyms: string[]; plans: { 
   const [issueDate, setIssueDate] = useState(today());
   const [dueDate, setDueDate] = useState(inDays(7));
   const [notes, setNotes] = useState("");
-  const [lines, setLines] = useState<Line[]>([{ description: "", quantity: "1", unitPrice: "" }]);
-  const [discountType, setDiscountType] = useState<"NONE" | "PERCENT" | "AMOUNT">("NONE");
-  const [discountValue, setDiscountValue] = useState("");
-  const [discountLabel, setDiscountLabel] = useState("");
+  const [lines, setLines] = useState<Line[]>([newLine()]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // The server recomputes all of this from the items; this is only the preview, using the same maths.
-  const discount: InvoiceDiscount | undefined =
-    discountType !== "NONE" && Number(discountValue) > 0 ? { type: discountType, value: Number(discountValue), label: discountLabel } : undefined;
-  const { subtotal, discountAmount: off, total } = invoiceTotals(
-    lines.map((l) => ({ description: l.description, quantity: Number(l.quantity) || 0, unitPrice: Number(l.unitPrice) || 0 })),
-    discount,
-  );
-  const tooMuch = discountType === "AMOUNT" && Number(discountValue) > subtotal;
+  const { gross, itemDiscounts, total } = invoiceTotals(lines.map(toItem));
 
   function addLine(description: string, unitPrice: number) {
     // Replace the empty starter row instead of leaving it dangling above the preset.
     setLines((ls) => {
       const kept = ls.filter((l) => l.description.trim() || l.unitPrice);
-      return [...kept, { description, quantity: "1", unitPrice: String(unitPrice) }];
+      return [...kept, newLine(description, String(unitPrice))];
     });
   }
   const setLine = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -63,8 +67,7 @@ export default function InvoiceForm({ gyms, plans }: { gyms: string[]; plans: { 
         issueDate,
         dueDate: dueDate || undefined,
         notes,
-        discount: discount ? { type: discount.type, value: discount.value, label: discount.label } : undefined,
-        items: lines.map((l) => ({ description: l.description, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice || 0) })),
+        items: lines.map(toItem),
       }),
     });
     const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
@@ -116,71 +119,70 @@ export default function InvoiceForm({ gyms, plans }: { gyms: string[]; plans: { 
           ))}
         </div>
 
-        <div className="space-y-2">
-          {lines.map((l, i) => (
-            <div key={i} className="grid grid-cols-[1fr_4.5rem_8rem_auto] items-start gap-2">
-              <input required maxLength={200} value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} className={input} placeholder="Description" aria-label="Description" />
-              <input required type="number" min={1} max={10000} value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} className={input} aria-label="Quantity" />
-              <input required type="number" min={0} step={1000} value={l.unitPrice} onChange={(e) => setLine(i, { unitPrice: e.target.value })} className={input} placeholder="Price (Rp)" aria-label="Unit price" />
-              <button type="button" disabled={lines.length === 1} onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} className={`${ghost} py-2 disabled:opacity-30`} aria-label="Remove item">
-                ✕
-              </button>
-            </div>
-          ))}
+        <div className="space-y-3">
+          {lines.map((l, i) => {
+            const item = toItem(l);
+            const off = lineDiscountAmount(item);
+            const tooMuch = l.dType === "AMOUNT" && Number(l.dValue) > lineGross(item);
+            return (
+              <div key={i} className="space-y-2 rounded-lg border border-neutral-800 p-2">
+                <div className="grid grid-cols-[1fr_4.5rem_8rem_auto] items-start gap-2">
+                  <input required maxLength={200} value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} className={input} placeholder="Description" aria-label="Description" />
+                  <input required type="number" min={1} max={10000} value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} className={input} aria-label="Quantity" />
+                  <input required type="number" min={0} step={1000} value={l.unitPrice} onChange={(e) => setLine(i, { unitPrice: e.target.value })} className={input} placeholder="Price (Rp)" aria-label="Unit price" />
+                  <button type="button" disabled={lines.length === 1} onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} className={`${ghost} py-2 disabled:opacity-30`} aria-label="Remove item">
+                    ✕
+                  </button>
+                </div>
+                <div className="grid grid-cols-[8.5rem_7rem_1fr] items-center gap-2">
+                  <select value={l.dType} onChange={(e) => setLine(i, { dType: e.target.value as Line["dType"], dValue: "" })} className={input} aria-label="Item discount type">
+                    <option value="NONE">No discount</option>
+                    <option value="PERCENT">% off</option>
+                    <option value="AMOUNT">Rp off</option>
+                  </select>
+                  <input
+                    type="number"
+                    min={l.dType === "PERCENT" ? 0.01 : 1}
+                    max={l.dType === "PERCENT" ? 100 : undefined}
+                    step={l.dType === "PERCENT" ? "any" : 1}
+                    disabled={l.dType === "NONE"}
+                    value={l.dValue}
+                    onChange={(e) => setLine(i, { dValue: e.target.value })}
+                    className={`${input} disabled:opacity-40`}
+                    placeholder={l.dType === "PERCENT" ? "e.g. 10" : "e.g. 50000"}
+                    aria-label="Item discount value"
+                  />
+                  <p className="text-right text-sm" data-testid="line-amount">
+                    {off > 0 && <span className="mr-2 text-xs text-neutral-500 line-through">{rp(lineGross(item))}</span>}
+                    <span className="font-medium">{rp(lineNet(item))}</span>
+                    {off > 0 && <span className="ml-2 text-xs text-emerald-400">−{discountText(item.discount!.type, item.discount!.value)}</span>}
+                  </p>
+                </div>
+                {tooMuch && <p className="text-xs text-red-400">This discount can&apos;t be more than the item&apos;s price ({rp(lineGross(item))}).</p>}
+              </div>
+            );
+          })}
         </div>
         <div className="mt-3 flex items-center justify-between">
-          <button type="button" className={ghost} onClick={() => setLines((ls) => [...ls, { description: "", quantity: "1", unitPrice: "" }])}>
+          <button type="button" className={ghost} onClick={() => setLines((ls) => [...ls, newLine()])}>
             + Add item
           </button>
-          {off === 0 && (
+          {itemDiscounts === 0 && (
             <p className="text-sm">
               Total: <span className="text-lg font-semibold">{rp(total)}</span>
             </p>
           )}
         </div>
 
-        <div className="mt-5 rounded-lg border border-neutral-800 p-3" data-testid="discount-section">
-          <p className="mb-2 text-sm text-neutral-300">Discount (optional)</p>
-          <div className="grid gap-2 sm:grid-cols-[9rem_8rem_1fr]">
-            <select value={discountType} onChange={(e) => setDiscountType(e.target.value as typeof discountType)} className={input} aria-label="Discount type">
-              <option value="NONE">No discount</option>
-              <option value="PERCENT">Percent (%)</option>
-              <option value="AMOUNT">Fixed amount (Rp)</option>
-            </select>
-            <input
-              type="number"
-              min={discountType === "PERCENT" ? 0.01 : 1}
-              max={discountType === "PERCENT" ? 100 : undefined}
-              step={discountType === "PERCENT" ? "any" : 1}
-              disabled={discountType === "NONE"}
-              value={discountValue}
-              onChange={(e) => setDiscountValue(e.target.value)}
-              className={`${input} disabled:opacity-40`}
-              placeholder={discountType === "PERCENT" ? "e.g. 10" : "e.g. 50000"}
-              aria-label="Discount value"
-            />
-            <input
-              maxLength={80}
-              disabled={discountType === "NONE"}
-              value={discountLabel}
-              onChange={(e) => setDiscountLabel(e.target.value)}
-              className={`${input} disabled:opacity-40`}
-              placeholder="Reason shown on the invoice (optional), e.g. Early bird"
-              aria-label="Discount label"
-            />
-          </div>
-          {tooMuch && <p className="mt-2 text-xs text-red-400">The discount can&apos;t be more than the subtotal ({rp(subtotal)}).</p>}
-        </div>
-
-        {off > 0 && (
+        {itemDiscounts > 0 && (
           <dl className="mt-4 ml-auto w-full max-w-xs space-y-1 text-sm" data-testid="invoice-preview">
             <div className="flex justify-between text-neutral-400">
-              <dt>Subtotal</dt>
-              <dd>{rp(subtotal)}</dd>
+              <dt>Items</dt>
+              <dd>{rp(gross)}</dd>
             </div>
             <div className="flex justify-between text-emerald-400">
-              <dt>Discount ({discountLabel.trim() ? `${discountLabel.trim()}, ` : ""}{discountText(discount!.type, discount!.value)})</dt>
-              <dd>− {rp(off)}</dd>
+              <dt>Item discounts</dt>
+              <dd>− {rp(itemDiscounts)}</dd>
             </div>
             <div className="flex justify-between border-t border-neutral-700 pt-1">
               <dt>Total</dt>
