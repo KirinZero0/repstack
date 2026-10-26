@@ -6,6 +6,7 @@ import { prisma, staffLoginUI } from "./helpers";
 import { encrypt, hmacLookup } from "../src/lib/crypto";
 import { displayName, getLeaderboard } from "../src/lib/leaderboard";
 import { tenantDb } from "../src/lib/prisma";
+import { monthKey } from "../src/lib/stats";
 
 const DAY = 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
@@ -267,20 +268,25 @@ test("the leaderboard ranks visits and streaks, and members always see it with s
   const [a, b, c] = f.members;
   const today = new Date();
   // a: 3 days in a row ending today; b: today and 5 days ago; c: a 4-day streak that ended last week.
-  for (const d of [0, 1, 2]) await checkIn(f, a.row.id, new Date(today.getTime() - d * DAY));
-  for (const d of [0, 5]) await checkIn(f, b.row.id, new Date(today.getTime() - d * DAY));
-  for (const d of [7, 8, 9, 10]) await checkIn(f, c.row.id, new Date(today.getTime() - d * DAY));
+  const visitDays: [typeof a, number[]][] = [[a, [0, 1, 2]], [b, [0, 5]], [c, [7, 8, 9, 10]]];
+  for (const [m, days] of visitDays) for (const d of days) await checkIn(f, m.row.id, new Date(today.getTime() - d * DAY));
 
   expect(displayName("Sari Dewi Lestari")).toBe("Sari L.");
   expect(displayName("Budi")).toBe("Budi");
 
   const board = await getLeaderboard(tenantDb(f.gym.id), f.gym.id, "Asia/Jakarta", today);
-  const names = (rows: { fullName: string }[]) => rows.map((r) => r.fullName);
-  // Visits this month depend on the calendar; the two who visited today are always on top.
-  expect(names(board.visits).slice(0, 1)[0]).toBe(a.row.fullName);
-  expect(board.visits.find((r) => r.memberId === a.row.id)!.value).toBeGreaterThanOrEqual(1);
+  // "Visits this month" depends on the calendar (the back-dated check-ins may fall in last month), so
+  // work the expected counts out from today's date instead of assuming who is on top.
+  const thisMonth = monthKey(today, "Asia/Jakarta");
+  const expected: Record<string, number> = {};
+  for (const [m, days] of visitDays) {
+    const n = days.filter((d) => monthKey(new Date(today.getTime() - d * DAY), "Asia/Jakarta") === thisMonth).length;
+    if (n > 0) expected[m.row.id] = n;
+  }
+  expect(Object.fromEntries(board.visits.map((r) => [r.memberId, r.value]))).toEqual(expected);
+  expect(board.visits.map((r) => r.value)).toEqual([...board.visits.map((r) => r.value)].sort((x, y) => y - x)); // ranked high to low
   expect(board.streaks.map((r) => [r.fullName, r.value])).toEqual([[a.row.fullName, 3]]);
-  expect(board.visits[0].name).toBe("Member1 S.");
+  expect(board.visits.find((r) => r.memberId === a.row.id)!.name).toBe("Member1 S.");
 
   // Always on: members see the board without any switch.
   const ctxB = await playwright.request.newContext();
