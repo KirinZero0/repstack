@@ -218,3 +218,31 @@ refuses with a clear message (409) when history would be lost.
 New guest ticket state `VOIDED` (migration `20261026000000_guest_pass_voided`).
 Shared helper `tenantOrResponse` (`src/lib/routeAuth.ts`) gives routes the standard session checks
 and an optional owner-only gate. Tests: `e2e/37-deletes.spec.ts`.
+
+## 5. Installable app (PWA)
+
+Liftmora can be installed to a phone's home screen and opens full screen like an app (staff scanning
+at the door, members showing their QR, owners checking the dashboard). One install serves everyone.
+
+- **Manifest** `src/app/manifest.ts` → `/manifest.webmanifest`: name, dark brand colours, standalone,
+  and icons (192, 512, plus a *maskable* 512 for Android's round crops). Icons live in `public/icons`
+  and come from the plate mark: re-make them with `CHROMIUM_PATH=… node scripts/make-pwa-icons.mjs`
+  (only needed if the mark changes). `src/app/layout.tsx` adds the theme colour, the iPhone
+  home-screen icon and the web-app meta tags.
+- **Entry point** `/open` (the manifest's `start_url`): signed-in staff go to their gym's dashboard,
+  members to `/my`, the superadmin to the platform dashboard, everyone else to `/login`.
+- **Service worker** `public/sw.js` (served uncached, scope `/`, via `next.config.mjs`). It only:
+  keeps `/offline.html` and the icons, shows the offline page when a page load fails, and caches
+  fixed files (`/_next/static`, `/icons`). It **never stores pages or API responses**, so no member
+  data, QR code or payment can be read from a phone's cache, and nothing shown is out of date.
+  Bump `CACHE` in `sw.js` if the cached file list changes.
+- **Registration + install banner** `src/components/PwaSupport.tsx`: registers the worker in
+  production builds only (so dev and tests aren't confused by caches), and shows an "Install
+  Liftmora" banner inside the app only (not on the marketing site, login, legal pages or one-off links
+  like a guest ticket). Chrome/Android get an Install button; iPhone, which has no install prompt,
+  gets "Share → Add to Home Screen". "Not now" snoozes it for 14 days; nothing shows once installed.
+- **Not included, on purpose:** offline check-in or offline member QR. Those need member data stored on
+  the phone, which is a privacy and fraud trade-off worth deciding separately. Push notifications
+  also aren't included (reminders go out by WhatsApp).
+- Tests: `e2e/38-pwa.spec.ts` (manifest and icons, headers, `/open`, the real worker going offline in a
+  browser, the install banner on Android-style and iPhone).
