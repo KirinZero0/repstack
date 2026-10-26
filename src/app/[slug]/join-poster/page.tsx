@@ -15,7 +15,7 @@ export default async function JoinPosterPage({ params }: { params: { slug: strin
   }
 
   const url = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/${gym.slug}/join`;
-  const qr = await QRCode.toDataURL(url, { width: 480, margin: 2 });
+  const qr = await QRCode.toDataURL(url, { width: 480, margin: 4 });
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-950 px-4 text-white print:bg-[#ffffff] print:text-black">
