@@ -36,7 +36,7 @@ export default function MemberActions({ slug, memberId, fullName, email, phone, 
     setBusy(true);
     setError(null);
     setNotice(null);
-    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
     setBusy(false);
     if (!res.ok) {
       const b = await res.json().catch(() => ({}));
@@ -125,6 +125,21 @@ export default function MemberActions({ slug, memberId, fullName, email, phone, 
 
       {isOwner && (
         <div className="border-t border-neutral-800 pt-4">
+          <p className="mb-3 text-sm text-neutral-400">
+            Added by mistake?{" "}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (window.confirm(`Delete ${fullName} for good? Only possible if they have no payments, visits or class bookings. Their email becomes free to use again.`)) {
+                  call(base, "DELETE", undefined, "Deleted.", () => router.push(`/${slug}/members`));
+                }
+              }}
+              className="text-red-400 underline underline-offset-2 hover:text-red-300 disabled:opacity-50"
+            >
+              Delete this member
+            </button>
+          </p>
           {!erasing ? (
             <button type="button" onClick={() => setErasing(true)} className="text-sm text-neutral-500 underline underline-offset-2 hover:text-red-400">
               Erase this member&apos;s personal data…

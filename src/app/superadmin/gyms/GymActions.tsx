@@ -7,12 +7,15 @@ import TransferReview, { type TransferInfo } from "./TransferReview";
 
 export default function GymActions({
   gymId,
+  slug,
   status,
   setupFeeDue = false,
   waNumber = null,
   transfer = null,
 }: {
   gymId: string;
+  /** The gym's slug: typed back to confirm a deletion. */
+  slug: string;
   status: string;
   /** True when the gym has an unpaid setup fee on record. */
   setupFeeDue?: boolean;
@@ -35,6 +38,27 @@ export default function GymActions({
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setError(body.error ?? "Action failed");
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function deleteGym() {
+    const typed = window.prompt(
+      `Delete this gym for good? Only possible if it has no members, visits or payments (otherwise suspend it).\n\nType its slug "${slug}" to confirm.`,
+    );
+    if (typed === null) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await fetch(`/api/superadmin/gyms/${gymId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmSlug: typed.trim() }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error ?? "Could not delete the gym");
         return;
       }
       router.refresh();
@@ -97,6 +121,14 @@ export default function GymActions({
             Suspend
           </button>
         )}
+        <button
+          onClick={deleteGym}
+          disabled={isPending}
+          title="Delete a gym created by mistake (only while it has no members or payments)"
+          className="rounded-md border border-neutral-700 px-3 py-1 text-sm text-neutral-400 hover:border-red-800 hover:text-red-400 disabled:opacity-50"
+        >
+          Delete
+        </button>
       </div>
       {transfer && <TransferReview gymId={gymId} transfer={transfer} />}
       {waOpen && <WhatsAppPanel gymId={gymId} connectedNumber={waNumber} />}

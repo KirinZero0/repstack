@@ -73,6 +73,7 @@ export default async function ClassesPage({ params }: { params: { slug: string }
         paid: r.payment?.status === "PAID",
         amount: r.payment?.status === "PAID" ? Number(r.payment.amount) : null,
         hasProof: Boolean(r.proofImageUrl),
+        paidManual: r.payment?.status === "PAID" && r.payment.provider === "CASH",
         attendance: (r.attendance as "ATTENDED" | "NO_SHOW" | null) ?? null,
       })),
     })),

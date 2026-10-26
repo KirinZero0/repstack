@@ -35,6 +35,17 @@ export default function DayPassPlans({ slug, plans }: { slug: string; plans: Day
     return true;
   }
 
+  async function remove(p: DayPassPlanRow) {
+    if (!window.confirm(`Delete the "${p.name}" day pass? If anyone has asked for it already you'll be told to hide it instead.`)) return;
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/${slug}/day-pass-plans/${p.id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) return setError(data.error ?? "Could not delete it.");
+    router.refresh();
+  }
+
   return (
     <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-5" data-testid="day-pass-plans">
       <h2 className="text-lg font-semibold">Day passes</h2>
@@ -46,9 +57,14 @@ export default function DayPassPlans({ slug, plans }: { slug: string; plans: Day
           {plans.map((p) => (
             <li key={p.id} className="flex items-center justify-between gap-3 py-2">
               <span className={p.isActive ? "" : "text-neutral-500"}>{p.name} · {rp(p.price)} · {p.validityDays ? `valid ${p.validityDays} days` : "never expires"}{p.isActive ? "" : " (hidden)"}</span>
-              <button className={btn} disabled={busy} onClick={() => call(`/api/${slug}/day-pass-plans/${p.id}`, "PATCH", { isActive: !p.isActive })}>
-                {p.isActive ? "Hide" : "Show"}
-              </button>
+              <span className="flex gap-2">
+                <button className={btn} disabled={busy} onClick={() => call(`/api/${slug}/day-pass-plans/${p.id}`, "PATCH", { isActive: !p.isActive })}>
+                  {p.isActive ? "Hide" : "Show"}
+                </button>
+                <button className={`${btn} hover:border-red-800 hover:text-red-400`} disabled={busy} onClick={() => remove(p)}>
+                  Delete
+                </button>
+              </span>
             </li>
           ))}
         </ul>

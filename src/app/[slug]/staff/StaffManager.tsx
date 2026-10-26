@@ -88,6 +88,17 @@ export default function StaffManager({ slug, staff, limit }: { slug: string; sta
     router.refresh();
   }
 
+  async function remove(id: string, name: string) {
+    if (!window.confirm(`Delete ${name}'s account? They lose access at once. Past records stay, without their name.`)) return;
+    setRowError(null);
+    const res = await fetch(`/api/${slug}/staff/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const b = await res.json().catch(() => ({}));
+      return setRowError(b.error ?? "Could not delete.");
+    }
+    router.refresh();
+  }
+
   async function newLink(id: string, name: string) {
     setRowError(null);
     const res = await fetch(`/api/${slug}/staff/${id}/reset-link`, { method: "POST" });
@@ -171,6 +182,11 @@ export default function StaffManager({ slug, staff, limit }: { slug: string; sta
                   {s.role === "STAFF" && (
                     <button onClick={() => setActive(s.id, !s.isActive)} className={ghost}>
                       {s.isActive ? "Deactivate" : "Reactivate"}
+                    </button>
+                  )}
+                  {s.role === "STAFF" && (
+                    <button onClick={() => remove(s.id, s.name)} className={`${ghost} hover:border-red-800 hover:text-red-400`}>
+                      Delete
                     </button>
                   )}
                 </td>

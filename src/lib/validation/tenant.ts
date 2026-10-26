@@ -265,7 +265,7 @@ export const createDayPassPlanSchema = z.object({
 export const updateDayPassPlanSchema = z.object(dayPassPlanFields).partial().refine((v) => Object.keys(v).length > 0, "Nothing to update");
 
 /** Staff decides on a request, or re-sends an approved guest's ticket link. */
-export const guestPassActionSchema = z.object({ action: z.enum(["approve", "reject", "resend"]) });
+export const guestPassActionSchema = z.object({ action: z.enum(["approve", "reject", "resend", "void"]) });
 
 /** Front desk logs a walk-in who pays for a day pass on the spot. Phone is optional; amount defaults to the plan price. */
 export const walkInSchema = z.object({

@@ -2,6 +2,9 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import type { MemberStatus } from "@prisma/client";
 import { requireTenantSession, SessionError } from "@/lib/session";
+import { tenantOrResponse } from "@/lib/routeAuth";
+import { prisma } from "@/lib/prisma";
+import { deleteBlob } from "@/lib/blob";
 import { memberActionSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
 import { countMemberSeats, memberLimitMessage } from "@/lib/limits";
@@ -110,4 +113,41 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
       return NextResponse.json({ ok: true, status: member.status });
     }
   }
+}
+
+/**
+ * Owner deletes a member who was added by mistake (typo, duplicate): gone for good, and the email is
+ * free to use again. Only possible while the member has no history. Anyone with a payment, a visit or a
+ * class booking is part of the books, so they can be cancelled or erased (kept, but anonymised) instead.
+ */
+export async function DELETE(_req: NextRequest, { params }: { params: { slug: string; memberId: string } }) {
+  const auth = await tenantOrResponse(params.slug, { ownerOnly: "Only the owner can delete a member" });
+  if ("response" in auth) return auth.response;
+  const { gym, db } = auth.ctx;
+
+  // Tenant isolation: the member must belong to the session's gym.
+  const member = await db.member.findUnique({ where: { id: params.memberId } });
+  if (!member || member.gymId !== gym.id) return NextResponse.json({ error: "Member not found" }, { status: 404 });
+
+  const [payments, checkIns, bookings] = await Promise.all([
+    db.payment.count({ where: { memberId: member.id } }),
+    db.checkIn.count({ where: { memberId: member.id } }),
+    db.classRegistration.count({ where: { memberId: member.id } }),
+  ]);
+  if (payments + checkIns + bookings > 0) {
+    return NextResponse.json(
+      { error: "This member has payments, visits or class bookings, so they can't be deleted. Cancel the membership, or erase their data, instead." },
+      { status: 409 },
+    );
+  }
+
+  // Their sign-up request, activation and reset links live in tables the gym role can't touch.
+  await prisma.$transaction([
+    prisma.magicLink.deleteMany({ where: { memberId: member.id } }),
+    prisma.passwordReset.deleteMany({ where: { kind: "member", subjectId: member.id } }),
+    prisma.memberSignup.deleteMany({ where: { OR: [{ memberId: member.id }, { gymId: gym.id, email: member.email }] } }),
+    prisma.member.delete({ where: { id: member.id } }),
+  ]);
+  if (member.photoUrl) await deleteBlob(member.photoUrl);
+  return NextResponse.json({ ok: true });
 }

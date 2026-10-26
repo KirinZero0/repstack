@@ -58,7 +58,7 @@ export default async function GuestPassesPage({ params }: { params: { slug: stri
         <p className="mb-6 text-sm text-neutral-500">
           Guests request day passes at <span className="text-neutral-300">/{params.slug}/join/day-pass</span> and class spots at <span className="text-neutral-300">/{params.slug}/guest-pass</span>.
         </p>
-        <GuestPassList slug={params.slug} rows={rows} />
+        <GuestPassList slug={params.slug} rows={rows} isOwner={session.role === "OWNER"} />
       </div>
     </main>
   );

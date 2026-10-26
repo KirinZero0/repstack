@@ -190,3 +190,31 @@ private blobs, and only staff of the same gym can open them. Nothing is confirme
   (`GET /api/[slug]/class-registrations/[registrationId]/proof`); staff then use the existing
   **Record payment** to confirm, as before.
 - Migration `20261009030000_transfer_proofs` (proof columns on `GuestPass` and `ClassRegistration`).
+
+## 4. Fixing mistakes: deletes, voids and undo
+
+The rule, followed everywhere: **anything that never touched money is deleted; anything that took
+money is voided (kept on the books, out of revenue), never deleted.** Voids are owner-only. Every
+delete is tenant-scoped (a gym can only reach its own rows), asks for confirmation in the UI, and
+refuses with a clear message (409) when history would be lost.
+
+| Data | Fix a mistake | Who |
+| --- | --- | --- |
+| Membership plan | Delete if no member/payment uses it, else hide | owner |
+| Day-pass plan | Delete if no one has requested it, else hide (`DELETE /api/[slug]/day-pass-plans/[id]`) | owner |
+| Class, class session | Delete if unused, else hide / cancel (existing) | owner |
+| Class booking | Cancel / delete if unpaid (existing) | owner, staff |
+| **Class payment** recorded by hand | **Undo payment** → voided, booking back to "waiting for payment" (`POST …/class-registrations/[id]/void`); online payments are refunded via the provider | owner |
+| Membership payment recorded by hand | Void (existing) | owner |
+| **Member** added by mistake | **Delete** if no payments, visits or bookings (`DELETE …/members/[id]`); otherwise cancel, or erase personal data (existing) | owner |
+| **Check-in** (scan, manual, tapped twice) | **Remove** it (`DELETE …/checkins/[id]`); the member's daily check-in is free again | owner, staff |
+| **Guest request / ticket** | **Delete** if unpaid, declined, or free (`DELETE …/guest-passes/[id]`); a paid approved/used ticket (incl. a walk-in) is **Voided** (`POST` `{action:"void"}`): QR dead, out of revenue, kept, seat freed | staff delete, owner void |
+| **Staff account** | **Delete** (`DELETE …/staff/[id]`), or deactivate (existing); past records keep working, just without their name; owner account can't be deleted | owner |
+| Gym photos, WhatsApp token | Remove (existing) | owner / superadmin |
+| **Gym** created by mistake | **Delete** only while it has no members, visits or payments; type the slug to confirm; audit-logged (`DELETE /api/superadmin/gyms/[id]`); otherwise suspend | superadmin |
+| Invoice (superadmin) | Void only, so invoice numbers stay unbroken (existing) | superadmin |
+| Platform subscription payments, audit log, notification log, login attempts | Not deletable on purpose: billing history, the audit trail and the WhatsApp allowance count depend on them | none |
+
+New guest ticket state `VOIDED` (migration `20261026000000_guest_pass_voided`).
+Shared helper `tenantOrResponse` (`src/lib/routeAuth.ts`) gives routes the standard session checks
+and an optional owner-only gate. Tests: `e2e/37-deletes.spec.ts`.

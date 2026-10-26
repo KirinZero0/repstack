@@ -514,6 +514,7 @@ enum GuestPassStatus {
   APPROVED
   REJECTED
   ATTENDED
+  VOIDED // a paid ticket the owner took back: no longer valid or counted as revenue, kept on record like a voided payment
 }
 
 // A day pass is the same ticket for a visit to the gym itself instead of one class: a DayPassPlan

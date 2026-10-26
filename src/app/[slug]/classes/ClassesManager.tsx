@@ -11,6 +11,8 @@ export interface RegistrationRow {
   paid: boolean;
   amount: number | null;
   hasProof: boolean;
+  /** Paid by hand at the desk, so the owner can undo it if it was entered wrong. */
+  paidManual: boolean;
   attendance: "ATTENDED" | "NO_SHOW" | null;
 }
 
@@ -251,6 +253,16 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
     onChanged();
   }
 
+  async function undoPayment(r: RegistrationRow) {
+    if (!window.confirm(`Undo ${r.memberName}'s payment? It leaves your revenue (the record stays as voided) and the booking goes back to waiting for payment.`)) return;
+    setBusy(r.id);
+    setError(null);
+    const { error } = await call(`/api/${slug}/class-registrations/${r.id}/void`, "POST");
+    setBusy(null);
+    if (error) return setError(error);
+    onChanged();
+  }
+
   async function confirm(r: RegistrationRow) {
     const raw = window.prompt(`Amount received from ${r.memberName} (Rp)`, String(price));
     if (raw === null) return;
@@ -340,7 +352,14 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
                     )}
                   </>
                 ) : r.status === "CONFIRMED" ? (
-                  <span className="text-emerald-400">Confirmed{r.amount !== null ? ` · ${rp(r.amount)}` : " · free"}</span>
+                  <>
+                    <span className="text-emerald-400">Confirmed{r.amount !== null ? ` · ${rp(r.amount)}` : " · free"}</span>
+                    {isOwner && r.paidManual && (
+                      <button onClick={() => undoPayment(r)} disabled={busy === r.id} className={`${ghostCls} hover:border-red-800 hover:text-red-400`}>
+                        {busy === r.id ? "Saving…" : "Undo payment"}
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <>
                     <span className="text-amber-400">Waiting for payment</span>

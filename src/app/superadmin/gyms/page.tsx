@@ -141,7 +141,7 @@ export default async function SuperadminGymsPage() {
                       )}
                     </td>
                     <td className="w-[300px] px-4 py-3 align-top">
-                      <GymActions gymId={gym.id} status={gym.subscriptionStatus} setupFeeDue={setupFee?.status === "PENDING"} transfer={transferByGym.get(gym.id) ?? null} waNumber={gym.whatsappConfig?.isActive ? gym.whatsappConfig.senderNumber : null} />
+                      <GymActions gymId={gym.id} slug={gym.slug} status={gym.subscriptionStatus} setupFeeDue={setupFee?.status === "PENDING"} transfer={transferByGym.get(gym.id) ?? null} waNumber={gym.whatsappConfig?.isActive ? gym.whatsappConfig.senderNumber : null} />
                     </td>
                   </tr>
                 );

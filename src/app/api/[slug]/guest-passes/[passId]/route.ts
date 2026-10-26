@@ -1,6 +1,9 @@
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { tenantTransaction } from "@/lib/prisma";
 import { requireTenantSession, SessionError } from "@/lib/session";
+import { tenantOrResponse } from "@/lib/routeAuth";
+import { deleteBlob } from "@/lib/blob";
 import { guestPassActionSchema } from "@/lib/validation/tenant";
 import { countSeatsTaken, effectiveCapacity } from "@/lib/classes";
 import { dayPassExpiry, passIsCancelled, passWindow, sendGuestRejection, sendGuestTicket } from "@/lib/guestPass";
@@ -31,6 +34,21 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // Tenant isolation: the pass must belong to the session's gym.
   const pass = await db.guestPass.findUnique({ where: { id: params.passId }, include: { session: { include: { class: true } }, dayPassPlan: true } });
   if (!pass || pass.gymId !== gym.id) return NextResponse.json({ error: "Request not found" }, { status: 404 });
+
+  if (action === "void") {
+    // Taking back a ticket someone already paid for is a money action, like voiding a payment: owner only.
+    if (session.role !== "OWNER") return NextResponse.json({ error: "Only the owner can void a paid ticket" }, { status: 403 });
+    if (pass.status !== "APPROVED" && pass.status !== "ATTENDED") {
+      return NextResponse.json({ error: "Only an approved or used ticket can be voided." }, { status: 409 });
+    }
+    // A new secret kills the ticket link and QR at once; the record stays, but it no longer counts as revenue or holds a seat.
+    const res = await db.guestPass.updateMany({
+      where: { id: pass.id, gymId: gym.id, status: { in: ["APPROVED", "ATTENDED"] } },
+      data: { status: "VOIDED", ticketSecret: randomUUID() },
+    });
+    if (res.count !== 1) return NextResponse.json({ error: "This ticket was already changed." }, { status: 409 });
+    return NextResponse.json({ ok: true });
+  }
 
   if (action === "resend") {
     if (pass.status !== "APPROVED") return NextResponse.json({ error: "Only an approved, unused ticket can be re-sent." }, { status: 409 });
@@ -71,5 +89,29 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   if (action === "approve") await sendGuestTicket(pass.id);
   else await sendGuestRejection(pass.id);
+  return NextResponse.json({ ok: true });
+}
+
+/**
+ * Owner or staff deletes a guest request or ticket made by mistake (a typo, a duplicate, a walk-in
+ * logged on the wrong plan). Anything that took money (approved or used, with a price) is part of the
+ * books and has to be voided instead, which keeps the record.
+ */
+export async function DELETE(_req: NextRequest, { params }: { params: { slug: string; passId: string } }) {
+  const auth = await tenantOrResponse(params.slug);
+  if ("response" in auth) return auth.response;
+  const { gym, db } = auth.ctx;
+
+  // Tenant isolation: the pass must belong to the session's gym.
+  const pass = await db.guestPass.findUnique({ where: { id: params.passId } });
+  if (!pass || pass.gymId !== gym.id) return NextResponse.json({ error: "Request not found" }, { status: 404 });
+
+  const tookMoney = (pass.status === "APPROVED" || pass.status === "ATTENDED") && Number(pass.amount ?? 0) > 0;
+  if (tookMoney || pass.status === "VOIDED") {
+    return NextResponse.json({ error: "This ticket was paid for, so it can't be deleted. The owner can void it instead." }, { status: 409 });
+  }
+
+  await db.guestPass.delete({ where: { id: pass.id } });
+  if (pass.proofImageUrl) await deleteBlob(pass.proofImageUrl);
   return NextResponse.json({ ok: true });
 }

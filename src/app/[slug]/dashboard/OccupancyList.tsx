@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import RemoveCheckInButton from "./RemoveCheckInButton";
 
 export interface PresentRow {
   checkInId: string;
@@ -45,13 +46,16 @@ export default function OccupancyList({ slug, rows, windowHours }: { slug: strin
                 {r.fullName}
                 <span className="ml-2 text-neutral-500">since {r.sinceLabel}</span>
               </span>
-              <button
-                onClick={() => checkOut(r.checkInId)}
-                disabled={busy === r.checkInId}
-                className="rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
-              >
-                {busy === r.checkInId ? "…" : "Check out"}
-              </button>
+              <span className="flex items-center gap-2">
+                <button
+                  onClick={() => checkOut(r.checkInId)}
+                  disabled={busy === r.checkInId}
+                  className="rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  {busy === r.checkInId ? "…" : "Check out"}
+                </button>
+                <RemoveCheckInButton slug={slug} checkInId={r.checkInId} name={r.fullName} />
+              </span>
             </li>
           ))}
         </ul>

@@ -5,6 +5,7 @@ import { getOccupancy, occupancyWindowHours } from "@/lib/occupancy";
 import { getLeaderboard } from "@/lib/leaderboard";
 import GymNav from "@/components/GymNav";
 import OccupancyList from "./OccupancyList";
+import RemoveCheckInButton from "./RemoveCheckInButton";
 
 export const dynamic = "force-dynamic";
 
@@ -97,7 +98,10 @@ export default async function DashboardPage({ params }: { params: { slug: string
               {checkinsToday.map((c) => (
                 <li key={c.id} className="flex items-center justify-between px-4 py-2.5">
                   <span>{nameOf.get(c.memberId) ?? "Member"}</span>
-                  <span className="tabular-nums text-neutral-400">{timeOf(c.checkedInAt)}</span>
+                  <span className="flex items-center gap-3">
+                    <span className="tabular-nums text-neutral-400">{timeOf(c.checkedInAt)}</span>
+                    <RemoveCheckInButton slug={params.slug} checkInId={c.id} name={nameOf.get(c.memberId) ?? "this member"} />
+                  </span>
                 </li>
               ))}
             </ul>

@@ -12,7 +12,7 @@ export interface GuestPassRow {
   /** What the guest owes (0 = free). Staff confirm the money arrived before approving. */
   amount: number;
   hasProof: boolean;
-  status: "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "ATTENDED";
+  status: "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "ATTENDED" | "VOIDED";
   ticketLink: string | null;
 }
 
@@ -21,17 +21,31 @@ const LABEL: Record<GuestPassRow["status"], string> = {
   APPROVED: "Ticket sent",
   REJECTED: "Declined",
   ATTENDED: "Attended",
+  VOIDED: "Voided",
 };
 
 const btn = "rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-900 disabled:opacity-50";
 
-export default function GuestPassList({ slug, rows }: { slug: string; rows: GuestPassRow[] }) {
+export default function GuestPassList({ slug, rows, isOwner }: { slug: string; rows: GuestPassRow[]; isOwner: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
-  async function act(id: string, action: "approve" | "reject" | "resend") {
+  async function remove(r: GuestPassRow) {
+    if (!window.confirm(`Delete ${r.fullName}'s request for ${r.className}? This can't be undone.`)) return;
+    setBusy(r.id);
+    setError(null);
+    setNote(null);
+    const res = await fetch(`/api/${slug}/guest-passes/${r.id}`, { method: "DELETE" });
+    const body = await res.json().catch(() => ({}));
+    setBusy(null);
+    if (!res.ok) return setError(body.error ?? "Could not delete it.");
+    router.refresh();
+  }
+
+  async function act(id: string, action: "approve" | "reject" | "resend" | "void") {
+    if (action === "void" && !window.confirm("Void this ticket? The QR stops working and the payment no longer counts as revenue. The record stays.")) return;
     setBusy(id);
     setError(null);
     setNote(null);
@@ -83,6 +97,12 @@ export default function GuestPassList({ slug, rows }: { slug: string; rows: Gues
                   <button className={btn} disabled={busy === r.id} onClick={() => act(r.id, "approve")}>{r.amount > 0 ? "Payment received — approve" : "Approve"}</button>
                   <button className={btn} disabled={busy === r.id} onClick={() => act(r.id, "reject")}>Decline</button>
                 </>
+              )}
+              {(r.status === "APPROVED" || r.status === "ATTENDED") && r.amount > 0 && isOwner && (
+                <button className={`${btn} hover:border-red-800 hover:text-red-400`} disabled={busy === r.id} onClick={() => act(r.id, "void")}>Void</button>
+              )}
+              {(r.status === "PENDING_REVIEW" || r.status === "REJECTED" || ((r.status === "APPROVED" || r.status === "ATTENDED") && r.amount === 0)) && (
+                <button className={`${btn} hover:border-red-800 hover:text-red-400`} disabled={busy === r.id} onClick={() => remove(r)}>Delete</button>
               )}
               {r.status === "APPROVED" && (
                 <>
