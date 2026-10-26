@@ -14,7 +14,7 @@ export default async function CheckinStationPage({ params }: { params: { slug: s
   }
 
   const token = buildStationToken(gym.id);
-  const qrDataUrl = await QRCode.toDataURL(token, { width: 480, margin: 4 });
+  const qrDataUrl = await QRCode.toDataURL(token, { width: 480, margin: 2 });
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-950 px-4 text-white print:bg-[#ffffff] print:text-black">

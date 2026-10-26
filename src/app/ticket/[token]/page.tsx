@@ -28,7 +28,7 @@ export default async function TicketPage({ params }: { params: { token: string }
   } else if (pass.status !== "APPROVED" || passIsCancelled(pass) || passWindow(pass, pass.gym.timezone) === "OVER") {
     body = <p className="text-neutral-300">This ticket is no longer valid.</p>;
   } else {
-    const qr = await QRCode.toDataURL(token, { width: 480, margin: 4 });
+    const qr = await QRCode.toDataURL(token, { width: 480, margin: 2 });
     body = (
       <>
         {/* eslint-disable-next-line @next/next/no-img-element */}

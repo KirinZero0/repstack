@@ -45,7 +45,7 @@ export default async function MyQrPage({
     { gymId: member.gymId, memberId: member.id, issuedAt: Date.now() },
     member.qrSecret,
   );
-  const qrDataUrl = await QRCode.toDataURL(token, { width: 320, margin: 4 });
+  const qrDataUrl = await QRCode.toDataURL(token, { width: 320, margin: 2 });
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-950 px-4 text-white">

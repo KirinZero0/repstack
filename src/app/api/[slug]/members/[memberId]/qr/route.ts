@@ -26,6 +26,6 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
   }
 
   const token = buildQrToken({ gymId: gym.id, memberId: member.id, issuedAt: Date.now() }, member.qrSecret);
-  const dataUrl = await QRCode.toDataURL(token, { width: 320, margin: 4 });
+  const dataUrl = await QRCode.toDataURL(token, { width: 320, margin: 2 });
   return NextResponse.json({ name: member.fullName, status: member.status, dataUrl }, { headers: { "Cache-Control": "no-store" } });
 }

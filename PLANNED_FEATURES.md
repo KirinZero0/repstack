@@ -287,12 +287,7 @@ line (price × quantity). Items without one are charged in full.
 
 Real-camera scanning was the least-tested part of the app, so it was hardened.
 
-- **Smaller codes** (`src/lib/qr.ts`): member, class/day-pass ticket and gym-station tokens are now compact
-  (binary ids, base64url, 96-bit truncated HMAC). A member code is QR version 5 (was 11), a ticket version 4
-  (was 10), a station poster version 3 (was 7): bigger squares, so they read faster, from further away and
-  on cracked or dim screens. **Every code already issued still works**: the old long tokens are still
-  accepted for members, tickets and stations. Rotating `qrSecret` still revokes a member's codes.
-  QR images use a 4-module quiet zone (the standard) instead of 2.
+- **Codes unchanged**: compact tokens were tried and reverted; member, ticket and poster QRs keep their original format, so nothing issued or printed is affected.
 - **Sturdier scanner** (`src/lib/scanner.ts`, used by staff `/[slug]/checkin` and member `/check-in`):
   QR-only decoding, the browser's native detector when available, 720p video, 15 fps, and **no scan box**,
   so the whole frame is searched (a 70% box cropped a code held close and it never read). A "Turn light on"
@@ -300,5 +295,5 @@ Real-camera scanning was the least-tested part of the app, so it was hardened.
   busy, not https). Start/stop is serialized so a remount never tears the video out from under the scanner.
 - Tests: `e2e/41-scan.spec.ts` plays a QR through Chromium's **fake camera** into the real scanner page
   (valid member code gives "Checked in" and a `CheckIn` row; an unknown code gives "Invalid QR code"), and
-  checks token size, signature, tampering and legacy tokens.
+  checks token signature and tampering.
 - No migration needed.

@@ -4,7 +4,7 @@ import path from "path";
 import QRCode from "qrcode";
 import { test, expect, chromium } from "@playwright/test";
 import { prisma, buildTokenForMember } from "./helpers";
-import { buildQrToken, verifyQrToken, parseQrToken, buildLegacyQrToken } from "../src/lib/qr";
+import { buildQrToken, verifyQrToken, parseQrToken } from "../src/lib/qr";
 
 /** Writes a looping Y4M camera feed showing `text` as a QR code — what Chromium's fake camera plays. */
 function writeQrVideo(text: string, file: string) {
@@ -81,7 +81,7 @@ test("the real scanner reads a member's compact QR from a camera feed", async ()
 
 test("the real scanner rejects a code that is not ours", async () => {
   test.setTimeout(60_000);
-  const { page, browser } = await scanWithFakeCamera("m1.not-a-real-liftmora-code-0123456789abcdefghijklmnopqrstuv", "10.41.0.2");
+  const { page, browser } = await scanWithFakeCamera("not-a-real-liftmora-code-0123456789abcdefghijklmnopqrstuvwxyz", "10.41.0.2");
   try {
     await expect(page.getByText("Invalid QR code")).toBeVisible({ timeout: 20_000 });
   } finally {
@@ -89,21 +89,12 @@ test("the real scanner rejects a code that is not ours", async () => {
   }
 });
 
-test("compact member tokens stay small, verify, reject tampering and legacy tokens still work", async () => {
+test("member tokens verify, reject tampering and a wrong secret", async () => {
   const member = await prisma.member.findUniqueOrThrow({ where: { email: "active-member@test.local" } });
-  const payload = { gymId: member.gymId, memberId: member.id, issuedAt: Date.now() };
-
-  const compact = buildQrToken(payload, member.qrSecret);
-  expect(compact.length).toBeLessThanOrEqual(70);
-  const parsed = parseQrToken(compact)!;
-  expect(parsed.memberId).toBe(member.id);
-  expect(verifyQrToken(compact, member.qrSecret)?.memberId).toBe(member.id);
-  expect(verifyQrToken(compact, "another-secret")).toBeNull();
-
-  const flipped = compact.slice(0, -2) + (compact.endsWith("AA") ? "BB" : "AA");
+  const token = buildQrToken({ gymId: member.gymId, memberId: member.id, issuedAt: Date.now() }, member.qrSecret);
+  expect(parseQrToken(token)!.memberId).toBe(member.id);
+  expect(verifyQrToken(token, member.qrSecret)?.memberId).toBe(member.id);
+  expect(verifyQrToken(token, "another-secret")).toBeNull();
+  const flipped = token.slice(0, -2) + (token.endsWith("aa") ? "bb" : "aa");
   expect(verifyQrToken(flipped, member.qrSecret)).toBeNull();
-
-  const legacy = buildLegacyQrToken(payload, member.qrSecret);
-  expect(verifyQrToken(legacy, member.qrSecret)?.memberId).toBe(member.id);
-  expect(parseQrToken(legacy)!.memberId).toBe(member.id);
 });
