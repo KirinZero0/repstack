@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { discountText, invoiceTotals, type InvoiceDiscount } from "@/lib/invoiceMath";
 
 interface Line {
   description: string;
@@ -24,10 +25,20 @@ export default function InvoiceForm({ gyms, plans }: { gyms: string[]; plans: { 
   const [dueDate, setDueDate] = useState(inDays(7));
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<Line[]>([{ description: "", quantity: "1", unitPrice: "" }]);
+  const [discountType, setDiscountType] = useState<"NONE" | "PERCENT" | "AMOUNT">("NONE");
+  const [discountValue, setDiscountValue] = useState("");
+  const [discountLabel, setDiscountLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const total = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0);
+  // The server recomputes all of this from the items; this is only the preview, using the same maths.
+  const discount: InvoiceDiscount | undefined =
+    discountType !== "NONE" && Number(discountValue) > 0 ? { type: discountType, value: Number(discountValue), label: discountLabel } : undefined;
+  const { subtotal, discountAmount: off, total } = invoiceTotals(
+    lines.map((l) => ({ description: l.description, quantity: Number(l.quantity) || 0, unitPrice: Number(l.unitPrice) || 0 })),
+    discount,
+  );
+  const tooMuch = discountType === "AMOUNT" && Number(discountValue) > subtotal;
 
   function addLine(description: string, unitPrice: number) {
     // Replace the empty starter row instead of leaving it dangling above the preset.
@@ -52,6 +63,7 @@ export default function InvoiceForm({ gyms, plans }: { gyms: string[]; plans: { 
         issueDate,
         dueDate: dueDate || undefined,
         notes,
+        discount: discount ? { type: discount.type, value: discount.value, label: discount.label } : undefined,
         items: lines.map((l) => ({ description: l.description, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice || 0) })),
       }),
     });
@@ -120,10 +132,62 @@ export default function InvoiceForm({ gyms, plans }: { gyms: string[]; plans: { 
           <button type="button" className={ghost} onClick={() => setLines((ls) => [...ls, { description: "", quantity: "1", unitPrice: "" }])}>
             + Add item
           </button>
-          <p className="text-sm">
-            Total: <span className="text-lg font-semibold">{rp(total)}</span>
-          </p>
+          {off === 0 && (
+            <p className="text-sm">
+              Total: <span className="text-lg font-semibold">{rp(total)}</span>
+            </p>
+          )}
         </div>
+
+        <div className="mt-5 rounded-lg border border-neutral-800 p-3" data-testid="discount-section">
+          <p className="mb-2 text-sm text-neutral-300">Discount (optional)</p>
+          <div className="grid gap-2 sm:grid-cols-[9rem_8rem_1fr]">
+            <select value={discountType} onChange={(e) => setDiscountType(e.target.value as typeof discountType)} className={input} aria-label="Discount type">
+              <option value="NONE">No discount</option>
+              <option value="PERCENT">Percent (%)</option>
+              <option value="AMOUNT">Fixed amount (Rp)</option>
+            </select>
+            <input
+              type="number"
+              min={discountType === "PERCENT" ? 0.01 : 1}
+              max={discountType === "PERCENT" ? 100 : undefined}
+              step={discountType === "PERCENT" ? "any" : 1}
+              disabled={discountType === "NONE"}
+              value={discountValue}
+              onChange={(e) => setDiscountValue(e.target.value)}
+              className={`${input} disabled:opacity-40`}
+              placeholder={discountType === "PERCENT" ? "e.g. 10" : "e.g. 50000"}
+              aria-label="Discount value"
+            />
+            <input
+              maxLength={80}
+              disabled={discountType === "NONE"}
+              value={discountLabel}
+              onChange={(e) => setDiscountLabel(e.target.value)}
+              className={`${input} disabled:opacity-40`}
+              placeholder="Reason shown on the invoice (optional), e.g. Early bird"
+              aria-label="Discount label"
+            />
+          </div>
+          {tooMuch && <p className="mt-2 text-xs text-red-400">The discount can&apos;t be more than the subtotal ({rp(subtotal)}).</p>}
+        </div>
+
+        {off > 0 && (
+          <dl className="mt-4 ml-auto w-full max-w-xs space-y-1 text-sm" data-testid="invoice-preview">
+            <div className="flex justify-between text-neutral-400">
+              <dt>Subtotal</dt>
+              <dd>{rp(subtotal)}</dd>
+            </div>
+            <div className="flex justify-between text-emerald-400">
+              <dt>Discount ({discountLabel.trim() ? `${discountLabel.trim()}, ` : ""}{discountText(discount!.type, discount!.value)})</dt>
+              <dd>− {rp(off)}</dd>
+            </div>
+            <div className="flex justify-between border-t border-neutral-700 pt-1">
+              <dt>Total</dt>
+              <dd className="text-lg font-semibold">{rp(total)}</dd>
+            </div>
+          </dl>
+        )}
       </div>
 
       <label className="block text-sm text-neutral-300">

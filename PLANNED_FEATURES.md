@@ -246,3 +246,24 @@ at the door, members showing their QR, owners checking the dashboard). One insta
   also aren't included (reminders go out by WhatsApp).
 - Tests: `e2e/38-pwa.spec.ts` (manifest and icons, headers, `/open`, the real worker going offline in a
   browser, the install banner on Android-style and iPhone).
+
+## 6. Invoice discounts (superadmin invoice maker)
+
+An invoice can carry one discount, taken off the subtotal: a **percentage** (0–100%) or a **fixed
+rupiah amount**, with an optional reason printed next to it ("Early bird").
+
+- **Form** `/superadmin/invoices/new`: a "Discount (optional)" block under the items. A live preview
+  shows Subtotal, Discount and Total as you type, using the same maths as the server
+  (`src/lib/invoiceMath.ts`, no server code in it so the browser can share it).
+- **Server is the authority** (`POST /api/superadmin/invoices`): subtotal, discount and total are always
+  recomputed from the line items; a total sent by the client is ignored. Percentages are rounded to the
+  nearest whole rupiah; a fixed amount must be whole rupiah and no more than the subtotal; a 100%
+  discount (total Rp 0) is allowed. Anything invalid is a 400 with a plain message.
+- **Data** `Invoice.subtotal`, `discountType`, `discountValue` (as typed), `discountLabel`,
+  `discountAmount` (rupiah actually deducted). **`total` is still what is payable**, so the invoice list,
+  the "outstanding" figure and everything else that reads `total` need no change. Migration
+  `20261026010000_invoice_discount` backfills `subtotal = total` for invoices made before discounts.
+- **Printed invoice**: with a discount it shows Subtotal, "Discount (Early bird, 10%)" and **Total due**;
+  without one it looks exactly as before.
+- Tests: `e2e/39-invoice-discount.spec.ts` (maths and rounding, server-side totals, validation limits,
+  the printed sheet, an old invoice, and the form's live preview in a browser).

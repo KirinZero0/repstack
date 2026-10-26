@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireSuperadminSession, SessionError } from "@/lib/session";
 import { getPlatformBank } from "@/lib/platformBank";
-import type { InvoiceItem } from "@/lib/invoices";
+import { discountText, type InvoiceItem } from "@/lib/invoices";
 import InvoiceControls from "./InvoiceControls";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +22,7 @@ export default async function InvoicePage({ params }: { params: { invoiceId: str
   if (!invoice) notFound();
   const bank = await getPlatformBank();
   const items = invoice.items as unknown as InvoiceItem[];
+  const discountAmount = Number(invoice.discountAmount);
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white print:bg-white print:p-0">
@@ -84,8 +85,22 @@ export default async function InvoicePage({ params }: { params: { invoiceId: str
               ))}
             </tbody>
             <tfoot>
+              {discountAmount > 0 && (
+                <>
+                  <tr>
+                    <td colSpan={3} className="pt-4 text-right text-neutral-600">Subtotal</td>
+                    <td className="pt-4 text-right" data-testid="invoice-subtotal">{rp(Number(invoice.subtotal))}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={3} className="pt-1 text-right text-neutral-600">
+                      Discount ({invoice.discountLabel ? `${invoice.discountLabel}, ` : ""}{discountText(invoice.discountType, Number(invoice.discountValue))})
+                    </td>
+                    <td className="pt-1 text-right" data-testid="invoice-discount">− {rp(discountAmount)}</td>
+                  </tr>
+                </>
+              )}
               <tr>
-                <td colSpan={3} className="pt-4 text-right font-semibold">Total</td>
+                <td colSpan={3} className="pt-4 text-right font-semibold">{discountAmount > 0 ? "Total due" : "Total"}</td>
                 <td className="pt-4 text-right text-lg font-bold">{rp(Number(invoice.total))}</td>
               </tr>
             </tfoot>

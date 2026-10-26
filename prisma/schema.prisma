@@ -317,7 +317,12 @@ model Invoice {
   billToInfo  String    @default("") // address / contact lines, shown under the name
   currency    String    @default("IDR")
   items       Json // [{ description, quantity, unitPrice }]
-  total       Decimal
+  subtotal    Decimal   @default(0) // sum of the line items, before any discount
+  discountType   String? // "PERCENT" | "AMOUNT" | null (no discount)
+  discountValue  Decimal @default(0) // the percentage, or the rupiah amount, as typed
+  discountLabel  String  @default("") // optional wording for the invoice, e.g. "Early bird"
+  discountAmount Decimal @default(0) // rupiah actually taken off the subtotal
+  total       Decimal // what is payable: subtotal minus discountAmount
   notes       String    @default("")
   status      String    @default("UNPAID") // "UNPAID" | "PAID" | "VOID"
   issueDate   DateTime

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSuperadminSession, SessionError } from "@/lib/session";
 import { createInvoiceSchema } from "@/lib/validation/superadmin";
-import { createInvoice, dateFromInput, invoiceTotal } from "@/lib/invoices";
+import { createInvoice, dateFromInput, invoiceTotals } from "@/lib/invoices";
 import { writeAuditLog } from "@/lib/audit";
 
-/** Superadmin issues an invoice. The total is computed here from the line items, never taken from the client. */
+/** Superadmin issues an invoice. The subtotal, discount and total are computed here from the line items, never taken from the client. */
 export async function POST(req: NextRequest) {
   let session;
   try {
@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
   }
   const d = parsed.data;
 
+  const totals = invoiceTotals(d.items, d.discount);
   const issueDate = dateFromInput(d.issueDate);
   const invoice = await createInvoice(
     {
@@ -28,7 +29,12 @@ export async function POST(req: NextRequest) {
       billToName: d.billToName,
       billToInfo: d.billToInfo,
       items: d.items,
-      total: invoiceTotal(d.items),
+      subtotal: totals.subtotal,
+      discountType: totals.discountAmount > 0 ? d.discount!.type : null,
+      discountValue: totals.discountAmount > 0 ? d.discount!.value : 0,
+      discountLabel: totals.discountAmount > 0 ? d.discount!.label : "",
+      discountAmount: totals.discountAmount,
+      total: totals.total,
       notes: d.notes,
       issueDate,
       dueDate: d.dueDate ? dateFromInput(d.dueDate) : null,
@@ -37,6 +43,6 @@ export async function POST(req: NextRequest) {
     issueDate.getUTCFullYear(),
   );
 
-  await writeAuditLog({ superadminId: session.superadminId, action: "INVOICE_CREATED", metadata: { invoiceId: invoice.id, number: invoice.number, total: Number(invoice.total) } });
+  await writeAuditLog({ superadminId: session.superadminId, action: "INVOICE_CREATED", metadata: { invoiceId: invoice.id, number: invoice.number, subtotal: totals.subtotal, discount: totals.discountAmount, total: Number(invoice.total) } });
   return NextResponse.json({ id: invoice.id, number: invoice.number }, { status: 201 });
 }

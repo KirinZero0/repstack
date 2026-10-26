@@ -1,13 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 
-export interface InvoiceItem {
-  description: string;
-  quantity: number;
-  unitPrice: number;
-}
-
-export const invoiceTotal = (items: InvoiceItem[]) => items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+export { invoiceSubtotal, invoiceTotals, discountAmount, discountText } from "./invoiceMath";
+export type { InvoiceItem, InvoiceDiscount } from "./invoiceMath";
 
 /** "YYYY-MM-DD" from the form → midday UTC, so the calendar day survives any timezone on display. */
 export const dateFromInput = (d: string) => new Date(`${d}T12:00:00.000Z`);

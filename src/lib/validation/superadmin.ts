@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { invoiceSubtotal } from "../invoiceMath";
 
 export const superadminLoginSchema = z.object({
   email: z.string().email(),
@@ -65,7 +66,21 @@ export const createInvoiceSchema = z
       )
       .min(1)
       .max(30),
+    // Optional: a percentage or a fixed rupiah amount off the subtotal. Leave it out for no discount.
+    discount: z
+      .object({
+        type: z.enum(["PERCENT", "AMOUNT"]),
+        value: z.number().positive("Enter a discount greater than 0"),
+        label: z.string().trim().max(80).default(""),
+      })
+      .optional(),
   })
-  .refine((v) => !v.dueDate || v.dueDate >= v.issueDate, { message: "Due date can't be before the issue date", path: ["dueDate"] });
+  .refine((v) => !v.dueDate || v.dueDate >= v.issueDate, { message: "Due date can't be before the issue date", path: ["dueDate"] })
+  .refine((v) => !v.discount || v.discount.type !== "PERCENT" || v.discount.value <= 100, { message: "A discount can't be more than 100%", path: ["discount"] })
+  .refine((v) => !v.discount || v.discount.type !== "AMOUNT" || Number.isInteger(v.discount.value), { message: "Enter the discount in whole rupiah", path: ["discount"] })
+  .refine((v) => !v.discount || v.discount.type !== "AMOUNT" || v.discount.value <= invoiceSubtotal(v.items), {
+    message: "The discount can't be more than the invoice subtotal",
+    path: ["discount"],
+  });
 
 export const invoiceActionSchema = z.object({ action: z.enum(["paid", "unpaid", "void"]) });
