@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import ScanResultModal from "@/components/ScanResultModal";
+import { createQrScanner, QR_SCAN_CONFIG } from "@/lib/qrScanner";
 
 type ResultCode =
   | "SUCCESS"
@@ -57,16 +58,15 @@ export default function CheckinScanner({ slug }: { slug: string }) {
     let cancelled = false;
 
     async function start() {
-      const { Html5Qrcode } = await import("html5-qrcode");
-      if (cancelled || !containerRef.current) return;
-
-      const scanner = new Html5Qrcode(containerRef.current.id);
+      if (!containerRef.current) return;
+      const scanner = await createQrScanner(containerRef.current.id);
+      if (cancelled) return;
       scannerRef.current = scanner;
 
       try {
         await scanner.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          QR_SCAN_CONFIG,
           async (decodedText) => {
             if (processingRef.current) return;
             processingRef.current = true;
