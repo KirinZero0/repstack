@@ -4,7 +4,7 @@ import { isAuthorizedCronRequest } from "@/lib/cronAuth";
 import { openPlatformInvoice } from "@/lib/platformBilling";
 import { getPlatformBank, manualPlatformBilling } from "@/lib/platformBank";
 import { withSuspensionReason } from "@/lib/suspension";
-import { sendPlatformWhatsapp } from "@/lib/whatsapp";
+import { notifyOwner } from "@/lib/notify";
 
 const GRACE_PERIOD_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -44,12 +44,16 @@ export async function GET(req: NextRequest) {
       if (!created) continue;
 
       const owner = gym.staff[0];
-      if (owner?.phone) {
+      if (owner) {
         const payUrl = url.startsWith("/") ? `${appUrl}${url}` : url;
         // Same date the Billing page shows: suspension comes GRACE_PERIOD_MS after the due date.
         const graceEnds = new Date((gym.nextBillingDate ?? now).getTime() + GRACE_PERIOD_MS).toLocaleDateString("id-ID");
-        await sendPlatformWhatsapp({
-          to: owner.phone,
+        await notifyOwner({
+          gymId: gym.id,
+          gymName: gym.name,
+          gymAddress: gym.address,
+          to: { name: owner.name, email: owner.email, phone: owner.phone },
+          type: "subscription_due",
           message: manual
             ? `Your Liftmora subscription for "${gym.name}" is due. Pay by bank transfer and upload the proof here: ${payUrl}. Please pay before ${graceEnds}, or the gym will be suspended.`
             : `Your Liftmora subscription for "${gym.name}" is due. Pay here: ${payUrl}`,
@@ -74,9 +78,13 @@ export async function GET(req: NextRequest) {
       data: { subscriptionStatus: "SUSPENDED", settings: withSuspensionReason(g.settings, "non_payment") },
     });
     const owner = g.staff[0];
-    if (owner?.phone) {
-      await sendPlatformWhatsapp({
-        to: owner.phone,
+    if (owner) {
+      await notifyOwner({
+        gymId: g.id,
+        gymName: g.name,
+        gymAddress: g.address,
+        to: { name: owner.name, email: owner.email, phone: owner.phone },
+        type: "gym_suspended",
         message: `Your Liftmora subscription for "${g.name}" was not paid, so the gym is suspended: staff and members can't log in or check in. Pay here to switch it back on right away: ${appUrl}/${g.slug}/billing`,
       });
     }

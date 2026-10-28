@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   });
 
   const token = await createPasswordReset({ kind: "staff", subjectId: staff.id, purpose: "invite" });
-  waitUntil(deliverResetLink({ kind: "staff", name: staff.name, token, purpose: "invite", staffPhone: staff.phone, gymName: gym.name }));
+  waitUntil(deliverResetLink({ kind: "staff", name: staff.name, token, purpose: "invite", staffPhone: staff.phone, staffEmail: staff.email, gymId: gym.id, gymName: gym.name }));
 
   // The owner sees the link once so they can hand it over in person if WhatsApp isn't an option.
   return NextResponse.json({ staffId: staff.id, inviteUrl: resetUrl(token) }, { status: 201 });

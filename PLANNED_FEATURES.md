@@ -349,3 +349,24 @@ Images: the logo (`public/icons/email-logo.png`, made by `scripts/make-pwa-icons
 because email apps block embedded images; they only appear once this version is deployed. The name is also text.
 See every email with sample data: `npx tsx scripts/preview-emails.ts [dir]` (images embedded). No migration.
 Tests: `e2e/42-email-templates.spec.ts`.
+
+## 11. System emails (Liftmora to a gym's owner and staff)
+
+Liftmora's own messages to the people who run a gym now go out as email as well as WhatsApp (`notifyOwner` in
+`src/lib/notify.ts`): to the phone and the email address they have, whichever exists. Unlike member messages
+these aren't the gym's to switch off, since they cover billing and access. Every attempt is logged against the
+gym (`NotificationLog`, channel `whatsapp` or `email`). The six kinds, all in the `MessageType` enum:
+
+- `gym_welcome`: a gym was set up, by a superadmin or by self-serve sign-up (login address, trial if any)
+- `subscription_due`: the renewal invoice, with the pay or upload-proof link
+- `subscription_paid`: **new**, a receipt when a subscription payment is confirmed, online or by a bank
+  transfer a superadmin confirms, saying what the gym is covered until
+- `gym_suspended`: the gym was suspended for non-payment, with the link to pay
+- `staff_invite` and `staff_password_reset`: a staff or owner link to set a password
+
+They use the same dark HTML design (a badge each, "Sent by Liftmora about <gym>" in the footer). The wording is
+the platform's, never a gym's: `DEFAULT_SYSTEM_EMAIL_TEMPLATES` and `SYSTEM_EMAIL_DESIGN` in
+`src/config/email.ts`, and an `EmailTemplate` row with no gym for one of these types overrides it (there is no
+screen for that yet). A gym's own templates are ignored for them. `{{recipientName}}` is a new placeholder.
+Migration: the `MessageType` enum gained the six values (same new migration as the email templates, so
+`npm run db:migrate` and `npm run db:rls` as before). Tests: `e2e/42-email-templates.spec.ts`.

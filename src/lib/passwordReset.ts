@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 import { decrypt } from "./crypto";
 import { generateMagicToken, hashMagicToken } from "./magicLink";
 import { sendPlatformWhatsapp } from "./whatsapp";
-import { notifyMember } from "./notify";
+import { notifyMember, notifyOwner } from "./notify";
 
 export const RESET_TTL_MS = 60 * 60 * 1000; // self-service "forgot password" links
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // staff invites created by an owner
@@ -106,6 +106,9 @@ export async function deliverResetLink(target: {
   purpose: "reset" | "invite";
   /** staff: the phone on their profile (plain). member: use memberWhatsapp instead. */
   staffPhone?: string | null;
+  /** staff: their email, and the gym id the message is logged against. */
+  staffEmail?: string | null;
+  gymId?: string;
   member?: { id: string; gymId: string; encryptedPhone: string };
   gymName: string;
 }): Promise<void> {
@@ -116,7 +119,17 @@ export async function deliverResetLink(target: {
       : `Hi ${target.name}, use this link to set a new password for ${target.gymName}: ${url} (valid 1 hour). If you didn't ask for this, ignore it.`;
   try {
     if (target.kind === "staff") {
-      if (target.staffPhone) await sendPlatformWhatsapp({ to: target.staffPhone, message });
+      if (target.gymId && (target.staffPhone || target.staffEmail)) {
+        await notifyOwner({
+          gymId: target.gymId,
+          gymName: target.gymName,
+          to: { name: target.name, email: target.staffEmail, phone: target.staffPhone },
+          type: target.purpose === "invite" ? "staff_invite" : "staff_password_reset",
+          message,
+        });
+      } else if (target.staffPhone) {
+        await sendPlatformWhatsapp({ to: target.staffPhone, message });
+      }
     } else if (target.member) {
       await notifyMember(target.member.gymId, {
         to: decrypt(target.member.encryptedPhone),

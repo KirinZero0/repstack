@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "MessageType" AS ENUM ('default', 'member_activation', 'member_welcome', 'renewal_confirmed', 'payment_receipt', 'expiry_reminder', 'expired_notice', 'manual_reminder', 'password_reset', 'qr_fallback', 'class_confirmation', 'class_reminder', 'class_cancelled', 'guest_ticket', 'guest_rejected');
+CREATE TYPE "MessageType" AS ENUM ('default', 'member_activation', 'member_welcome', 'renewal_confirmed', 'payment_receipt', 'expiry_reminder', 'expired_notice', 'manual_reminder', 'password_reset', 'qr_fallback', 'class_confirmation', 'class_reminder', 'class_cancelled', 'guest_ticket', 'guest_rejected', 'gym_welcome', 'subscription_due', 'subscription_paid', 'gym_suspended', 'staff_invite', 'staff_password_reset');
 
 -- CreateTable
 CREATE TABLE "EmailTemplate" (

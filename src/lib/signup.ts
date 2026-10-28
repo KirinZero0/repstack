@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { sendPlatformWhatsapp } from "./whatsapp";
+import { notifyOwner } from "./notify";
 import { platformProviderName } from "./gateway";
 
 export const SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
@@ -78,10 +78,14 @@ export async function completeSignup(signupId: string, invoice: { paidAt: Date; 
     return gym;
   });
 
-  if (signup.ownerPhone) {
-    await sendPlatformWhatsapp({
-      to: signup.ownerPhone,
+  {
+    await notifyOwner({
+      gymId: gym.id,
+      gymName: gym.name,
+      gymAddress: gym.address,
+      to: { name: signup.ownerName, email: signup.ownerEmail, phone: signup.ownerPhone },
+      type: "gym_welcome",
       message: `Welcome to Liftmora, ${signup.ownerName}! "${gym.name}" is ready. Log in at ${process.env.NEXT_PUBLIC_APP_URL}/${gym.slug}/login with ${signup.ownerEmail} and the password you chose.`,
-    }).catch((err) => console.error("Signup welcome message failed", err));
+    });
   }
 }

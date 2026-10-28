@@ -5,7 +5,7 @@ import { requireSuperadminSession, SessionError } from "@/lib/session";
 import { createGymSchema } from "@/lib/validation/superadmin";
 import { RESERVED_SLUGS } from "@/lib/signup";
 import { writeAuditLog } from "@/lib/audit";
-import { sendPlatformWhatsapp } from "@/lib/whatsapp";
+import { notifyOwner } from "@/lib/notify";
 
 export async function POST(req: NextRequest) {
   let session;
@@ -113,10 +113,14 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  if (data.ownerPhone) {
+  {
     const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL}/${gym.slug}/login`;
-    await sendPlatformWhatsapp({
-      to: data.ownerPhone,
+    await notifyOwner({
+      gymId: gym.id,
+      gymName: gym.name,
+      gymAddress: gym.address,
+      to: { name: data.ownerName, email: data.ownerEmail, phone: data.ownerPhone },
+      type: "gym_welcome",
       message: `Welcome to Liftmora, ${data.ownerName}! Your gym "${data.gymName}" is set up. Log in at ${loginUrl} with email ${data.ownerEmail} and the temporary password you were given.${hasTrial ? ` You have a free ${data.trialDays}-day trial.` : ""}`,
     });
   }

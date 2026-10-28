@@ -1,15 +1,20 @@
 import {
   DEFAULT_EMAIL_TEMPLATES,
+  DEFAULT_SYSTEM_EMAIL_TEMPLATES,
+  SYSTEM_EMAIL_DESIGN,
+  isSystemEmailType,
   EMAIL_BRAND,
   EMAIL_DESIGN,
   EMAIL_LIMITS,
   EMAIL_PLACEHOLDERS,
   isEmailMessageType,
   type EmailMessageType,
+  type MessageType,
   type EmailTemplate,
 } from "@/config/email";
 
-export type EmailVars = Record<keyof typeof EMAIL_PLACEHOLDERS, string>;
+/** `recipientName` falls back to `memberName`, so member emails need not set it. */
+export type EmailVars = Record<Exclude<keyof typeof EMAIL_PLACEHOLDERS, "recipientName">, string> & { recipientName?: string };
 
 const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z]+)\s*\}\}/g;
 
@@ -31,7 +36,7 @@ export function templateError(t: { subject: string; body: string }): string | nu
 
 /** Fills placeholders in one pass, so a value containing "{{...}}" is never expanded again. */
 export function renderText(template: string, vars: EmailVars): string {
-  return template.replace(PLACEHOLDER_RE, (_, name: string) => (name in vars ? vars[name as keyof EmailVars] : ""));
+  return template.replace(PLACEHOLDER_RE, (_, name: string) => (name in vars ? (vars[name as keyof EmailVars] ?? "") : ""));
 }
 
 /** A stored template row. `gymId: null` is a platform default; otherwise it belongs to that gym. */
@@ -49,6 +54,11 @@ export interface TemplateRow {
  * `rows` may hold any gyms' rows; only this gym's and the platform's are considered.
  */
 export function resolveTemplate(rows: TemplateRow[], gymId: string | null, type: string): EmailTemplate {
+  // Liftmora's own emails belong to the platform: a gym's rows are never looked at.
+  if (isSystemEmailType(type)) {
+    const own = rows.find((r) => r.gymId === null && r.type === type);
+    return own ? { subject: own.subject, body: own.body } : DEFAULT_SYSTEM_EMAIL_TEMPLATES[type];
+  }
   const key: EmailMessageType = isEmailMessageType(type) ? type : "default";
   const find = (owner: string | null, t: string) => rows.find((r) => r.gymId === owner && r.type === t);
   const hit =
@@ -58,6 +68,7 @@ export function resolveTemplate(rows: TemplateRow[], gymId: string | null, type:
 
 export function renderEmail(rows: TemplateRow[], gymId: string | null, type: string, vars: EmailVars): { subject: string; text: string; html: string } {
   const t = resolveTemplate(rows, gymId, type);
+  vars = { ...vars, recipientName: vars.recipientName ?? vars.memberName };
   // A subject is a header: never let a value smuggle in a line break.
   const subject = renderText(t.subject, vars).replace(/[\r\n]+/g, " ").trim().slice(0, EMAIL_LIMITS.subject);
   const text = renderText(t.body, vars);
@@ -105,7 +116,7 @@ export function emailLogoUrl(): string {
 }
 
 /** The yellow badge shown above the heading, one per kind of message (see scripts/make-email-assets.mjs). */
-export function emailBadgeUrl(type: EmailMessageType): string {
+export function emailBadgeUrl(type: MessageType): string {
   return `${assetBase()}/email/${type}.png`;
 }
 
@@ -125,8 +136,9 @@ function barbell(color: string): string {
  * tables and inline styles because email apps ignore most other CSS.
  */
 export function htmlEmail(opts: { text: string; type: string; gymName: string; gymAddress: string }): string {
-  const key: EmailMessageType = isEmailMessageType(opts.type) ? opts.type : "default";
-  const design = EMAIL_DESIGN[key];
+  const system = isSystemEmailType(opts.type);
+  const key: MessageType = system ? (opts.type as MessageType) : isEmailMessageType(opts.type) ? opts.type : "default";
+  const design = isSystemEmailType(key) ? SYSTEM_EMAIL_DESIGN[key] : EMAIL_DESIGN[key as EmailMessageType];
   const b = EMAIL_BRAND;
   const link = design.cta ? opts.text.match(URL_RE)?.[0] : undefined;
   const button = link
@@ -147,7 +159,7 @@ export function htmlEmail(opts: { text: string; type: string; gymName: string; g
 <tr><td style="background:${b.bandBg};padding:32px 28px 8px 28px">
 ${paragraphs(opts.text)}${button}
 </td></tr>
-<tr><td style="background:${b.bandBg};padding:22px 28px;border-top:1px solid ${b.rule};font-size:12px;line-height:1.7;color:${b.bandMuted}"><span style="color:${b.bandText};font-weight:bold">${escapeHtml(opts.gymName)}</span>${opts.gymAddress ? `<br>${escapeHtml(opts.gymAddress)}` : ""}<br><span style="color:${b.accent}">&#9679;</span> Sent by Liftmora on behalf of ${escapeHtml(opts.gymName)}.</td></tr>
+<tr><td style="background:${b.bandBg};padding:22px 28px;border-top:1px solid ${b.rule};font-size:12px;line-height:1.7;color:${b.bandMuted}"><span style="color:${b.bandText};font-weight:bold">${escapeHtml(opts.gymName)}</span>${opts.gymAddress ? `<br>${escapeHtml(opts.gymAddress)}` : ""}<br><span style="color:${b.accent}">&#9679;</span> ${system ? `Sent by Liftmora about ${escapeHtml(opts.gymName)}.` : `Sent by Liftmora on behalf of ${escapeHtml(opts.gymName)}.`}</td></tr>
 </table></td></tr></table>
 </body></html>`;
 }

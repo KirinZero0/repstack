@@ -50,7 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (staff && staff.gymId === gym.id && staff.isActive && !(await tooMany(staff.id))) {
     const token = await createPasswordReset({ kind: "staff", subjectId: staff.id, purpose: "reset", ipHash });
     waitUntil(
-      deliverResetLink({ kind: "staff", name: staff.name, token, purpose: "reset", staffPhone: staff.phone, gymName: gym.name }),
+      deliverResetLink({ kind: "staff", name: staff.name, token, purpose: "reset", staffPhone: staff.phone, staffEmail: staff.email, gymId: gym.id, gymName: gym.name }),
     );
   }
 

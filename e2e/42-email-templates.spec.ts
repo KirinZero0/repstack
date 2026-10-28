@@ -4,7 +4,8 @@ import { prisma } from "./helpers";
 import { renderEmail, resolveTemplate, templateError, textToHtml, htmlEmail } from "../src/lib/emailTemplates";
 import { sendEmail } from "../src/lib/email";
 import { MessageType } from "@prisma/client";
-import { MESSAGE_TYPES, EMAIL_MESSAGE_TYPES, DEFAULT_EMAIL_TEMPLATES } from "../src/config/email";
+import { MESSAGE_TYPES, EMAIL_MESSAGE_TYPES, DEFAULT_EMAIL_TEMPLATES, SYSTEM_EMAIL_TYPES, DEFAULT_SYSTEM_EMAIL_TEMPLATES, SYSTEM_EMAIL_DESIGN } from "../src/config/email";
+import { notifyOwner } from "../src/lib/notify";
 
 let seq = 0;
 const uniq = (tag: string) => `${tag}-${Date.now()}-${seq++}`;
@@ -207,6 +208,11 @@ test("the owner edits a template on the settings page and sees the preview", asy
 test("the message types in code are exactly the database enum, and every emailable one has default wording", async () => {
   expect([...MESSAGE_TYPES].sort()).toEqual(Object.values(MessageType).sort());
   expect(Object.keys(DEFAULT_EMAIL_TEMPLATES).sort()).toEqual(Object.keys(EMAIL_MESSAGE_TYPES).sort());
+  expect(Object.keys(DEFAULT_SYSTEM_EMAIL_TEMPLATES).sort()).toEqual(Object.keys(SYSTEM_EMAIL_TYPES).sort());
+  expect(Object.keys(SYSTEM_EMAIL_DESIGN).sort()).toEqual(Object.keys(SYSTEM_EMAIL_TYPES).sort());
+  // Every message type is either a member email (or the default slot), a system email, or WhatsApp-only.
+  const known = new Set<string>([...Object.keys(EMAIL_MESSAGE_TYPES), ...Object.keys(SYSTEM_EMAIL_TYPES), "guest_ticket", "guest_rejected"]);
+  expect([...MESSAGE_TYPES].filter((t) => !known.has(t))).toEqual([]);
   // The database itself refuses a type that isn't in the enum.
   await expect(prisma.$executeRawUnsafe(`INSERT INTO "EmailTemplate" (id, type, subject, body, "updatedAt") VALUES ('x', 'bogus', 's', 'b', now())`)).rejects.toThrow();
 });
@@ -273,4 +279,48 @@ test("the HTML email has the gym header, a heading, a button only where there is
   expect(htmlEmail({ text: "Hello", type: "something_new", gymName: "G", gymAddress: "" })).toContain("A message from your gym");
   // A hostile name or message can't inject markup.
   expect(htmlEmail({ text: "<script>alert(1)</script>", type: "default", gymName: "<img src=x>", gymAddress: "" })).not.toMatch(/<script|<img src=x/);
+});
+
+test("system emails use the platform's wording, never a gym's, and a platform row overrides the built-in", () => {
+  const rows = [
+    { gymId: "g1", type: "gym_welcome", subject: "Gym wrote this", body: "{{message}}" },
+    { gymId: "g1", type: "default", subject: "Gym default", body: "{{message}}" },
+  ];
+  expect(resolveTemplate(rows, "g1", "gym_welcome").subject).toBe("Welcome to Liftmora, {{gymName}} is ready");
+  expect(resolveTemplate([...rows, { gymId: null, type: "gym_welcome", subject: "Platform {{gymName}}", body: "{{message}}" }], "g1", "gym_welcome").subject).toBe("Platform {{gymName}}");
+
+  const out = renderEmail([], null, "subscription_due", { ...vars, message: "Pay here: https://x.test/pay/1" });
+  expect(out.subject).toBe("Your Liftmora subscription for Iron Co is due");
+  expect(out.html).toContain("Your subscription is due");
+  expect(out.html).toContain("Pay your invoice &rarr;");
+  expect(out.html).toContain("/email/subscription_due.png");
+  expect(out.html).toContain("Sent by Liftmora about Iron Co.");
+  // A billing receipt has no button.
+  expect(renderEmail([], null, "subscription_paid", vars).html).not.toContain("&rarr;");
+});
+
+test("notifyOwner emails and messages the owner, logs both against the gym, and skips what it can't reach", async () => {
+  const f = await makeGym();
+  const marker = new Date();
+  await notifyOwner({ gymId: f.gym.id, gymName: f.gym.name, to: { name: "Owner", email: f.owner.email, phone: "081200009999" }, type: "subscription_due", message: "Pay here: https://x.test/pay" });
+  await notifyOwner({ gymId: f.gym.id, gymName: f.gym.name, to: { name: "Owner", email: `bad+bounce@x.test` }, type: "gym_suspended", message: "Suspended." });
+  await notifyOwner({ gymId: f.gym.id, gymName: f.gym.name, to: { name: "Owner" }, type: "staff_invite", message: "No way to reach them." });
+  const logs = (await prisma.notificationLog.findMany({ where: { gymId: f.gym.id, sentAt: { gte: marker } } })).map((l) => `${l.type}:${l.channel}:${l.status}`).sort();
+  expect(logs).toContain("subscription_due:email:SENT");
+  expect(logs.some((l) => l.startsWith("subscription_due:whatsapp:"))).toBe(true);
+  expect(logs).toContain("gym_suspended:email:FAILED");
+  expect(logs.filter((l) => l.startsWith("staff_invite"))).toEqual([]);
+});
+
+test("setting up a gym emails its owner a welcome from Liftmora", async ({ request, baseURL }) => {
+  await request.post(`${baseURL}/api/superadmin/login`, { data: { email: "superadmin@test.local", password: "superadmin-pass-123" } });
+  const plan = await prisma.saasPlan.create({ data: { name: uniq("Sys"), price: 1, billingInterval: "monthly", maxMembers: 100, maxStaff: 5, maxWhatsappPerMonth: 500 } });
+  const slug = uniq("sys");
+  const res = await request.post(`${baseURL}/api/superadmin/gyms`, {
+    data: { gymName: `Sys ${slug}`, slug, saasPlanId: plan.id, ownerName: "New Owner", ownerEmail: `${slug}@owner.test`, ownerTempPassword: "temp-pass-1234" },
+  });
+  expect(res.status()).toBe(201);
+  const gym = await prisma.gym.findUniqueOrThrow({ where: { slug } });
+  const logs = await prisma.notificationLog.findMany({ where: { gymId: gym.id } });
+  expect(logs.map((l) => `${l.type}:${l.channel}:${l.status}`)).toContain("gym_welcome:email:SENT");
 });

@@ -639,4 +639,10 @@ enum MessageType {
   class_cancelled
   guest_ticket
   guest_rejected
+  gym_welcome
+  subscription_due
+  subscription_paid
+  gym_suspended
+  staff_invite
+  staff_password_reset
 }

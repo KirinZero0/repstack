@@ -1,6 +1,6 @@
-import type { NotificationType } from "@/config/email";
+import type { NotificationType, SystemEmailType } from "@/config/email";
 import { prisma } from "./prisma";
-import { sendGymWhatsapp } from "./whatsapp";
+import { sendGymWhatsapp, sendPlatformWhatsapp } from "./whatsapp";
 import { emailConfigured, sendEmail } from "./email";
 import { renderEmail } from "./emailTemplates";
 
@@ -60,5 +60,59 @@ export async function notifyMember(
   const sends: Promise<unknown>[] = [];
   if (channels.whatsapp) sends.push(sendGymWhatsapp(gymId, opts));
   if (channels.email) sends.push(emailMember(gymId, gym, opts));
+  await Promise.all(sends);
+}
+
+/**
+ * Liftmora's own message to a gym's owner or staff (welcome, billing, access): WhatsApp to their phone and
+ * email to their address, whichever they have. Unlike member messages these aren't the gym's to switch off,
+ * because they cover billing and security. The wording is the platform's (see SYSTEM_EMAIL_TYPES). Every
+ * attempt is logged against the gym. Never throws.
+ */
+export async function notifyOwner(opts: {
+  gymId: string;
+  gymName: string;
+  gymAddress?: string | null;
+  to: { name: string; email?: string | null; phone?: string | null };
+  message: string;
+  type: SystemEmailType;
+}): Promise<void> {
+  const log = (channel: "whatsapp" | "email", status: "SENT" | "FAILED" | "SKIPPED") =>
+    prisma.notificationLog
+      .create({ data: { gymId: opts.gymId, type: opts.type, channel, status } })
+      .catch((err) => console.error("System message log failed", err));
+
+  const sends: Promise<unknown>[] = [];
+  if (opts.to.phone) {
+    sends.push(
+      sendPlatformWhatsapp({ to: opts.to.phone, message: opts.message })
+        .then((r) => log("whatsapp", r.ok ? "SENT" : r.skipped ? "SKIPPED" : "FAILED"))
+        .catch((err) => {
+          console.error("System WhatsApp failed", err);
+          return log("whatsapp", "FAILED");
+        }),
+    );
+  }
+  if (opts.to.email) {
+    const email = opts.to.email;
+    sends.push(
+      (async () => {
+        if (!emailConfigured()) return log("email", "SKIPPED");
+        const rows = await prisma.emailTemplate.findMany({ where: { gymId: null, type: opts.type } });
+        const { subject, text, html } = renderEmail(rows, null, opts.type, {
+          gymName: opts.gymName,
+          gymAddress: opts.gymAddress ?? "",
+          memberName: opts.to.name,
+          recipientName: opts.to.name,
+          message: opts.message,
+        });
+        const result = await sendEmail({ to: email, subject, text, html });
+        return log("email", result.ok ? "SENT" : "FAILED");
+      })().catch((err) => {
+        console.error("System email failed", err);
+        return log("email", "FAILED");
+      }),
+    );
+  }
   await Promise.all(sends);
 }

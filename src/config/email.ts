@@ -13,6 +13,7 @@ export interface EmailTemplate {
 export const EMAIL_PLACEHOLDERS = {
   gymName: "Your gym's name",
   memberName: "The member's full name",
+  recipientName: "The name of whoever is receiving the email",
   gymAddress: "Your gym's address (empty if not set)",
   message: "The text of this message: the dates, amounts and links the system fills in",
 } as const;
@@ -40,6 +41,13 @@ export const MESSAGE_TYPES = [
   "class_cancelled",
   "guest_ticket",
   "guest_rejected",
+  // Liftmora's own emails to a gym's owner and staff, not to members.
+  "gym_welcome",
+  "subscription_due",
+  "subscription_paid",
+  "gym_suspended",
+  "staff_invite",
+  "staff_password_reset",
 ] as const;
 
 export type MessageType = (typeof MESSAGE_TYPES)[number];
@@ -49,6 +57,25 @@ export type NotificationType = Exclude<MessageType, "default">;
 
 /** Guests give a WhatsApp number but no email, so these two are WhatsApp-only. */
 const WHATSAPP_ONLY: readonly MessageType[] = ["guest_ticket", "guest_rejected"];
+
+/**
+ * Liftmora's own emails, sent to a gym's owner or staff (signing up, billing, access). They belong to the
+ * platform: a gym can't rewrite them. The wording is here, and a platform template row (no gym) overrides it.
+ */
+export const SYSTEM_EMAIL_TYPES = {
+  gym_welcome: "Welcome to Liftmora (a gym was set up)",
+  subscription_due: "Subscription invoice",
+  subscription_paid: "Subscription payment received",
+  gym_suspended: "Gym suspended for non-payment",
+  staff_invite: "Staff invitation",
+  staff_password_reset: "Staff password reset",
+} as const;
+
+export type SystemEmailType = keyof typeof SYSTEM_EMAIL_TYPES;
+
+export function isSystemEmailType(type: string): type is SystemEmailType {
+  return type in SYSTEM_EMAIL_TYPES;
+}
 
 /** Message types a gym can write an email for, with the label the editor shows. */
 export const EMAIL_MESSAGE_TYPES = {
@@ -128,4 +155,23 @@ export const EMAIL_DESIGN: Record<EmailMessageType, { heading: string; cta?: str
   class_confirmation: { heading: "You're booked" },
   class_reminder: { heading: "Your class is coming up" },
   class_cancelled: { heading: "A class was cancelled" },
+};
+
+/** Default wording for the system emails. */
+export const DEFAULT_SYSTEM_EMAIL_TEMPLATES: Record<SystemEmailType, EmailTemplate> = {
+  gym_welcome: { subject: "Welcome to Liftmora, {{gymName}} is ready", body: "{{message}}" },
+  subscription_due: { subject: "Your Liftmora subscription for {{gymName}} is due", body: "{{message}}" },
+  subscription_paid: { subject: "Payment received for {{gymName}}", body: "{{message}}" },
+  gym_suspended: { subject: "{{gymName}} has been suspended", body: "{{message}}" },
+  staff_invite: { subject: "You've been added to {{gymName}} on Liftmora", body: "{{message}}" },
+  staff_password_reset: { subject: "Reset your Liftmora password", body: "{{message}}" },
+};
+
+export const SYSTEM_EMAIL_DESIGN: Record<SystemEmailType, { heading: string; cta?: string }> = {
+  gym_welcome: { heading: "Your gym is ready", cta: "Log in to Liftmora" },
+  subscription_due: { heading: "Your subscription is due", cta: "Pay your invoice" },
+  subscription_paid: { heading: "Payment received" },
+  gym_suspended: { heading: "Your gym is suspended", cta: "Pay to switch it back on" },
+  staff_invite: { heading: "You've been added", cta: "Set your password" },
+  staff_password_reset: { heading: "Reset your password", cta: "Choose a new password" },
 };

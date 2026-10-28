@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { notifyOwner } from "./notify";
 import type { XenditWebhookEvent } from "./xendit";
 import { completeSignup } from "./signup";
 import { suspendedForNonPayment, withSuspensionReason } from "./suspension";
@@ -164,6 +165,26 @@ async function handlePlatformPayment(
         },
       }),
     ]);
+
+    // Tell the owner their payment arrived, with the date they're covered until. Never blocks or fails the payment.
+    try {
+      const [owner, plan] = await Promise.all([
+        prisma.staffUser.findFirst({ where: { gymId: gym.id, role: "OWNER" }, orderBy: { createdAt: "asc" } }),
+        prisma.saasPlan.findUnique({ where: { id: payment.saasPlanId } }),
+      ]);
+      if (owner) {
+        await notifyOwner({
+          gymId: gym.id,
+          gymName: gym.name,
+          gymAddress: gym.address,
+          to: { name: owner.name, email: owner.email, phone: owner.phone },
+          type: "subscription_paid",
+          message: `Hi ${owner.name}, we received your payment of Rp ${Number(payment.amount).toLocaleString("id-ID")} for ${plan?.name ?? "your Liftmora plan"}. ${gym.name} is covered until ${newBillingDate.toLocaleDateString("id-ID", { timeZone: gym.timezone })}. Thank you!`,
+        });
+      }
+    } catch (err) {
+      console.error("Subscription payment message failed", err);
+    }
   } else if (event.status === "EXPIRED") {
     await prisma.$transaction([
       prisma.platformPayment.update({ where: { id: payment.id }, data: { status: "EXPIRED" } }),
