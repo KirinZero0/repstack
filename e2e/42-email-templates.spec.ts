@@ -258,10 +258,13 @@ test("the HTML email has the gym header, a heading, a button only where there is
   expect(link.html).not.toContain("<Co>");
   expect(link.html).toContain("Reset your password");
   // Liftmora's mark and name head every email, loaded from the app's own address.
-  expect(link.html).toMatch(/<img src="https?:\/\/[^"]+\/icons\/email-logo\.png" width="32"/);
+  expect(link.html).toMatch(/<img src="https?:\/\/[^"]+\/icons\/email-logo\.png" width="26"/);
+  // Each kind of message has its own badge.
+  expect(link.html).toMatch(/<img src="https?:\/\/[^"]+\/email\/password_reset\.png" width="56"/);
   expect(link.html).toContain(">Liftmora</td>");
+  expect(link.html).toContain("Choose a new password &rarr;");
   // The button goes to the first link, labelled for this kind of message.
-  expect(link.html).toMatch(/<a href="https:\/\/x\.test\/reset\/abc"[^>]*>Choose a new password<\/a>/);
+  expect(link.html).toMatch(/<a href="https:\/\/x\.test\/reset\/abc"[^>]*>Choose a new password &rarr;<\/a>/);
 
   // A receipt has no link, so no button; a type with a button label but no link in the text gets none either.
   expect(renderEmail([], null, "payment_receipt", vars).html).not.toContain("<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:8px");

@@ -95,33 +95,59 @@ function linkify(escaped: string): string {
  * itself, a button to its first link (when the design gives that message one), and a footer. Built from
  * tables and inline styles because email apps ignore most other CSS.
  */
-/** Where the logo image is served from: the app's own public folder, since email apps block embedded images. */
-export function emailLogoUrl(): string {
-  return `${(process.env.NEXT_PUBLIC_APP_URL || "https://liftmora.com").replace(/\/$/, "")}/icons/email-logo.png`;
+function assetBase(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL || "https://liftmora.com").replace(/\/$/, "");
 }
 
+/** Where the logo image is served from: the app's own public folder, since email apps block embedded images. */
+export function emailLogoUrl(): string {
+  return `${assetBase()}/icons/email-logo.png`;
+}
+
+/** The yellow badge shown above the heading, one per kind of message (see scripts/make-email-assets.mjs). */
+export function emailBadgeUrl(type: EmailMessageType): string {
+  return `${assetBase()}/email/${type}.png`;
+}
+
+/** A barbell drawn from table cells (plates and a bar), so it renders without any image. */
+function barbell(color: string): string {
+  const plate = (w: number, h: number) =>
+    `<td width="${w}" style="width:${w}px;height:${h}px;background:${color};border-radius:3px;font-size:0;line-height:0">&nbsp;</td><td width="4" style="width:4px;font-size:0;line-height:0">&nbsp;</td>`;
+  const plateR = (w: number, h: number) =>
+    `<td width="4" style="width:4px;font-size:0;line-height:0">&nbsp;</td><td width="${w}" style="width:${w}px;height:${h}px;background:${color};border-radius:3px;font-size:0;line-height:0">&nbsp;</td>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr style="vertical-align:middle">${plate(8, 22)}${plate(8, 34)}${plate(8, 44)}<td style="vertical-align:middle;font-size:0;line-height:0"><div style="height:6px;background:${color};font-size:0;line-height:0">&nbsp;</div></td>${plateR(8, 44)}${plateR(8, 34)}${plateR(8, 22)}</tr></table>`;
+}
+
+/**
+ * The full HTML email: Liftmora's mark in a black bar, then a black hero with a yellow badge for this kind of
+ * message, the gym's name and a big heading, a barbell divider, the message itself (links clickable), a
+ * yellow button to its first link when the design gives that message one, and a black footer. Built from
+ * tables and inline styles because email apps ignore most other CSS.
+ */
 export function htmlEmail(opts: { text: string; type: string; gymName: string; gymAddress: string }): string {
   const key: EmailMessageType = isEmailMessageType(opts.type) ? opts.type : "default";
   const design = EMAIL_DESIGN[key];
   const b = EMAIL_BRAND;
   const link = design.cta ? opts.text.match(URL_RE)?.[0] : undefined;
   const button = link
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 24px 0"><tr><td style="border-radius:8px;background:${b.accent}"><a href="${escapeHtml(link)}" style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:bold;color:${b.buttonText};text-decoration:none">${escapeHtml(design.cta!)}</a></td></tr></table>`
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 28px 0"><tr><td style="border-radius:8px;background:${b.accent}"><a href="${escapeHtml(link)}" style="display:inline-block;padding:15px 30px;font-size:16px;font-weight:bold;color:${b.buttonText};text-decoration:none">${escapeHtml(design.cta!)} &rarr;</a></td></tr></table>`
     : "";
-  const footer = [opts.gymName, opts.gymAddress].filter(Boolean).map(escapeHtml).join(" &middot; ");
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(design.heading)}</title></head>
 <body style="margin:0;padding:0;background:${b.pageBg};font-family:Arial,Helvetica,sans-serif">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${b.pageBg}"><tr><td align="center" style="padding:24px 12px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:${b.cardBg};border-radius:12px;overflow:hidden">
-<tr><td style="background:${b.bandBg};padding:18px 28px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:10px;vertical-align:middle"><img src="${escapeHtml(emailLogoUrl())}" width="32" height="32" alt="" style="display:block;border:0"></td><td style="vertical-align:middle;font-size:20px;font-weight:bold;letter-spacing:-0.3px;color:${b.bandText}">Liftmora</td></tr></table></td></tr>
-<tr><td style="background:${b.accent};height:4px;line-height:4px;font-size:0">&nbsp;</td></tr>
-<tr><td style="padding:28px 28px 8px 28px">
-<div style="margin:0 0 10px 0;font-size:12px;font-weight:bold;letter-spacing:1.2px;text-transform:uppercase;color:${b.muted}">${escapeHtml(opts.gymName)}</div>
-<h1 style="margin:0 0 20px 0;font-size:24px;line-height:1.3;color:${b.text}">${escapeHtml(design.heading)}</h1>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:${b.cardBg};border-radius:14px;overflow:hidden">
+<tr><td style="background:${b.bandBg};padding:16px 28px;border-bottom:1px solid #1d252d"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:10px;vertical-align:middle"><img src="${escapeHtml(emailLogoUrl())}" width="26" height="26" alt="" style="display:block;border:0"></td><td style="vertical-align:middle;font-size:17px;font-weight:bold;letter-spacing:-0.3px;color:${b.bandText}">Liftmora</td></tr></table></td></tr>
+<tr><td style="background:${b.bandBg};padding:36px 28px 8px 28px">
+<img src="${escapeHtml(emailBadgeUrl(key))}" width="56" height="56" alt="" style="display:block;border:0;margin:0 0 20px 0">
+<div style="margin:0 0 10px 0;font-size:12px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:${b.accent}">${escapeHtml(opts.gymName)}</div>
+<h1 style="margin:0;font-size:32px;line-height:1.15;letter-spacing:-0.6px;color:${b.bandText}">${escapeHtml(design.heading)}</h1>
+</td></tr>
+<tr><td style="background:${b.bandBg};padding:28px 28px 0 28px">${barbell(b.accent)}</td></tr>
+<tr><td style="padding:32px 28px 8px 28px">
 ${paragraphs(opts.text)}${button}
 </td></tr>
-<tr><td style="background:${b.bandBg};padding:18px 28px;font-size:12px;line-height:1.6;color:${b.bandMuted}">${footer}<br>Sent by Liftmora on behalf of ${escapeHtml(opts.gymName)}.</td></tr>
+<tr><td style="background:${b.bandBg};padding:22px 28px;font-size:12px;line-height:1.7;color:${b.bandMuted}"><span style="color:${b.bandText};font-weight:bold">${escapeHtml(opts.gymName)}</span>${opts.gymAddress ? `<br>${escapeHtml(opts.gymAddress)}` : ""}<br><span style="color:${b.accent}">&#9679;</span> Sent by Liftmora on behalf of ${escapeHtml(opts.gymName)}.</td></tr>
 </table></td></tr></table>
 </body></html>`;
 }

@@ -335,11 +335,17 @@ Code: `revokeMemberPasswordLinks` in `src/lib/magicLink.ts`. Tests: `e2e/43-emai
 ## 10. HTML emails
 
 Every member email goes out as a designed HTML email as well as plain text (`htmlEmail` in
-`src/lib/emailTemplates.ts`): Liftmora's plate mark and name in a black header with a yellow stripe, the gym's name above a heading for that kind of message, the message
-(links clickable), a button to the first link when the message has one (activation, welcome, password reset, QR
-link; a yellow button), and a black footer with the gym's name and address. The logo is `public/icons/email-logo.png` (made by `scripts/make-pwa-icons.mjs`), loaded from `NEXT_PUBLIC_APP_URL`, since email apps block embedded images. It is built from tables and inline styles so email apps
-render it, and everything a gym or member can type is escaped. The look is data, in `src/config/email.ts`:
-`EMAIL_BRAND` (colours) and `EMAIL_DESIGN` (heading and button label per message type). A gym edits the
-wording (subject and body) as before; the frame around it is the same for every gym. The default bodies no
-longer repeat the gym's name, since the header and footer carry it. See every email with sample data:
-`npx tsx scripts/preview-emails.ts [dir]`. No migration. Tests: `e2e/42-email-templates.spec.ts`.
+`src/lib/emailTemplates.ts`), in Liftmora's black and plate yellow: a black bar with the Liftmora mark, a black
+hero with a yellow badge for that kind of message (a check, a lock, a calendar, a receipt...), the gym's name
+in yellow and a big white heading, a barbell divider drawn from table cells, the message (links clickable), a
+yellow button with an arrow to the first link when the message has one (activation, welcome, renewal, password
+reset, QR link), and a black footer with the gym's name and address. Built from tables and inline styles so
+email apps render it; everything a gym or member can type is escaped. The look is data in `src/config/email.ts`
+(`EMAIL_BRAND` colours, `EMAIL_DESIGN` heading and button label per message type). A gym edits the wording
+(subject and body) as before; the frame is the same for every gym.
+
+Images: the logo (`public/icons/email-logo.png`, made by `scripts/make-pwa-icons.mjs`) and the 13 badges
+(`public/email/<type>.png`, made by `scripts/make-email-assets.mjs`) are loaded from `NEXT_PUBLIC_APP_URL`,
+because email apps block embedded images; they only appear once this version is deployed. The name is also text.
+See every email with sample data: `npx tsx scripts/preview-emails.ts [dir]` (images embedded). No migration.
+Tests: `e2e/42-email-templates.spec.ts`.

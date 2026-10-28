@@ -10,7 +10,7 @@
 import fs from "fs";
 import path from "path";
 import { EMAIL_MESSAGE_TYPES, type EmailMessageType } from "../src/config/email";
-import { emailLogoUrl, renderEmail } from "../src/lib/emailTemplates";
+import { renderEmail } from "../src/lib/emailTemplates";
 
 const gymName = "Iron Ledger Gym";
 const gymAddress = "Jl. Sudirman No. 12, Jakarta";
@@ -34,14 +34,16 @@ const SAMPLE_MESSAGES: Record<EmailMessageType, string> = {
   class_cancelled: `Hi ${memberName}, Morning Yoga at ${gymName} on Sat, 31 Oct, 07:00 has been cancelled. Sorry for the inconvenience.`,
 };
 
-const logo = `data:image/png;base64,${fs.readFileSync(path.resolve("public/icons/email-logo.png")).toString("base64")}`;
+/** Swaps each image URL (logo, badge) for the file itself so the page works from disk. */
+const inlineImages = (html: string) =>
+  html.replace(/src="[^"]*\/(icons\/email-logo|email\/[a-z_]+)\.png"/g, (_, rel: string) => `src="data:image/png;base64,${fs.readFileSync(path.resolve("public", `${rel}.png`)).toString("base64")}"`);
 const out = path.resolve(process.argv[2] ?? "email-previews");
 fs.mkdirSync(out, { recursive: true });
 const index: { type: string; label: string; subject: string; file: string }[] = [];
 for (const type of Object.keys(EMAIL_MESSAGE_TYPES) as EmailMessageType[]) {
   const email = renderEmail([], null, type, { gymName, gymAddress, memberName, message: SAMPLE_MESSAGES[type] });
   const file = `${type}.html`;
-  fs.writeFileSync(path.join(out, file), email.html.replace(emailLogoUrl(), logo));
+  fs.writeFileSync(path.join(out, file), inlineImages(email.html));
   index.push({ type, label: EMAIL_MESSAGE_TYPES[type], subject: email.subject, file });
 }
 fs.writeFileSync(path.join(out, "index.json"), JSON.stringify(index, null, 2));
