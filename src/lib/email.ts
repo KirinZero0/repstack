@@ -10,8 +10,6 @@ export interface OutgoingEmail {
   subject: string;
   text: string;
   html?: string;
-  /** The gym's name, so the sender reads as the gym while the address stays the platform's verified one. */
-  fromName: string;
   /** Where a member's reply goes (the gym's own address); optional. */
   replyTo?: string;
 }
@@ -40,6 +38,11 @@ export function emailConfigured(): boolean {
   return isMock() || provider() !== null;
 }
 
+/** Every email leaves from Liftmora's one address; which gym it is about is told by the template. */
+function fromHeader(address: string): string {
+  return `${safeName(process.env.EMAIL_FROM_NAME || "Liftmora")} <${address}>`;
+}
+
 /** A display name can't contain the characters that delimit an address header. */
 function safeName(name: string): string {
   return name.replace(/[<>",\r\n]/g, "").trim().slice(0, 60) || "Liftmora";
@@ -55,7 +58,7 @@ async function sendViaMailgun(e: OutgoingEmail): Promise<EmailResult> {
   const host = process.env.MAILGUN_REGION?.toLowerCase() === "eu" ? "api.eu.mailgun.net" : "api.mailgun.net";
   const address = process.env.EMAIL_FROM || `no-reply@${domain}`;
   const form = new URLSearchParams({
-    from: `${safeName(e.fromName)} <${address}>`,
+    from: fromHeader(address),
     to: e.to,
     subject: e.subject,
     text: e.text,
@@ -75,7 +78,7 @@ async function sendViaResend(e: OutgoingEmail): Promise<EmailResult> {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: `${safeName(e.fromName)} <${process.env.EMAIL_FROM}>`,
+      from: fromHeader(process.env.EMAIL_FROM!),
       to: [e.to],
       subject: e.subject,
       text: e.text,
@@ -89,7 +92,7 @@ async function sendViaResend(e: OutgoingEmail): Promise<EmailResult> {
 /** Sends one email through the configured provider. Never throws. */
 export async function sendEmail(opts: OutgoingEmail): Promise<EmailResult> {
   if (isMock()) {
-    console.log(`[email:mock] ${opts.fromName} -> ${opts.to}: ${opts.subject}`);
+    console.log(`[email:mock] ${opts.to}: ${opts.subject}`);
     // A recipient containing "+bounce" simulates the provider rejecting the address.
     return opts.to.includes("+bounce") ? { ok: false, error: "Address rejected" } : { ok: true };
   }

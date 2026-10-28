@@ -23,30 +23,37 @@ const settings = (request: APIRequestContext, baseURL: string, slug: string, dat
 
 const vars = { gymName: "Iron Co", memberName: "Sari", gymAddress: "Jl. 1", message: "Pay here: https://x.test/p?a=1&b=2" };
 
-test("templates resolve gym type, then gym default, then platform default, and fill placeholders once", () => {
-  const s = {
-    emailTemplates: {
-      default: { subject: "Hello from {{gymName}}", body: "Hi {{memberName}}\n{{message}}\nSee you at {{gymAddress}}" },
-      payment_receipt: { subject: "Receipt, {{memberName}}" },
-    },
-  };
-  // Own type overrides the subject only; the body falls through to the gym's default.
-  const own = resolveTemplate(s, "payment_receipt");
-  expect(own.subject).toBe("Receipt, {{memberName}}");
-  expect(own.body).toContain("See you at");
-  // A type with nothing of its own uses the gym default.
-  expect(resolveTemplate(s, "class_reminder").subject).toBe("Hello from {{gymName}}");
-  // A gym with no templates gets the platform wording.
-  expect(resolveTemplate({}, "payment_receipt").subject).toBe("{{gymName}}: Payment received");
-  expect(resolveTemplate(null, "something_new").subject).toBe("{{gymName}}");
+const row = (gymId: string | null, type: string, subject: string, body: string) => ({ gymId, type, subject, body });
 
-  const out = renderEmail(s, "class_reminder", vars);
+test("a template resolves gym type, gym default, platform type, platform default, then the built-in wording", () => {
+  const rows = [
+    row("g1", "payment_receipt", "G1 receipt, {{memberName}}", "G1 {{message}}"),
+    row("g1", "default", "Hello from {{gymName}}", "Hi {{memberName}}\n{{message}}\nSee you at {{gymAddress}}"),
+    row("g2", "payment_receipt", "G2 receipt", "G2 {{message}}"),
+    row(null, "payment_receipt", "Platform receipt", "Platform {{message}}"),
+    row(null, "class_reminder", "Platform reminder", "Platform {{message}}"),
+    row(null, "default", "Platform default", "Platform default {{message}}"),
+  ];
+  expect(resolveTemplate(rows, "g1", "payment_receipt").subject).toBe("G1 receipt, {{memberName}}");
+  // Another gym's template is never used for this one.
+  expect(resolveTemplate(rows, "g3", "payment_receipt").subject).toBe("Platform receipt");
+  expect(resolveTemplate(rows, "g2", "payment_receipt").subject).toBe("G2 receipt");
+  // g1 has no reminder of its own: its own default wins over the platform's reminder.
+  expect(resolveTemplate(rows, "g1", "class_reminder").subject).toBe("Hello from {{gymName}}");
+  // g3 has nothing: platform type, then platform default.
+  expect(resolveTemplate(rows, "g3", "class_reminder").subject).toBe("Platform reminder");
+  expect(resolveTemplate(rows, "g3", "member_welcome").subject).toBe("Platform default");
+  // No rows at all: the wording built into the app.
+  expect(resolveTemplate([], "g3", "payment_receipt").subject).toBe("{{gymName}}: Payment received");
+  expect(resolveTemplate([], null, "something_new").subject).toBe("{{gymName}}");
+
+  const out = renderEmail(rows, "g1", "class_reminder", vars);
   expect(out.subject).toBe("Hello from Iron Co");
   expect(out.text).toBe("Hi Sari\nPay here: https://x.test/p?a=1&b=2\nSee you at Jl. 1");
 });
 
 test("a value is never expanded as a placeholder, and a subject can't carry a line break", () => {
-  const out = renderEmail({}, "member_welcome", { ...vars, memberName: "{{message}}", gymName: "Evil\r\nBcc: x@y.z", message: "{{gymName}}" });
+  const out = renderEmail([], null, "member_welcome", { ...vars, memberName: "{{message}}", gymName: "Evil\r\nBcc: x@y.z", message: "{{gymName}}" });
   expect(out.text).toContain("{{gymName}}");
   expect(out.subject).not.toMatch(/[\r\n]/);
   expect(textToHtml("<b>hi</b> https://a.test/?x=1&y=2")).toContain("&lt;b&gt;hi&lt;/b&gt;");
@@ -61,44 +68,65 @@ test("templateError catches the mistakes an owner can make", () => {
   expect(templateError({ subject: "a\nb", body: "{{message}}" })).toMatch(/single line/);
 });
 
-test("the owner saves, edits and resets a gym's templates over the API", async ({ request, baseURL }) => {
+const tpl = (request: APIRequestContext, baseURL: string, slug: string, data: unknown) =>
+  request.post(`${baseURL}/api/${slug}/email-templates`, { data });
+
+test("the owner saves, edits and resets a gym's templates, stored against that gym", async ({ request, baseURL }) => {
   const f = await makeGym();
+  const other = await makeGym();
   await request.post(`${baseURL}/api/${f.slug}/login`, { data: f.owner });
 
-  const ok = await settings(request, baseURL!, f.slug, {
-    emailTemplates: { member_activation: { subject: "Welcome to {{gymName}}", body: "Hello {{memberName}},\n{{message}}" } },
-    emailReplyTo: "hello@gym.test",
-  });
-  expect(ok.ok()).toBeTruthy();
-  let saved = (await prisma.gym.findUniqueOrThrow({ where: { id: f.gym.id } })).settings as Record<string, any>;
-  expect(saved.emailTemplates.member_activation.subject).toBe("Welcome to {{gymName}}");
-  expect(saved.emailReplyTo).toBe("hello@gym.test");
+  expect((await tpl(request, baseURL!, f.slug, { type: "member_activation", subject: "Welcome to {{gymName}}", body: "Hello {{memberName}},\n{{message}}" })).ok()).toBeTruthy();
+  expect((await tpl(request, baseURL!, f.slug, { type: "member_activation", subject: "Edited {{gymName}}", body: "{{message}}" })).ok()).toBeTruthy();
+  let rows = await prisma.emailTemplate.findMany({ where: { gymId: f.gym.id } });
+  expect(rows).toHaveLength(1);
+  expect(rows[0].subject).toBe("Edited {{gymName}}");
+  expect(await prisma.emailTemplate.count({ where: { gymId: other.gym.id } })).toBe(0);
 
   // Rejections leave what is saved untouched.
   for (const bad of [
-    { emailTemplates: { member_activation: { subject: "x", body: "no message" } } },
-    { emailTemplates: { member_activation: { subject: "{{bogus}}", body: "{{message}}" } } },
-    { emailTemplates: { not_a_type: { subject: "x", body: "{{message}}" } } },
-    { emailReplyTo: "not-an-email" },
+    { type: "member_activation", subject: "x", body: "no message" },
+    { type: "member_activation", subject: "{{bogus}}", body: "{{message}}" },
+    { type: "not_a_type", subject: "x", body: "{{message}}" },
+    { type: "member_activation", subject: "a\nb", body: "{{message}}" },
   ]) {
-    expect((await settings(request, baseURL!, f.slug, bad)).status()).toBe(400);
+    expect((await tpl(request, baseURL!, f.slug, bad)).status()).toBe(400);
   }
-  saved = (await prisma.gym.findUniqueOrThrow({ where: { id: f.gym.id } })).settings as Record<string, any>;
-  expect(saved.emailTemplates.member_activation.body).toBe("Hello {{memberName}},\n{{message}}");
+  rows = await prisma.emailTemplate.findMany({ where: { gymId: f.gym.id } });
+  expect(rows[0].subject).toBe("Edited {{gymName}}");
 
-  // null puts one back to the default; clearing the last one removes the key.
-  expect((await settings(request, baseURL!, f.slug, { emailTemplates: { member_activation: null }, emailReplyTo: "" })).ok()).toBeTruthy();
-  saved = (await prisma.gym.findUniqueOrThrow({ where: { id: f.gym.id } })).settings as Record<string, any>;
-  expect(saved.emailTemplates).toBeUndefined();
-  expect(saved.emailReplyTo).toBeUndefined();
+  // The reply-to address is a gym setting.
+  expect((await settings(request, baseURL!, f.slug, { emailReplyTo: "hello@gym.test" })).ok()).toBeTruthy();
+  expect((await settings(request, baseURL!, f.slug, { emailReplyTo: "not-an-email" })).status()).toBe(400);
+
+  expect((await tpl(request, baseURL!, f.slug, { type: "member_activation", reset: true })).ok()).toBeTruthy();
+  expect(await prisma.emailTemplate.count({ where: { gymId: f.gym.id } })).toBe(0);
 });
 
-test("a member email is logged as sent using the gym's template, and staff can't edit templates", async ({ request, baseURL }) => {
+test("one platform default per type, and the gym's own template wins over it when sending", async ({ request, baseURL }) => {
+  const type = "class_cancelled";
+  await prisma.emailTemplate.deleteMany({ where: { gymId: null, type } });
+  await prisma.emailTemplate.create({ data: { gymId: null, type, subject: "Platform: {{gymName}}", body: "{{message}}" } });
+  // A second platform row for the same type is refused by the database.
+  await expect(prisma.emailTemplate.create({ data: { gymId: null, type, subject: "dup", body: "{{message}}" } })).rejects.toThrow();
+
+  const f = await makeGym();
+  await request.post(`${baseURL}/api/${f.slug}/login`, { data: f.owner });
+  const rows = await prisma.emailTemplate.findMany({ where: { OR: [{ gymId: f.gym.id }, { gymId: null }] } });
+  expect(resolveTemplate(rows, f.gym.id, type).subject).toBe("Platform: {{gymName}}");
+  await tpl(request, baseURL!, f.slug, { type, subject: "Ours: {{gymName}}", body: "{{message}}" });
+  const after = await prisma.emailTemplate.findMany({ where: { OR: [{ gymId: f.gym.id }, { gymId: null }] } });
+  expect(resolveTemplate(after, f.gym.id, type).subject).toBe("Ours: {{gymName}}");
+  await prisma.emailTemplate.deleteMany({ where: { gymId: null, type } });
+});
+
+test("a member email is logged as sent, and staff can't edit templates", async ({ request, baseURL }) => {
   const f = await makeGym();
   const staff = { email: `staff-${f.slug}@test.local`, password: "staff-pass-123" };
   await prisma.staffUser.create({ data: { gymId: f.gym.id, name: "Staff", email: staff.email, passwordHash: await bcrypt.hash(staff.password, 10), role: "STAFF" } });
   await request.post(`${baseURL}/api/${f.slug}/login`, { data: f.owner });
-  await settings(request, baseURL!, f.slug, { notifyEmail: true, emailTemplates: { member_activation: { subject: "Hi {{memberName}}", body: "{{message}}" } } });
+  await settings(request, baseURL!, f.slug, { notifyEmail: true });
+  await tpl(request, baseURL!, f.slug, { type: "member_activation", subject: "Hi {{memberName}}", body: "{{message}}" });
   const plan = await prisma.membershipPlan.create({ data: { gymId: f.gym.id, name: "Monthly", durationDays: 30, price: 250000 } });
   const res = await request.post(`${baseURL}/api/${f.slug}/members`, {
     data: { fullName: "Tpl Member", email: `${uniq("m")}@test.local`, phoneWhatsapp: `0819${Date.now().toString().slice(-7)}${seq++}`, planId: plan.id },
@@ -109,7 +137,7 @@ test("a member email is logged as sent using the gym's template, and staff can't
 
   const staffReq = await playwrightRequest.newContext({ baseURL });
   await staffReq.post(`${baseURL}/api/${f.slug}/login`, { data: staff });
-  expect((await settings(staffReq, baseURL!, f.slug, { emailTemplates: { default: { subject: "x", body: "{{message}}" } } })).status()).toBe(403);
+  expect((await tpl(staffReq, baseURL!, f.slug, { type: "default", subject: "x", body: "{{message}}" })).status()).toBe(403);
 });
 
 test("Mailgun gets a form post to the right region and domain, with HTML and reply-to", async () => {
@@ -123,24 +151,24 @@ test("Mailgun gets a form post to the right region and domain, with HTML and rep
   try {
     Object.assign(process.env, { EMAIL_MOCK: "", MAILGUN_API_KEY: "key-123", MAILGUN_DOMAIN: "mg.liftmora.test", MAILGUN_REGION: "eu" });
     delete process.env.EMAIL_PROVIDER;
-    const r = await sendEmail({ to: "m@x.test", subject: "S", text: "T", html: "<p>T</p>", fromName: 'Iron "Co"', replyTo: "hi@gym.test" });
+    const r = await sendEmail({ to: "m@x.test", subject: "S", text: "T", html: "<p>T</p>", replyTo: "hi@gym.test" });
     expect(r.ok).toBe(true);
     expect(calls[0].url).toBe("https://api.eu.mailgun.net/v3/mg.liftmora.test/messages");
     expect((calls[0].init.headers as Record<string, string>).Authorization).toBe(`Basic ${Buffer.from("api:key-123").toString("base64")}`);
     const form = calls[0].init.body as URLSearchParams;
-    expect(form.get("from")).toBe("Iron Co <no-reply@mg.liftmora.test>");
+    expect(form.get("from")).toBe("Liftmora <no-reply@mg.liftmora.test>");
     expect(form.get("to")).toBe("m@x.test");
     expect(form.get("html")).toBe("<p>T</p>");
     expect(form.get("h:Reply-To")).toBe("hi@gym.test");
 
     // A provider error comes back as a failure with its message, not a throw.
     globalThis.fetch = (async () => new Response(JSON.stringify({ message: "Forbidden" }), { status: 401 })) as typeof fetch;
-    expect(await sendEmail({ to: "m@x.test", subject: "S", text: "T", fromName: "G" })).toEqual({ ok: false, error: "Forbidden" });
+    expect(await sendEmail({ to: "m@x.test", subject: "S", text: "T" })).toEqual({ ok: false, error: "Forbidden" });
 
     // Nothing configured: skipped, no call.
     delete process.env.MAILGUN_API_KEY;
     delete process.env.RESEND_API_KEY;
-    expect((await sendEmail({ to: "m@x.test", subject: "S", text: "T", fromName: "G" })).skipped).toBe(true);
+    expect((await sendEmail({ to: "m@x.test", subject: "S", text: "T" })).skipped).toBe(true);
   } finally {
     globalThis.fetch = realFetch;
     for (const k of ["EMAIL_MOCK", "MAILGUN_API_KEY", "MAILGUN_DOMAIN", "MAILGUN_REGION", "EMAIL_PROVIDER", "RESEND_API_KEY"]) {
@@ -165,8 +193,8 @@ test("the owner edits a template on the settings page and sees the preview", asy
   await expect(page.getByText("Thanks, Sari Wijaya!")).toBeVisible();
   await page.getByRole("button", { name: "Save email" }).click();
   await expect(page.getByText("Saved").first()).toBeVisible();
-  const saved = (await prisma.gym.findUniqueOrThrow({ where: { id: f.gym.id } })).settings as Record<string, any>;
-  expect(saved.emailTemplates.payment_receipt.subject).toBe("Thanks, {{memberName}}!");
+  const saved = await prisma.emailTemplate.findFirstOrThrow({ where: { gymId: f.gym.id, type: "payment_receipt" } });
+  expect(saved.subject).toBe("Thanks, {{memberName}}!");
 
   await page.getByRole("button", { name: "Back to default" }).click();
   await expect(page.getByLabel("Email subject")).toHaveValue("{{gymName}}: Payment received");

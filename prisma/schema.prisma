@@ -81,6 +81,7 @@ model Gym {
   classPayments      ClassPayment[]
   guestPasses        GuestPass[]
   dayPassPlans       DayPassPlan[]
+  emailTemplates     EmailTemplate[]
 
   @@index([subscriptionStatus])
 }
@@ -601,4 +602,21 @@ model LoginAttempt {
   createdAt DateTime @default(now())
 
   @@index([ipHash, createdAt])
+}
+
+// The wording of one email. A row with a gymId is that gym's own template; a row with no gymId is the
+// platform default every gym falls back to. All mail leaves from Liftmora's single address, so the
+// template is what tells one gym's email from another's. (gymId, type) is unique, with one platform
+// row per type enforced by a partial index in the migration, since NULLs never collide in a plain one.
+model EmailTemplate {
+  id        String   @id @default(uuid())
+  gymId     String?
+  gym       Gym?     @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  type      String
+  subject   String
+  body      String
+  updatedAt DateTime @updatedAt
+
+  @@unique([gymId, type])
+  @@index([type])
 }

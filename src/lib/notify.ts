@@ -21,7 +21,8 @@ async function emailMember(
   if (!emailConfigured()) {
     status = "SKIPPED";
   } else {
-    const { subject, text, html } = renderEmail(gym.settings, opts.type, {
+    const rows = await prisma.emailTemplate.findMany({ where: { OR: [{ gymId }, { gymId: null }] } });
+    const { subject, text, html } = renderEmail(rows, gymId, opts.type, {
       gymName: gym.name,
       memberName: member.fullName,
       gymAddress: gym.address ?? "",
@@ -33,7 +34,6 @@ async function emailMember(
       subject,
       text,
       html,
-      fromName: gym.name,
       replyTo: typeof replyTo === "string" && replyTo ? replyTo : undefined,
     });
     status = result.ok ? "SENT" : "FAILED";

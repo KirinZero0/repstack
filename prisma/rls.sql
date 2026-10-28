@@ -15,7 +15,9 @@ GRANT USAGE ON SCHEMA public TO {{ROLE}};
 -- manual join/bank-transfer requests staff review on /[slug]/members and act on via approve/reject.
 -- GymClass, ClassSession, ClassRegistration and ClassPayment are the classes feature (/[slug]/classes, /my/classes).
 -- GuestPass holds non-member class ticket requests (/[slug]/classes/guests); the public request form writes it with the owner client.
-GRANT SELECT, INSERT, UPDATE, DELETE ON "Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup", "GymClass", "ClassSession", "ClassRegistration", "ClassPayment", "GuestPass", "DayPassPlan" TO {{ROLE}};
+GRANT SELECT, INSERT, UPDATE, DELETE ON "Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup", "GymClass", "ClassSession", "ClassRegistration", "ClassPayment", "GuestPass", "DayPassPlan", "EmailTemplate" TO {{ROLE}};
+-- EmailTemplate: a gym sees and edits only its own rows. The platform defaults (no gymId) are invisible to this role;
+-- sending and the settings page read them with the owner client.
 -- The plan catalog is not tenant data; gyms read their own plan's limits.
 GRANT SELECT ON "SaasPlan" TO {{ROLE}};
 
@@ -82,3 +84,7 @@ CREATE POLICY tenant_isolation ON "GuestPass" USING ("gymId" = current_setting('
 ALTER TABLE "DayPassPlan" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON "DayPassPlan";
 CREATE POLICY tenant_isolation ON "DayPassPlan" USING ("gymId" = current_setting('app.current_gym_id', true)) WITH CHECK ("gymId" = current_setting('app.current_gym_id', true));
+
+ALTER TABLE "EmailTemplate" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "EmailTemplate";
+CREATE POLICY tenant_isolation ON "EmailTemplate" USING ("gymId" = current_setting('app.current_gym_id', true)) WITH CHECK ("gymId" = current_setting('app.current_gym_id', true));

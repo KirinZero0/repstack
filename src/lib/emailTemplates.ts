@@ -35,25 +35,30 @@ export function renderText(template: string, vars: EmailVars): string {
   return template.replace(PLACEHOLDER_RE, (_, name: string) => (name in vars ? vars[name as keyof EmailVars] : ""));
 }
 
-function overrides(settings: unknown): Partial<Record<string, Partial<EmailTemplate>>> {
-  const raw = (settings as { emailTemplates?: unknown } | null)?.emailTemplates;
-  return raw && typeof raw === "object" ? (raw as Record<string, Partial<EmailTemplate>>) : {};
+/** A stored template row. `gymId: null` is a platform default; otherwise it belongs to that gym. */
+export interface TemplateRow {
+  gymId: string | null;
+  type: string;
+  subject: string;
+  body: string;
 }
 
 /**
- * The template for a message: the gym's own for that type, else the gym's "everything else" one, else
- * the platform default. Subject and body are chosen independently, so a gym may change only one.
+ * The template for a message, most specific first: the gym's own for that type, the gym's own
+ * "everything else", the platform default for that type, the platform "everything else", and finally
+ * the wording built into the app (src/config/email.ts), so a missing row never means no email.
+ * `rows` may hold any gyms' rows; only this gym's and the platform's are considered.
  */
-export function resolveTemplate(settings: unknown, type: string): EmailTemplate {
-  const own = overrides(settings);
+export function resolveTemplate(rows: TemplateRow[], gymId: string | null, type: string): EmailTemplate {
   const key: EmailMessageType = isEmailMessageType(type) ? type : "default";
-  const pick = (field: keyof EmailTemplate) =>
-    own[key]?.[field] ?? own.default?.[field] ?? DEFAULT_EMAIL_TEMPLATES[key][field];
-  return { subject: pick("subject"), body: pick("body") };
+  const find = (owner: string | null, t: string) => rows.find((r) => r.gymId === owner && r.type === t);
+  const hit =
+    (gymId && (find(gymId, key) ?? find(gymId, "default"))) || find(null, key) || find(null, "default") || undefined;
+  return hit ? { subject: hit.subject, body: hit.body } : DEFAULT_EMAIL_TEMPLATES[key];
 }
 
-export function renderEmail(settings: unknown, type: string, vars: EmailVars): { subject: string; text: string; html: string } {
-  const t = resolveTemplate(settings, type);
+export function renderEmail(rows: TemplateRow[], gymId: string | null, type: string, vars: EmailVars): { subject: string; text: string; html: string } {
+  const t = resolveTemplate(rows, gymId, type);
   // A subject is a header: never let a value smuggle in a line break.
   const subject = renderText(t.subject, vars).replace(/[\r\n]+/g, " ").trim().slice(0, EMAIL_LIMITS.subject);
   const text = renderText(t.body, vars);

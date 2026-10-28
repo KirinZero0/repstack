@@ -296,17 +296,24 @@ Real-camera scanning was the least-tested part of the app, so it was hardened.
 
 ## 8. Email via Mailgun, with per-gym templates
 
-- **Provider** (`src/lib/email.ts`): Mailgun is used when `MAILGUN_API_KEY` and `MAILGUN_DOMAIN` are set
-  (`MAILGUN_REGION=eu` for EU domains); otherwise Resend as before. `EMAIL_PROVIDER` forces one. Mail goes
-  out from `EMAIL_FROM` (Mailgun defaults to `no-reply@<domain>`) under the gym's name, as plain text plus a
-  simple HTML version, with the gym's reply-to address if it set one.
-- **Config-driven** (`src/config/email.ts`): the message types, the placeholders (`{{gymName}}`,
-  `{{memberName}}`, `{{gymAddress}}`, `{{message}}`) and the default wording are data, not code. Adding a
-  message type is one line there.
-- **Per gym** (Settings, "Email templates", owner only): each gym can rewrite the subject and body of any
-  message, or of "everything else". Resolution is the gym's template for that type, then the gym's default,
-  then the platform default, per field. Stored in `Gym.settings.emailTemplates`, so **no migration**.
-- **Safety** (`src/lib/emailTemplates.ts`): only known placeholders are accepted, the body must keep
-  `{{message}}` (it carries the link and dates), subjects are one line, values are filled in a single pass
-  (a value can't inject a placeholder), and HTML is escaped.
+- **One sender** (`src/lib/email.ts`): every email leaves from Liftmora's single address (`EMAIL_FROM`; Mailgun
+  defaults to `no-reply@<domain>`, display name `EMAIL_FROM_NAME`, default "Liftmora"). Nothing about the sender
+  is per gym. Mailgun is used when `MAILGUN_API_KEY` and `MAILGUN_DOMAIN` are set (`MAILGUN_REGION=eu` for EU
+  domains), otherwise Resend as before; `EMAIL_PROVIDER` forces one. Plain text plus a simple HTML version; a
+  gym can set a reply-to address so replies reach it.
+- **The template tells gyms apart** (`EmailTemplate` table): a row with a `gymId` is that gym's own template for
+  a message type; a row with **no gym is the platform default** gyms fall back to. Lookup, most specific first:
+  the gym's template for the type, the gym's "everything else", the platform's template for the type, the
+  platform's "everything else", then the wording built into the app. One platform row per type is enforced by
+  a partial unique index. Deleting a gym deletes its templates.
+- **Config-driven** (`src/config/email.ts`): message types, placeholders (`{{gymName}}`, `{{memberName}}`,
+  `{{gymAddress}}`, `{{message}}`) and the built-in wording are data. Adding a message type is one line.
+- **Editing**: owners edit in Settings, "Email templates" (`POST /api/[slug]/email-templates`, owner only), with
+  a live preview and "Back to default". Platform defaults are plain `EmailTemplate` rows with no `gymId`.
+- **Isolation**: row-level security limits a gym to its own rows; the platform rows are read with the system
+  client (sending and the settings page).
+- **Safety** (`src/lib/emailTemplates.ts`): only known placeholders, the body must keep `{{message}}` (it
+  carries the link and dates), subjects are one line, values are filled in one pass (no placeholder
+  injection), HTML is escaped.
+- **Deploy**: needs `npm run db:migrate` then `npm run db:rls`.
 - Tests: `e2e/42-email-templates.spec.ts`.

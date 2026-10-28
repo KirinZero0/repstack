@@ -12,6 +12,7 @@ import { emailConfigured } from "@/lib/email";
 import { gymPaymentsEnabled, onlinePaymentsEnabled } from "@/lib/gateway";
 import { MAX_GYM_PHOTOS } from "@/lib/validation/tenant";
 import GymNav from "@/components/GymNav";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -36,12 +37,16 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
 
   const channels = notificationChannels(gym.settings);
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const [plan, waConfig, used, recent] = await Promise.all([
+  const [plan, waConfig, used, recent, ownTemplates, platformTemplates] = await Promise.all([
     db.saasPlan.findUnique({ where: { id: gym.saasPlanId } }),
     db.whatsappSenderConfig.findUnique({ where: { gymId: gym.id }, select: { senderNumber: true, isActive: true } }),
     db.notificationLog.count({ where: { gymId: gym.id, channel: "whatsapp", status: "SENT", sentAt: { gte: monthStart } } }),
     db.notificationLog.findMany({ where: { gymId: gym.id }, orderBy: { sentAt: "desc" }, take: 5 }),
+    db.emailTemplate.findMany({ where: { gymId: gym.id } }),
+    // Platform defaults have no gym, so the gym-scoped client can't see them; they're not sensitive.
+    prisma.emailTemplate.findMany({ where: { gymId: null } }),
   ]);
+  const emailRows = [...platformTemplates, ...ownTemplates];
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
@@ -93,7 +98,8 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
           <Card title="Email templates">
             <EmailTemplatesForm
               slug={params.slug}
-              initialTemplates={((gym.settings ?? {}) as { emailTemplates?: Record<string, { subject?: string; body?: string }> }).emailTemplates ?? {}}
+              initialTemplates={Object.fromEntries(emailRows.filter((r) => r.gymId === gym.id).map((r) => [r.type, { subject: r.subject, body: r.body }]))}
+              platformRows={emailRows.filter((r) => r.gymId === null)}
               initialReplyTo={String((gym.settings as { emailReplyTo?: unknown } | null)?.emailReplyTo ?? "")}
             />
           </Card>

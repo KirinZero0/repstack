@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { EMAIL_LIMITS, EMAIL_MESSAGE_TYPES, EMAIL_PLACEHOLDERS, type EmailMessageType } from "@/config/email";
-import { renderEmail, resolveTemplate, type EmailVars } from "@/lib/emailTemplates";
+import { renderEmail, resolveTemplate, type EmailVars, type TemplateRow } from "@/lib/emailTemplates";
 
 const selectCls =
   "w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-white outline-none focus:border-neutral-500";
@@ -567,7 +567,8 @@ export function WhoIsInForm({ slug, initial }: { slug: string; initial: boolean 
 }
 
 
-type TemplateMap = Record<string, { subject?: string; body?: string }>;
+/** A gym's own saved templates by message type, plus the platform defaults the editor starts from. */
+type TemplateMap = Record<string, { subject: string; body: string }>;
 
 const SAMPLE_VARS: EmailVars = {
   gymName: "Your Gym",
@@ -580,43 +581,51 @@ const SAMPLE_VARS: EmailVars = {
 export function EmailTemplatesForm({
   slug,
   initialTemplates,
+  platformRows,
   initialReplyTo,
 }: {
   slug: string;
   initialTemplates: TemplateMap;
+  platformRows: TemplateRow[];
   initialReplyTo: string;
 }) {
   const [type, setType] = useState<EmailMessageType>("default");
   const [saved, setSaved] = useState<TemplateMap>(initialTemplates);
   const [replyTo, setReplyTo] = useState(initialReplyTo);
-  const current = resolveTemplate({ emailTemplates: saved }, type);
+  const rowsOf = (own: TemplateMap): TemplateRow[] => [
+    ...platformRows,
+    ...Object.entries(own).map(([t, v]) => ({ gymId: slug, type: t, ...v })),
+  ];
+  const current = resolveTemplate(rowsOf(saved), slug, type);
   const [subject, setSubject] = useState(current.subject);
   const [body, setBody] = useState(current.body);
   const { state, error, save } = useSave(`/api/${slug}/settings`);
+  const templates = useSave(`/api/${slug}/email-templates`);
+  const saveTemplateApi = templates.save;
 
   function choose(next: EmailMessageType) {
-    const t = resolveTemplate({ emailTemplates: saved }, next);
+    const t = resolveTemplate(rowsOf(saved), slug, next);
     setType(next);
     setSubject(t.subject);
     setBody(t.body);
   }
 
   async function saveTemplate() {
-    await save({ emailTemplates: { [type]: { subject, body } } });
+    await saveTemplateApi({ type, subject, body });
     setSaved({ ...saved, [type]: { subject, body } });
   }
 
   async function reset() {
-    await save({ emailTemplates: { [type]: null } });
+    await saveTemplateApi({ type, reset: true });
     const rest = { ...saved };
     delete rest[type];
     setSaved(rest);
-    const t = resolveTemplate({ emailTemplates: rest }, type);
+    const t = resolveTemplate(rowsOf(rest), slug, type);
     setSubject(t.subject);
     setBody(t.body);
   }
 
-  const preview = renderEmail({ emailTemplates: { [type]: { subject, body } } }, type, SAMPLE_VARS);
+  const preview = renderEmail([{ gymId: slug, type, subject, body }], slug, type, SAMPLE_VARS);
   const customised = Boolean(saved[type]);
 
   return (
@@ -650,7 +659,7 @@ export function EmailTemplatesForm({
         <p className="mt-2 whitespace-pre-wrap">{preview.text}</p>
       </div>
       <div className="flex gap-2">
-        <button type="button" onClick={saveTemplate} disabled={state === "saving"} className={btnCls}>
+        <button type="button" onClick={saveTemplate} disabled={templates.state === "saving"} className={btnCls}>
           Save email
         </button>
         {customised && (
@@ -673,8 +682,8 @@ export function EmailTemplatesForm({
         />
         <span className="mt-1 block text-neutral-500">Emails come from Liftmora&apos;s address under your gym&apos;s name. Replies go here.</span>
       </label>
-      {error && <p className="text-sm text-red-400">{error}</p>}
-      {state === "saved" && <p className="text-sm text-emerald-400">Saved</p>}
+      {(templates.error ?? error) && <p className="text-sm text-red-400">{templates.error ?? error}</p>}
+      {(templates.state === "saved" || state === "saved") && <p className="text-sm text-emerald-400">Saved</p>}
     </div>
   );
 }
