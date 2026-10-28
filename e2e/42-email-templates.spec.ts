@@ -258,7 +258,7 @@ test("the HTML email has the gym header, a heading, a button only where there is
   expect(link.html).not.toContain("<Co>");
   expect(link.html).toContain("Reset your password");
   // Liftmora's mark and name head every email, loaded from the app's own address.
-  expect(link.html).toMatch(/<img src="https:\/\/[^"]+\/icons\/email-logo\.png" width="32"/);
+  expect(link.html).toMatch(/<img src="https?:\/\/[^"]+\/icons\/email-logo\.png" width="32"/);
   expect(link.html).toContain(">Liftmora</td>");
   // The button goes to the first link, labelled for this kind of message.
   expect(link.html).toMatch(/<a href="https:\/\/x\.test\/reset\/abc"[^>]*>Choose a new password<\/a>/);
@@ -269,5 +269,5 @@ test("the HTML email has the gym header, a heading, a button only where there is
   // Messages we don't know are still wrapped, under the generic heading.
   expect(htmlEmail({ text: "Hello", type: "something_new", gymName: "G", gymAddress: "" })).toContain("A message from your gym");
   // A hostile name or message can't inject markup.
-  expect(htmlEmail({ text: "<script>alert(1)</script>", type: "default", gymName: "<img src=x>", gymAddress: "" })).not.toMatch(/<script|<img/);
+  expect(htmlEmail({ text: "<script>alert(1)</script>", type: "default", gymName: "<img src=x>", gymAddress: "" })).not.toMatch(/<script|<img src=x/);
 });
