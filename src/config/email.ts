@@ -95,18 +95,21 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailMessageType, EmailTemplate> = 
   renewal_confirmed: { subject: "{{gymName}}: Membership renewed", body: "{{message}}" },
 };
 
-/** How the HTML version of each email looks. The wording itself comes from the template; this is the frame around it. */
+/** How the HTML version of each email looks: Liftmora's black and plate yellow. */
 export const EMAIL_BRAND = {
-  /** Header band behind the gym's name. */
-  headerBg: "#0f172a",
-  headerText: "#ffffff",
-  /** The call-to-action button. */
-  buttonBg: "#0f766e",
-  buttonText: "#ffffff",
-  pageBg: "#f1f5f9",
+  /** Header and footer bands. */
+  bandBg: "#0c1014",
+  bandText: "#ffffff",
+  bandMuted: "#9aa4ae",
+  /** The plate yellow: the stripe under the header and the call-to-action button (dark text on it). */
+  accent: "#e8b923",
+  buttonText: "#0c1014",
+  /** Links in the body. Yellow itself is too faint on white, so they use a deep gold. */
+  link: "#8a6a00",
+  pageBg: "#eceef0",
   cardBg: "#ffffff",
-  text: "#0f172a",
-  muted: "#64748b",
+  text: "#0c1014",
+  muted: "#5b6670",
 } as const;
 
 /**

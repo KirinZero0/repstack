@@ -335,9 +335,9 @@ Code: `revokeMemberPasswordLinks` in `src/lib/magicLink.ts`. Tests: `e2e/43-emai
 ## 10. HTML emails
 
 Every member email goes out as a designed HTML email as well as plain text (`htmlEmail` in
-`src/lib/emailTemplates.ts`): the gym's name in a header band, a heading for that kind of message, the message
+`src/lib/emailTemplates.ts`): Liftmora's plate mark and name in a black header with a yellow stripe, the gym's name above a heading for that kind of message, the message
 (links clickable), a button to the first link when the message has one (activation, welcome, password reset, QR
-link), and a footer with the gym's name and address. It is built from tables and inline styles so email apps
+link; a yellow button), and a black footer with the gym's name and address. The logo is `public/icons/email-logo.png` (made by `scripts/make-pwa-icons.mjs`), loaded from `NEXT_PUBLIC_APP_URL`, since email apps block embedded images. It is built from tables and inline styles so email apps
 render it, and everything a gym or member can type is escaped. The look is data, in `src/config/email.ts`:
 `EMAIL_BRAND` (colours) and `EMAIL_DESIGN` (heading and button label per message type). A gym edits the
 wording (subject and body) as before; the frame around it is the same for every gym. The default bodies no

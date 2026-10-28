@@ -87,7 +87,7 @@ function paragraphs(text: string): string {
 }
 
 function linkify(escaped: string): string {
-  return escaped.replace(/(https?:\/\/[^\s<]+)/g, (url) => `<a href="${url}" style="color:${EMAIL_BRAND.buttonBg};word-break:break-all">${url}</a>`);
+  return escaped.replace(/(https?:\/\/[^\s<]+)/g, (url) => `<a href="${url}" style="color:${EMAIL_BRAND.link};word-break:break-all">${url}</a>`);
 }
 
 /**
@@ -95,13 +95,18 @@ function linkify(escaped: string): string {
  * itself, a button to its first link (when the design gives that message one), and a footer. Built from
  * tables and inline styles because email apps ignore most other CSS.
  */
+/** Where the logo image is served from: the app's own public folder, since email apps block embedded images. */
+export function emailLogoUrl(): string {
+  return `${(process.env.NEXT_PUBLIC_APP_URL || "https://liftmora.com").replace(/\/$/, "")}/icons/email-logo.png`;
+}
+
 export function htmlEmail(opts: { text: string; type: string; gymName: string; gymAddress: string }): string {
   const key: EmailMessageType = isEmailMessageType(opts.type) ? opts.type : "default";
   const design = EMAIL_DESIGN[key];
   const b = EMAIL_BRAND;
   const link = design.cta ? opts.text.match(URL_RE)?.[0] : undefined;
   const button = link
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 24px 0"><tr><td style="border-radius:8px;background:${b.buttonBg}"><a href="${escapeHtml(link)}" style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:bold;color:${b.buttonText};text-decoration:none">${escapeHtml(design.cta!)}</a></td></tr></table>`
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 24px 0"><tr><td style="border-radius:8px;background:${b.accent}"><a href="${escapeHtml(link)}" style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:bold;color:${b.buttonText};text-decoration:none">${escapeHtml(design.cta!)}</a></td></tr></table>`
     : "";
   const footer = [opts.gymName, opts.gymAddress].filter(Boolean).map(escapeHtml).join(" &middot; ");
   return `<!DOCTYPE html>
@@ -109,12 +114,14 @@ export function htmlEmail(opts: { text: string; type: string; gymName: string; g
 <body style="margin:0;padding:0;background:${b.pageBg};font-family:Arial,Helvetica,sans-serif">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${b.pageBg}"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:${b.cardBg};border-radius:12px;overflow:hidden">
-<tr><td style="background:${b.headerBg};padding:20px 28px;color:${b.headerText};font-size:14px;font-weight:bold;letter-spacing:1px;text-transform:uppercase">${escapeHtml(opts.gymName)}</td></tr>
-<tr><td style="padding:32px 28px 8px 28px">
+<tr><td style="background:${b.bandBg};padding:18px 28px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:10px;vertical-align:middle"><img src="${escapeHtml(emailLogoUrl())}" width="32" height="32" alt="" style="display:block;border:0"></td><td style="vertical-align:middle;font-size:20px;font-weight:bold;letter-spacing:-0.3px;color:${b.bandText}">Liftmora</td></tr></table></td></tr>
+<tr><td style="background:${b.accent};height:4px;line-height:4px;font-size:0">&nbsp;</td></tr>
+<tr><td style="padding:28px 28px 8px 28px">
+<div style="margin:0 0 10px 0;font-size:12px;font-weight:bold;letter-spacing:1.2px;text-transform:uppercase;color:${b.muted}">${escapeHtml(opts.gymName)}</div>
 <h1 style="margin:0 0 20px 0;font-size:24px;line-height:1.3;color:${b.text}">${escapeHtml(design.heading)}</h1>
 ${paragraphs(opts.text)}${button}
 </td></tr>
-<tr><td style="padding:16px 28px 28px 28px;border-top:1px solid ${b.pageBg};font-size:12px;line-height:1.6;color:${b.muted}">${footer}<br>Sent by Liftmora on behalf of ${escapeHtml(opts.gymName)}.</td></tr>
+<tr><td style="background:${b.bandBg};padding:18px 28px;font-size:12px;line-height:1.6;color:${b.bandMuted}">${footer}<br>Sent by Liftmora on behalf of ${escapeHtml(opts.gymName)}.</td></tr>
 </table></td></tr></table>
 </body></html>`;
 }

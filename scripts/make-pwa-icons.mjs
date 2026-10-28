@@ -3,7 +3,7 @@
  *
  *   node scripts/make-pwa-icons.mjs
  *
- * Output goes to public/icons and is committed, so this only needs re-running if the mark changes.
+ * Also writes email-logo.png, the mark on a transparent background for emails. Output goes to public/icons and is committed, so this only needs re-running if the mark changes.
  * Uses Playwright's Chromium; set CHROMIUM_PATH if the browser lives somewhere unusual.
  */
 import { chromium } from "@playwright/test";
@@ -40,5 +40,15 @@ for (const { file, size, scale } of ICONS) {
   await page.screenshot({ path: path.join(OUT, file), clip: { x: 0, y: 0, width: size, height: size } });
   await page.close();
   console.log("wrote", file);
+}
+
+// The mark on a transparent background for the email header (which is dark), drawn at 2x for sharp screens.
+{
+  const size = 96;
+  const page = await browser.newPage({ viewport: { width: size, height: size } });
+  await page.setContent(`<body style="margin:0;background:transparent">${mark(size, 1)}</body>`);
+  await page.screenshot({ path: path.join(OUT, "email-logo.png"), omitBackground: true, clip: { x: 0, y: 0, width: size, height: size } });
+  await page.close();
+  console.log("wrote email-logo.png");
 }
 await browser.close();
