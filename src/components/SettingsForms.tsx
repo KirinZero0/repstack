@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { EMAIL_LIMITS, EMAIL_MESSAGE_TYPES, EMAIL_PLACEHOLDERS, type EmailMessageType } from "@/config/email";
+import { renderEmail, resolveTemplate, type EmailVars } from "@/lib/emailTemplates";
 
 const selectCls =
   "w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-white outline-none focus:border-neutral-500";
@@ -564,3 +566,115 @@ export function WhoIsInForm({ slug, initial }: { slug: string; initial: boolean 
   );
 }
 
+
+type TemplateMap = Record<string, { subject?: string; body?: string }>;
+
+const SAMPLE_VARS: EmailVars = {
+  gymName: "Your Gym",
+  memberName: "Sari Wijaya",
+  gymAddress: "Jl. Sudirman 1, Jakarta",
+  message: "(the message the system fills in: dates, amounts and links)",
+};
+
+/** Owner edits the wording of each member email. Anything left alone uses the platform default. */
+export function EmailTemplatesForm({
+  slug,
+  initialTemplates,
+  initialReplyTo,
+}: {
+  slug: string;
+  initialTemplates: TemplateMap;
+  initialReplyTo: string;
+}) {
+  const [type, setType] = useState<EmailMessageType>("default");
+  const [saved, setSaved] = useState<TemplateMap>(initialTemplates);
+  const [replyTo, setReplyTo] = useState(initialReplyTo);
+  const current = resolveTemplate({ emailTemplates: saved }, type);
+  const [subject, setSubject] = useState(current.subject);
+  const [body, setBody] = useState(current.body);
+  const { state, error, save } = useSave(`/api/${slug}/settings`);
+
+  function choose(next: EmailMessageType) {
+    const t = resolveTemplate({ emailTemplates: saved }, next);
+    setType(next);
+    setSubject(t.subject);
+    setBody(t.body);
+  }
+
+  async function saveTemplate() {
+    await save({ emailTemplates: { [type]: { subject, body } } });
+    setSaved({ ...saved, [type]: { subject, body } });
+  }
+
+  async function reset() {
+    await save({ emailTemplates: { [type]: null } });
+    const rest = { ...saved };
+    delete rest[type];
+    setSaved(rest);
+    const t = resolveTemplate({ emailTemplates: rest }, type);
+    setSubject(t.subject);
+    setBody(t.body);
+  }
+
+  const preview = renderEmail({ emailTemplates: { [type]: { subject, body } } }, type, SAMPLE_VARS);
+  const customised = Boolean(saved[type]);
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-neutral-400">
+        Write how each email to your members reads. Placeholders: {Object.keys(EMAIL_PLACEHOLDERS).map((k) => `{{${k}}}`).join(", ")}.
+        The body must keep <code>{"{{message}}"}</code>, which carries the dates, amounts and links.
+      </p>
+      <label className="block text-sm text-neutral-300">
+        <span className="mb-1 block">Email</span>
+        <select value={type} onChange={(e) => choose(e.target.value as EmailMessageType)} className={selectCls} aria-label="Email type">
+          {(Object.keys(EMAIL_MESSAGE_TYPES) as EmailMessageType[]).map((k) => (
+            <option key={k} value={k}>
+              {EMAIL_MESSAGE_TYPES[k]}
+              {saved[k] ? " (customised)" : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="block text-sm text-neutral-300">
+        <span className="mb-1 block">Subject</span>
+        <input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={EMAIL_LIMITS.subject} className={selectCls} aria-label="Email subject" />
+      </label>
+      <label className="block text-sm text-neutral-300">
+        <span className="mb-1 block">Body</span>
+        <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={7} maxLength={EMAIL_LIMITS.body} className={selectCls} aria-label="Email body" />
+      </label>
+      <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-sm text-neutral-300">
+        <p className="mb-1 text-xs uppercase tracking-wide text-neutral-500">Preview</p>
+        <p className="font-medium">{preview.subject}</p>
+        <p className="mt-2 whitespace-pre-wrap">{preview.text}</p>
+      </div>
+      <div className="flex gap-2">
+        <button type="button" onClick={saveTemplate} disabled={state === "saving"} className={btnCls}>
+          Save email
+        </button>
+        {customised && (
+          <button type="button" onClick={reset} disabled={state === "saving"} className="rounded-md border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800">
+            Back to default
+          </button>
+        )}
+      </div>
+      <label className="block text-sm text-neutral-300">
+        <span className="mb-1 block">Reply-to address</span>
+        <input
+          type="email"
+          value={replyTo}
+          onChange={(e) => setReplyTo(e.target.value)}
+          onBlur={() => save({ emailReplyTo: replyTo.trim() })}
+          maxLength={120}
+          placeholder="hello@yourgym.com"
+          className={selectCls}
+          aria-label="Reply-to address"
+        />
+        <span className="mt-1 block text-neutral-500">Emails come from Liftmora&apos;s address under your gym&apos;s name. Replies go here.</span>
+      </label>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {state === "saved" && <p className="text-sm text-emerald-400">Saved</p>}
+    </div>
+  );
+}

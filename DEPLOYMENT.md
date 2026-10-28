@@ -121,7 +121,8 @@ Leave these **unset**:
 - every `*_MOCK` variable (`PAYMENTS_MOCK`, `XENDIT_MOCK`, `WHATSAPP_MOCK`, `EMAIL_MOCK`): they are ignored in
   production anyway, but keep them out.
 - `XENDIT_*` and `MIDTRANS_*`: until a provider approves you (see `PAYMENTS.md`).
-- `RESEND_API_KEY` / `EMAIL_FROM`: email to members is optional.
+- `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` (and `MAILGUN_REGION=eu` for an EU domain), or `RESEND_API_KEY` / `EMAIL_FROM`: email to
+  members is optional. Each gym turns it on in Settings and can write its own email wording there.
 
 - [ ] Deploy. If `APP_DATABASE_URL` was added after the first deploy, redeploy so the app picks it up.
 - [ ] In the function logs there is **no** line saying `APP_DATABASE_URL is not set`. That line means row-level

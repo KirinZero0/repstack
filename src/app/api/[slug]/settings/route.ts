@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymSettingsSchema } from "@/lib/validation/tenant";
+import { isEmailMessageType, templateError } from "@/lib/emailTemplates";
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   let session, gym, db;
@@ -30,6 +31,25 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (parsed.data.paymentsEnabled !== undefined) next.paymentsEnabled = parsed.data.paymentsEnabled;
   if (parsed.data.notifyWhatsapp !== undefined) next.notifyWhatsapp = parsed.data.notifyWhatsapp;
   if (parsed.data.notifyEmail !== undefined) next.notifyEmail = parsed.data.notifyEmail;
+  if (parsed.data.emailReplyTo !== undefined) {
+    if (parsed.data.emailReplyTo) next.emailReplyTo = parsed.data.emailReplyTo;
+    else delete next.emailReplyTo;
+  }
+  if (parsed.data.emailTemplates !== undefined) {
+    const templates = { ...((next.emailTemplates ?? {}) as Record<string, unknown>) };
+    for (const [type, template] of Object.entries(parsed.data.emailTemplates)) {
+      if (!isEmailMessageType(type)) return NextResponse.json({ error: `Unknown email type: ${type}` }, { status: 400 });
+      if (template === null) {
+        delete templates[type];
+        continue;
+      }
+      const problem = templateError(template);
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+      templates[type] = { subject: template.subject, body: template.body };
+    }
+    if (Object.keys(templates).length) next.emailTemplates = templates;
+    else delete next.emailTemplates;
+  }
   if (parsed.data.occupancyWindowHours !== undefined) next.occupancyWindowHours = parsed.data.occupancyWindowHours;
   if (parsed.data.checkinsPerDay !== undefined) next.checkinsPerDay = parsed.data.checkinsPerDay;
   if (parsed.data.checkinGapMinutes !== undefined) next.checkinGapMinutes = parsed.data.checkinGapMinutes;

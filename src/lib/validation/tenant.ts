@@ -43,6 +43,15 @@ export const gymSettingsSchema = z
     paymentsEnabled: z.boolean().optional(),
     notifyWhatsapp: z.boolean().optional(),
     notifyEmail: z.boolean().optional(),
+    /** Where a member's reply to an email goes. Empty string clears it. */
+    emailReplyTo: z.union([z.literal(""), z.string().trim().email().max(120)]).optional(),
+    /**
+     * Per-message email templates. A message type maps to its template, or to null to go back to the
+     * platform default. Which placeholders are allowed is checked in the route (see emailTemplates.ts).
+     */
+    emailTemplates: z
+      .record(z.string(), z.union([z.null(), z.object({ subject: z.string().max(400), body: z.string().max(8000) })]))
+      .optional(),
     /** How long after a check-in a member still counts as "in the gym" if they never checked out. */
     occupancyWindowHours: z.number().int().min(1).max(12).optional(),
     /** Successful check-ins allowed per member per day (1 = the original once-a-day rule). */

@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { sendGymWhatsapp } from "./whatsapp";
 import { emailConfigured, sendEmail } from "./email";
+import { renderEmail } from "./emailTemplates";
 
 /** Per-gym channel switches live in Gym.settings. WhatsApp stays on unless turned off; email is opt-in. */
 export function notificationChannels(settings: unknown): { whatsapp: boolean; email: boolean } {
@@ -8,34 +9,33 @@ export function notificationChannels(settings: unknown): { whatsapp: boolean; em
   return { whatsapp: s.notifyWhatsapp !== false, email: s.notifyEmail === true };
 }
 
-const SUBJECTS: Record<string, string> = {
-  member_activation: "Activate your account",
-  member_welcome: "Welcome",
-  payment_receipt: "Payment received",
-  expiry_reminder: "Your membership is expiring soon",
-  expired_notice: "Your membership has expired",
-  password_reset: "Reset your password",
-  qr_fallback: "Your check-in QR link",
-  class_confirmation: "Your class booking",
-  class_cancelled: "A class was cancelled",
-  class_reminder: "Your class is tomorrow",
-  renewal_confirmed: "Membership renewed",
-};
-
-function subjectFor(gymName: string, type: string): string {
-  const title = SUBJECTS[type] ?? type.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
-  return `${gymName}: ${title}`;
-}
-
-async function emailMember(gymId: string, gymName: string, opts: { message: string; type: string; memberId: string }) {
-  const member = await prisma.member.findUnique({ where: { id: opts.memberId }, select: { email: true, anonymizedAt: true } });
+async function emailMember(
+  gymId: string,
+  gym: { name: string; address: string | null; settings: unknown },
+  opts: { message: string; type: string; memberId: string },
+) {
+  const member = await prisma.member.findUnique({ where: { id: opts.memberId }, select: { email: true, fullName: true, anonymizedAt: true } });
   if (!member || member.anonymizedAt) return;
 
   let status: "SENT" | "FAILED" | "SKIPPED";
   if (!emailConfigured()) {
     status = "SKIPPED";
   } else {
-    const result = await sendEmail({ to: member.email, subject: subjectFor(gymName, opts.type), text: opts.message, fromName: gymName });
+    const { subject, text, html } = renderEmail(gym.settings, opts.type, {
+      gymName: gym.name,
+      memberName: member.fullName,
+      gymAddress: gym.address ?? "",
+      message: opts.message,
+    });
+    const replyTo = (gym.settings as { emailReplyTo?: unknown } | null)?.emailReplyTo;
+    const result = await sendEmail({
+      to: member.email,
+      subject,
+      text,
+      html,
+      fromName: gym.name,
+      replyTo: typeof replyTo === "string" && replyTo ? replyTo : undefined,
+    });
     status = result.ok ? "SENT" : "FAILED";
   }
   await prisma.notificationLog.create({
@@ -52,12 +52,12 @@ export async function notifyMember(
   gymId: string,
   opts: { to: string; message: string; type: string; memberId: string },
 ): Promise<void> {
-  const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, settings: true } });
+  const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, address: true, settings: true } });
   if (!gym) return;
   const channels = notificationChannels(gym.settings);
 
   const sends: Promise<unknown>[] = [];
   if (channels.whatsapp) sends.push(sendGymWhatsapp(gymId, opts));
-  if (channels.email) sends.push(emailMember(gymId, gym.name, opts));
+  if (channels.email) sends.push(emailMember(gymId, gym, opts));
   await Promise.all(sends);
 }

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymThemeFromSettings } from "@/lib/theme";
 import { Card } from "@/components/charts";
-import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm, OnlinePaymentsForm, GymProfileForm, NotificationsForm, OccupancyForm, WhoIsInForm, CheckinRulesForm } from "@/components/SettingsForms";
+import { GymDetailsForm, GymThemeForm, JoinSettingsForm, BankDetailsForm, OnlinePaymentsForm, GymProfileForm, NotificationsForm, OccupancyForm, WhoIsInForm, EmailTemplatesForm, CheckinRulesForm } from "@/components/SettingsForms";
 import { occupancyWindowHours, whoIsInEnabled } from "@/lib/occupancy";
 import { checkinRules } from "@/lib/checkin";
 import GymPhotosManager from "@/components/GymPhotosManager";
@@ -85,6 +85,16 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
               initialWhatsapp={channels.whatsapp}
               initialEmail={channels.email}
               emailReady={emailConfigured()}
+            />
+          </Card>
+        </div>
+
+        <div className="mb-6">
+          <Card title="Email templates">
+            <EmailTemplatesForm
+              slug={params.slug}
+              initialTemplates={((gym.settings ?? {}) as { emailTemplates?: Record<string, { subject?: string; body?: string }> }).emailTemplates ?? {}}
+              initialReplyTo={String((gym.settings as { emailReplyTo?: unknown } | null)?.emailReplyTo ?? "")}
             />
           </Card>
         </div>

@@ -293,3 +293,20 @@ Real-camera scanning was the least-tested part of the app, so it was hardened.
   (valid member code gives "Checked in" and a `CheckIn` row; an unknown code gives "Invalid QR code"), and
   checks token signature and tampering.
 - No migration needed.
+
+## 8. Email via Mailgun, with per-gym templates
+
+- **Provider** (`src/lib/email.ts`): Mailgun is used when `MAILGUN_API_KEY` and `MAILGUN_DOMAIN` are set
+  (`MAILGUN_REGION=eu` for EU domains); otherwise Resend as before. `EMAIL_PROVIDER` forces one. Mail goes
+  out from `EMAIL_FROM` (Mailgun defaults to `no-reply@<domain>`) under the gym's name, as plain text plus a
+  simple HTML version, with the gym's reply-to address if it set one.
+- **Config-driven** (`src/config/email.ts`): the message types, the placeholders (`{{gymName}}`,
+  `{{memberName}}`, `{{gymAddress}}`, `{{message}}`) and the default wording are data, not code. Adding a
+  message type is one line there.
+- **Per gym** (Settings, "Email templates", owner only): each gym can rewrite the subject and body of any
+  message, or of "everything else". Resolution is the gym's template for that type, then the gym's default,
+  then the platform default, per field. Stored in `Gym.settings.emailTemplates`, so **no migration**.
+- **Safety** (`src/lib/emailTemplates.ts`): only known placeholders are accepted, the body must keep
+  `{{message}}` (it carries the link and dates), subjects are one line, values are filled in a single pass
+  (a value can't inject a placeholder), and HTML is escaped.
+- Tests: `e2e/42-email-templates.spec.ts`.
