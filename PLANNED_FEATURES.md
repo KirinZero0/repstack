@@ -335,7 +335,7 @@ Code: `revokeMemberPasswordLinks` in `src/lib/magicLink.ts`. Tests: `e2e/43-emai
 ## 10. HTML emails
 
 Every member email goes out as a designed HTML email as well as plain text (`htmlEmail` in
-`src/lib/emailTemplates.ts`), in Liftmora's black and plate yellow: a black bar with the Liftmora mark, a black
+`src/lib/emailTemplates.ts`), in Liftmora's black and plate yellow, dark all the way through (no white panel): a bar with the Liftmora mark, a
 hero with a yellow badge for that kind of message (a check, a lock, a calendar, a receipt...), the gym's name
 in yellow and a big white heading, a barbell divider drawn from table cells, the message (links clickable), a
 yellow button with an arrow to the first link when the message has one (activation, welcome, renewal, password

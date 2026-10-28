@@ -82,12 +82,12 @@ function paragraphs(text: string): string {
   return text
     .split(/\n{2,}/)
     .filter((p) => p.trim())
-    .map((p) => `<p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:${EMAIL_BRAND.text}">${linkify(escapeHtml(p.trim())).replace(/\r?\n/g, "<br>")}</p>`)
+    .map((p) => `<p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:${EMAIL_BRAND.bodyText}">${linkify(escapeHtml(p.trim())).replace(/\r?\n/g, "<br>")}</p>`)
     .join("");
 }
 
 function linkify(escaped: string): string {
-  return escaped.replace(/(https?:\/\/[^\s<]+)/g, (url) => `<a href="${url}" style="color:${EMAIL_BRAND.link};word-break:break-all">${url}</a>`);
+  return escaped.replace(/(https?:\/\/[^\s<]+)/g, (url) => `<a href="${url}" style="color:${EMAIL_BRAND.accent};word-break:break-all">${url}</a>`);
 }
 
 /**
@@ -136,18 +136,18 @@ export function htmlEmail(opts: { text: string; type: string; gymName: string; g
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(design.heading)}</title></head>
 <body style="margin:0;padding:0;background:${b.pageBg};font-family:Arial,Helvetica,sans-serif">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${b.pageBg}"><tr><td align="center" style="padding:24px 12px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:${b.cardBg};border-radius:14px;overflow:hidden">
-<tr><td style="background:${b.bandBg};padding:16px 28px;border-bottom:1px solid #1d252d"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:10px;vertical-align:middle"><img src="${escapeHtml(emailLogoUrl())}" width="26" height="26" alt="" style="display:block;border:0"></td><td style="vertical-align:middle;font-size:17px;font-weight:bold;letter-spacing:-0.3px;color:${b.bandText}">Liftmora</td></tr></table></td></tr>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:${b.bandBg};border-radius:14px;overflow:hidden">
+<tr><td style="background:${b.bandBg};padding:16px 28px;border-bottom:1px solid ${b.rule}"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:10px;vertical-align:middle"><img src="${escapeHtml(emailLogoUrl())}" width="26" height="26" alt="" style="display:block;border:0"></td><td style="vertical-align:middle;font-size:17px;font-weight:bold;letter-spacing:-0.3px;color:${b.bandText}">Liftmora</td></tr></table></td></tr>
 <tr><td style="background:${b.bandBg};padding:36px 28px 8px 28px">
 <img src="${escapeHtml(emailBadgeUrl(key))}" width="56" height="56" alt="" style="display:block;border:0;margin:0 0 20px 0">
 <div style="margin:0 0 10px 0;font-size:12px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:${b.accent}">${escapeHtml(opts.gymName)}</div>
 <h1 style="margin:0;font-size:32px;line-height:1.15;letter-spacing:-0.6px;color:${b.bandText}">${escapeHtml(design.heading)}</h1>
 </td></tr>
 <tr><td style="background:${b.bandBg};padding:28px 28px 0 28px">${barbell(b.accent)}</td></tr>
-<tr><td style="padding:32px 28px 8px 28px">
+<tr><td style="background:${b.bandBg};padding:32px 28px 8px 28px">
 ${paragraphs(opts.text)}${button}
 </td></tr>
-<tr><td style="background:${b.bandBg};padding:22px 28px;font-size:12px;line-height:1.7;color:${b.bandMuted}"><span style="color:${b.bandText};font-weight:bold">${escapeHtml(opts.gymName)}</span>${opts.gymAddress ? `<br>${escapeHtml(opts.gymAddress)}` : ""}<br><span style="color:${b.accent}">&#9679;</span> Sent by Liftmora on behalf of ${escapeHtml(opts.gymName)}.</td></tr>
+<tr><td style="background:${b.bandBg};padding:22px 28px;border-top:1px solid ${b.rule};font-size:12px;line-height:1.7;color:${b.bandMuted}"><span style="color:${b.bandText};font-weight:bold">${escapeHtml(opts.gymName)}</span>${opts.gymAddress ? `<br>${escapeHtml(opts.gymAddress)}` : ""}<br><span style="color:${b.accent}">&#9679;</span> Sent by Liftmora on behalf of ${escapeHtml(opts.gymName)}.</td></tr>
 </table></td></tr></table>
 </body></html>`;
 }
