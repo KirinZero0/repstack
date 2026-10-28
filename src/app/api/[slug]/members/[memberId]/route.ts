@@ -8,6 +8,7 @@ import { deleteBlob } from "@/lib/blob";
 import { memberActionSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
 import { countMemberSeats, memberLimitMessage } from "@/lib/limits";
+import { revokeMemberPasswordLinks } from "@/lib/magicLink";
 
 /** The status a member returns to once their membership period is running again. */
 function statusForExpiry(expiry: Date | null, now: Date): MemberStatus {
@@ -110,7 +111,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
 
       if (Object.keys(data).length === 0) return NextResponse.json({ ok: true, status: member.status });
       await db.member.update({ where: { id: member.id }, data });
-      return NextResponse.json({ ok: true, status: member.status });
+      // A new email means anyone holding an earlier password link (sent to the old address or phone) must not be able to use it.
+      const revoked = data.email !== undefined ? await revokeMemberPasswordLinks(member.id) : 0;
+      return NextResponse.json({ ok: true, status: member.status, linksRevoked: revoked });
     }
   }
 }

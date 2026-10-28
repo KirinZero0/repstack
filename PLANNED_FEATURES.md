@@ -321,3 +321,13 @@ Real-camera scanning was the least-tested part of the app, so it was hardened.
   injection), HTML is escaped.
 - **Deploy**: needs `npm run db:migrate` then `npm run db:rls`.
 - Tests: `e2e/42-email-templates.spec.ts`.
+
+## 9. Changing a member's email cancels their password links
+
+When staff change a member's email (member detail, Edit), every unused link that lets someone set that member's
+password is revoked on the spot: the activation link from when they were added and any password-reset link.
+A link already sent to the old address or phone, or sitting in an old message, can't be used to take over the
+account. Saving the same email, or editing only the name, phone or plan, revokes nothing. The QR-only fallback
+link isn't a password link and keeps working. Staff can send a new link afterwards ("Send password link"). The
+edit response reports `linksRevoked`. Only that member's links are touched. No migration.
+Code: `revokeMemberPasswordLinks` in `src/lib/magicLink.ts`. Tests: `e2e/43-email-change-revokes-links.spec.ts`.

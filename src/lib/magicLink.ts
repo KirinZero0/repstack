@@ -39,3 +39,18 @@ export async function findValidMagicLink(token: string, purpose?: string) {
   if (link.expiresAt < new Date()) return null;
   return link;
 }
+
+/**
+ * Kills every link that lets someone set this member's password: unused activation links and unused
+ * password-reset links. Called when staff change the member's email, so a link already sent to the old
+ * address or sitting in an old message can't be used to take over the account. (The QR-only fallback
+ * link is not a password link and is left alone.) Returns how many links were revoked.
+ */
+export async function revokeMemberPasswordLinks(memberId: string): Promise<number> {
+  const now = new Date();
+  const [activation, resets] = await prisma.$transaction([
+    prisma.magicLink.updateMany({ where: { memberId, purpose: "activate", usedAt: null }, data: { usedAt: now } }),
+    prisma.passwordReset.updateMany({ where: { kind: "member", subjectId: memberId, usedAt: null }, data: { usedAt: now } }),
+  ]);
+  return activation.count + resets.count;
+}

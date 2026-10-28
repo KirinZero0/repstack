@@ -8,12 +8,13 @@ import { buildQrToken, verifyQrToken, parseQrToken } from "../src/lib/qr";
 
 /** Writes a looping Y4M camera feed showing `text` as a QR code — what Chromium's fake camera plays. */
 function writeQrVideo(text: string, file: string) {
-  const W = 640;
-  const H = 480;
+  const W = 1280;
+  const H = 720;
   const qr = QRCode.create(text, { errorCorrectionLevel: "M" });
   const n = qr.modules.size;
   const quiet = 4;
-  const cell = Math.floor(Math.min(W, H) / (n + quiet * 2));
+  // About 60% of the frame, like a code held at a normal distance; the scanner's box is 75% of the shorter edge.
+  const cell = Math.floor((Math.min(W, H) * 0.6) / (n + quiet * 2));
   const side = cell * (n + quiet * 2);
   const x0 = Math.floor((W - side) / 2);
   const y0 = Math.floor((H - side) / 2);
@@ -31,7 +32,7 @@ function writeQrVideo(text: string, file: string) {
   const chroma = Buffer.alloc((W / 2) * (H / 2), 128);
   const frame = Buffer.concat([Buffer.from("FRAME\n"), y, chroma, chroma]);
   const header = Buffer.from(`YUV4MPEG2 W${W} H${H} F10:1 Ip A1:1 C420jpeg\n`);
-  fs.writeFileSync(file, Buffer.concat([header, ...Array(5).fill(frame)]));
+  fs.writeFileSync(file, Buffer.concat([header, ...Array(3).fill(frame)]));
 }
 
 async function scanWithFakeCamera(token: string, ip: string) {
@@ -61,7 +62,7 @@ async function scanWithFakeCamera(token: string, ip: string) {
   return { page, browser };
 }
 
-test("the real scanner reads a member's compact QR from a camera feed", async () => {
+test("the real scanner reads a member's QR from a camera feed", async () => {
   test.setTimeout(60_000);
   const member = await prisma.member.findUniqueOrThrow({ where: { email: "active-member@test.local" } });
   await prisma.checkIn.deleteMany({ where: { memberId: member.id } });
