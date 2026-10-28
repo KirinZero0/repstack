@@ -210,3 +210,43 @@ test("the message types in code are exactly the database enum, and every emailab
   // The database itself refuses a type that isn't in the enum.
   await expect(prisma.$executeRawUnsafe(`INSERT INTO "EmailTemplate" (id, type, subject, body, "updatedAt") VALUES ('x', 'bogus', 's', 'b', now())`)).rejects.toThrow();
 });
+
+test("Mailjet gets a v3.1 JSON post with basic auth, and a per-message error counts as a failure", async () => {
+  const keep = { ...process.env };
+  const calls: { url: string; init: RequestInit }[] = [];
+  const realFetch = globalThis.fetch;
+  let reply: () => Response = () => new Response(JSON.stringify({ Messages: [{ Status: "success" }] }), { status: 200 });
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
+    calls.push({ url, init });
+    return reply();
+  }) as typeof fetch;
+  try {
+    Object.assign(process.env, { EMAIL_MOCK: "", MAILJET_API_KEY: "pub", MAILJET_SECRET_KEY: "sec", EMAIL_FROM: "noreply@liftmora.test" });
+    for (const k of ["MAILGUN_API_KEY", "MAILGUN_DOMAIN", "RESEND_API_KEY", "EMAIL_PROVIDER"]) delete process.env[k];
+    const r = await sendEmail({ to: "m@x.test", subject: "S", text: "T", html: "<p>T</p>", replyTo: "hi@gym.test" });
+    expect(r.ok).toBe(true);
+    expect(calls[0].url).toBe("https://api.mailjet.com/v3.1/send");
+    expect((calls[0].init.headers as Record<string, string>).Authorization).toBe(`Basic ${Buffer.from("pub:sec").toString("base64")}`);
+    const msg = JSON.parse(calls[0].init.body as string).Messages[0];
+    expect(msg.From).toEqual({ Email: "noreply@liftmora.test", Name: "Liftmora" });
+    expect(msg.To).toEqual([{ Email: "m@x.test" }]);
+    expect(msg.TextPart).toBe("T");
+    expect(msg.HTMLPart).toBe("<p>T</p>");
+    expect(msg.ReplyTo).toEqual({ Email: "hi@gym.test" });
+
+    reply = () => new Response(JSON.stringify({ Messages: [{ Status: "error", Errors: [{ ErrorMessage: "Sender not verified" }] }] }), { status: 200 });
+    expect(await sendEmail({ to: "m@x.test", subject: "S", text: "T" })).toEqual({ ok: false, error: "Sender not verified" });
+
+    // Without a verified sender address Mailjet isn't "configured", so nothing is sent.
+    delete process.env.EMAIL_FROM;
+    const before = calls.length;
+    expect((await sendEmail({ to: "m@x.test", subject: "S", text: "T" })).skipped).toBe(true);
+    expect(calls.length).toBe(before);
+  } finally {
+    globalThis.fetch = realFetch;
+    for (const k of ["EMAIL_MOCK", "MAILJET_API_KEY", "MAILJET_SECRET_KEY", "EMAIL_FROM", "MAILGUN_API_KEY", "MAILGUN_DOMAIN", "RESEND_API_KEY", "EMAIL_PROVIDER"]) {
+      if (keep[k] === undefined) delete process.env[k];
+      else process.env[k] = keep[k];
+    }
+  }
+});

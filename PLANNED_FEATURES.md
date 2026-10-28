@@ -299,7 +299,7 @@ Real-camera scanning was the least-tested part of the app, so it was hardened.
 - **One sender** (`src/lib/email.ts`): every email leaves from Liftmora's single address (`EMAIL_FROM`; Mailgun
   defaults to `no-reply@<domain>`, display name `EMAIL_FROM_NAME`, default "Liftmora"). Nothing about the sender
   is per gym. Mailgun is used when `MAILGUN_API_KEY` and `MAILGUN_DOMAIN` are set (`MAILGUN_REGION=eu` for EU
-  domains), otherwise Resend as before; `EMAIL_PROVIDER` forces one. Plain text plus a simple HTML version; a
+  domains), then Mailjet (`MAILJET_API_KEY`, `MAILJET_SECRET_KEY`, and `EMAIL_FROM` set to a sender verified in Mailjet), then Resend; `EMAIL_PROVIDER` forces one. Plain text plus a simple HTML version; a
   gym can set a reply-to address so replies reach it.
 - **The template tells gyms apart** (`EmailTemplate` table): a row with a `gymId` is that gym's own template for
   a message type; a row with **no gym is the platform default** gyms fall back to. Lookup, most specific first:

@@ -14,23 +14,26 @@ export interface OutgoingEmail {
   replyTo?: string;
 }
 
-type Provider = "mailgun" | "resend";
+type Provider = "mailgun" | "mailjet" | "resend";
 
 function isMock(): boolean {
   return process.env.EMAIL_MOCK === "1" && process.env.NODE_ENV !== "production";
 }
 
 /**
- * Which provider sends email: EMAIL_PROVIDER if set, otherwise Mailgun when its key and domain are
- * present, otherwise Resend when its key is. null means email isn't set up.
+ * Which provider sends email: EMAIL_PROVIDER if set, otherwise the first of Mailgun, Mailjet, Resend
+ * that has its credentials. null means email isn't set up.
  */
 function provider(): Provider | null {
-  const mailgun = Boolean(process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN);
-  const resend = Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
+  const ready: Record<Provider, boolean> = {
+    mailgun: Boolean(process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN),
+    // Mailjet only sends from a sender address or domain verified in its dashboard, so EMAIL_FROM is required.
+    mailjet: Boolean(process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY && process.env.EMAIL_FROM),
+    resend: Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM),
+  };
   const chosen = process.env.EMAIL_PROVIDER?.toLowerCase();
-  if (chosen === "mailgun") return mailgun ? "mailgun" : null;
-  if (chosen === "resend") return resend ? "resend" : null;
-  return mailgun ? "mailgun" : resend ? "resend" : null;
+  if (chosen === "mailgun" || chosen === "mailjet" || chosen === "resend") return ready[chosen] ? chosen : null;
+  return (["mailgun", "mailjet", "resend"] as const).find((p) => ready[p]) ?? null;
 }
 
 /** Email works once a provider is configured on the platform (mock mode counts, dev/test only). */
@@ -73,6 +76,34 @@ async function sendViaMailgun(e: OutgoingEmail): Promise<EmailResult> {
   return res.ok ? { ok: true } : failure(res);
 }
 
+async function sendViaMailjet(e: OutgoingEmail): Promise<EmailResult> {
+  const auth = Buffer.from(`${process.env.MAILJET_API_KEY}:${process.env.MAILJET_SECRET_KEY}`).toString("base64");
+  const res = await fetch("https://api.mailjet.com/v3.1/send", {
+    method: "POST",
+    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      Messages: [
+        {
+          From: { Email: process.env.EMAIL_FROM, Name: safeName(process.env.EMAIL_FROM_NAME || "Liftmora") },
+          To: [{ Email: e.to }],
+          Subject: e.subject,
+          TextPart: e.text,
+          ...(e.html ? { HTMLPart: e.html } : {}),
+          ...(e.replyTo ? { ReplyTo: { Email: e.replyTo } } : {}),
+        },
+      ],
+    }),
+  });
+  // Mailjet can answer 200 with a per-message error, so the message's own status is the truth.
+  const body = (await res.json().catch(() => ({}))) as {
+    ErrorMessage?: unknown;
+    Messages?: { Status?: string; Errors?: { ErrorMessage?: unknown }[] }[];
+  };
+  const msg = body.Messages?.[0];
+  if (res.ok && (!msg || msg.Status === "success")) return { ok: true };
+  return { ok: false, error: String(msg?.Errors?.[0]?.ErrorMessage ?? body.ErrorMessage ?? `Email provider returned HTTP ${res.status}`) };
+}
+
 async function sendViaResend(e: OutgoingEmail): Promise<EmailResult> {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -102,7 +133,7 @@ export async function sendEmail(opts: OutgoingEmail): Promise<EmailResult> {
     return { ok: false, skipped: true };
   }
   try {
-    return await (p === "mailgun" ? sendViaMailgun(opts) : sendViaResend(opts));
+    return await (p === "mailgun" ? sendViaMailgun(opts) : p === "mailjet" ? sendViaMailjet(opts) : sendViaResend(opts));
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

@@ -121,7 +121,7 @@ Leave these **unset**:
 - every `*_MOCK` variable (`PAYMENTS_MOCK`, `XENDIT_MOCK`, `WHATSAPP_MOCK`, `EMAIL_MOCK`): they are ignored in
   production anyway, but keep them out.
 - `XENDIT_*` and `MIDTRANS_*`: until a provider approves you (see `PAYMENTS.md`).
-- `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` (and `MAILGUN_REGION=eu` for an EU domain), or `RESEND_API_KEY` / `EMAIL_FROM`: email to
+- `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` (and `MAILGUN_REGION=eu` for an EU domain), or `MAILJET_API_KEY` / `MAILJET_SECRET_KEY` / `EMAIL_FROM`, or `RESEND_API_KEY` / `EMAIL_FROM`: email to
   members is optional. All email is sent from this one address; each gym turns it on in Settings and can write its own
   email wording there.
 
