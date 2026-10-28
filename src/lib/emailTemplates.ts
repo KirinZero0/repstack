@@ -1,5 +1,7 @@
 import {
   DEFAULT_EMAIL_TEMPLATES,
+  EMAIL_BRAND,
+  EMAIL_DESIGN,
   EMAIL_LIMITS,
   EMAIL_PLACEHOLDERS,
   isEmailMessageType,
@@ -59,7 +61,7 @@ export function renderEmail(rows: TemplateRow[], gymId: string | null, type: str
   // A subject is a header: never let a value smuggle in a line break.
   const subject = renderText(t.subject, vars).replace(/[\r\n]+/g, " ").trim().slice(0, EMAIL_LIMITS.subject);
   const text = renderText(t.body, vars);
-  return { subject, text, html: textToHtml(text) };
+  return { subject, text, html: htmlEmail({ text, type, gymName: vars.gymName, gymAddress: vars.gymAddress }) };
 }
 
 function escapeHtml(s: string): string {
@@ -72,4 +74,47 @@ export function textToHtml(text: string): string {
     .replace(/(https?:\/\/[^\s<]+)/g, (url) => `<a href="${url}">${url}</a>`)
     .replace(/\r?\n/g, "<br>");
   return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#111">${body}</div>`;
+}
+
+const URL_RE = /https?:\/\/[^\s<]+/;
+
+function paragraphs(text: string): string {
+  return text
+    .split(/\n{2,}/)
+    .filter((p) => p.trim())
+    .map((p) => `<p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:${EMAIL_BRAND.text}">${linkify(escapeHtml(p.trim())).replace(/\r?\n/g, "<br>")}</p>`)
+    .join("");
+}
+
+function linkify(escaped: string): string {
+  return escaped.replace(/(https?:\/\/[^\s<]+)/g, (url) => `<a href="${url}" style="color:${EMAIL_BRAND.buttonBg};word-break:break-all">${url}</a>`);
+}
+
+/**
+ * The full HTML email: the gym's name in a header band, a heading for this kind of message, the message
+ * itself, a button to its first link (when the design gives that message one), and a footer. Built from
+ * tables and inline styles because email apps ignore most other CSS.
+ */
+export function htmlEmail(opts: { text: string; type: string; gymName: string; gymAddress: string }): string {
+  const key: EmailMessageType = isEmailMessageType(opts.type) ? opts.type : "default";
+  const design = EMAIL_DESIGN[key];
+  const b = EMAIL_BRAND;
+  const link = design.cta ? opts.text.match(URL_RE)?.[0] : undefined;
+  const button = link
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 24px 0"><tr><td style="border-radius:8px;background:${b.buttonBg}"><a href="${escapeHtml(link)}" style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:bold;color:${b.buttonText};text-decoration:none">${escapeHtml(design.cta!)}</a></td></tr></table>`
+    : "";
+  const footer = [opts.gymName, opts.gymAddress].filter(Boolean).map(escapeHtml).join(" &middot; ");
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(design.heading)}</title></head>
+<body style="margin:0;padding:0;background:${b.pageBg};font-family:Arial,Helvetica,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${b.pageBg}"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:${b.cardBg};border-radius:12px;overflow:hidden">
+<tr><td style="background:${b.headerBg};padding:20px 28px;color:${b.headerText};font-size:14px;font-weight:bold;letter-spacing:1px;text-transform:uppercase">${escapeHtml(opts.gymName)}</td></tr>
+<tr><td style="padding:32px 28px 8px 28px">
+<h1 style="margin:0 0 20px 0;font-size:24px;line-height:1.3;color:${b.text}">${escapeHtml(design.heading)}</h1>
+${paragraphs(opts.text)}${button}
+</td></tr>
+<tr><td style="padding:16px 28px 28px 28px;border-top:1px solid ${b.pageBg};font-size:12px;line-height:1.6;color:${b.muted}">${footer}<br>Sent by Liftmora on behalf of ${escapeHtml(opts.gymName)}.</td></tr>
+</table></td></tr></table>
+</body></html>`;
 }

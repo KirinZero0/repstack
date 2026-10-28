@@ -80,17 +80,51 @@ export const EMAIL_LIMITS = { subject: 150, body: 5000 } as const;
  * on WhatsApp, so every message type works without its own template.
  */
 export const DEFAULT_EMAIL_TEMPLATES: Record<EmailMessageType, EmailTemplate> = {
-  default: { subject: "{{gymName}}", body: "{{message}}\n\n{{gymName}}" },
-  member_activation: { subject: "{{gymName}}: Activate your account", body: "{{message}}\n\n{{gymName}}" },
-  member_welcome: { subject: "{{gymName}}: Welcome", body: "{{message}}\n\n{{gymName}}" },
-  payment_receipt: { subject: "{{gymName}}: Payment received", body: "{{message}}\n\n{{gymName}}" },
-  expiry_reminder: { subject: "{{gymName}}: Your membership is expiring soon", body: "{{message}}\n\n{{gymName}}" },
-  expired_notice: { subject: "{{gymName}}: Your membership has expired", body: "{{message}}\n\n{{gymName}}" },
-  manual_reminder: { subject: "{{gymName}}: A message from your gym", body: "{{message}}\n\n{{gymName}}" },
-  password_reset: { subject: "{{gymName}}: Reset your password", body: "{{message}}\n\n{{gymName}}" },
-  qr_fallback: { subject: "{{gymName}}: Your check-in QR link", body: "{{message}}\n\n{{gymName}}" },
-  class_confirmation: { subject: "{{gymName}}: Your class booking", body: "{{message}}\n\n{{gymName}}" },
-  class_reminder: { subject: "{{gymName}}: Your class is tomorrow", body: "{{message}}\n\n{{gymName}}" },
-  class_cancelled: { subject: "{{gymName}}: A class was cancelled", body: "{{message}}\n\n{{gymName}}" },
-  renewal_confirmed: { subject: "{{gymName}}: Membership renewed", body: "{{message}}\n\n{{gymName}}" },
+  default: { subject: "{{gymName}}", body: "{{message}}" },
+  member_activation: { subject: "{{gymName}}: Activate your account", body: "{{message}}" },
+  member_welcome: { subject: "{{gymName}}: Welcome", body: "{{message}}" },
+  payment_receipt: { subject: "{{gymName}}: Payment received", body: "{{message}}" },
+  expiry_reminder: { subject: "{{gymName}}: Your membership is expiring soon", body: "{{message}}" },
+  expired_notice: { subject: "{{gymName}}: Your membership has expired", body: "{{message}}" },
+  manual_reminder: { subject: "{{gymName}}: A message from your gym", body: "{{message}}" },
+  password_reset: { subject: "{{gymName}}: Reset your password", body: "{{message}}" },
+  qr_fallback: { subject: "{{gymName}}: Your check-in QR link", body: "{{message}}" },
+  class_confirmation: { subject: "{{gymName}}: Your class booking", body: "{{message}}" },
+  class_reminder: { subject: "{{gymName}}: Your class is tomorrow", body: "{{message}}" },
+  class_cancelled: { subject: "{{gymName}}: A class was cancelled", body: "{{message}}" },
+  renewal_confirmed: { subject: "{{gymName}}: Membership renewed", body: "{{message}}" },
+};
+
+/** How the HTML version of each email looks. The wording itself comes from the template; this is the frame around it. */
+export const EMAIL_BRAND = {
+  /** Header band behind the gym's name. */
+  headerBg: "#0f172a",
+  headerText: "#ffffff",
+  /** The call-to-action button. */
+  buttonBg: "#0f766e",
+  buttonText: "#ffffff",
+  pageBg: "#f1f5f9",
+  cardBg: "#ffffff",
+  text: "#0f172a",
+  muted: "#64748b",
+} as const;
+
+/**
+ * A big heading for each message and, where the message carries a link, the label on the button that opens
+ * it. The button goes to the first link found in the message, so a message with no link gets no button.
+ */
+export const EMAIL_DESIGN: Record<EmailMessageType, { heading: string; cta?: string }> = {
+  default: { heading: "A message from your gym" },
+  member_activation: { heading: "Welcome! Set up your account", cta: "Set your password" },
+  member_welcome: { heading: "You're in. Welcome!", cta: "Log in to see your QR" },
+  renewal_confirmed: { heading: "Your membership is renewed", cta: "Log in to see your QR" },
+  payment_receipt: { heading: "Payment received" },
+  expiry_reminder: { heading: "Your membership is expiring soon" },
+  expired_notice: { heading: "Your membership has expired" },
+  manual_reminder: { heading: "A reminder from your gym" },
+  password_reset: { heading: "Reset your password", cta: "Choose a new password" },
+  qr_fallback: { heading: "Your check-in QR", cta: "Show my QR" },
+  class_confirmation: { heading: "You're booked" },
+  class_reminder: { heading: "Your class is coming up" },
+  class_cancelled: { heading: "A class was cancelled" },
 };

@@ -1,7 +1,7 @@
 import { test, expect, request as playwrightRequest, type APIRequestContext } from "@playwright/test";
 import bcrypt from "bcryptjs";
 import { prisma } from "./helpers";
-import { renderEmail, resolveTemplate, templateError, textToHtml } from "../src/lib/emailTemplates";
+import { renderEmail, resolveTemplate, templateError, textToHtml, htmlEmail } from "../src/lib/emailTemplates";
 import { sendEmail } from "../src/lib/email";
 import { MessageType } from "@prisma/client";
 import { MESSAGE_TYPES, EMAIL_MESSAGE_TYPES, DEFAULT_EMAIL_TEMPLATES } from "../src/config/email";
@@ -249,4 +249,22 @@ test("Mailjet gets a v3.1 JSON post with basic auth, and a per-message error cou
       else process.env[k] = keep[k];
     }
   }
+});
+
+test("the HTML email has the gym header, a heading, a button only where there is a link, and escapes everything", () => {
+  const link = renderEmail([], null, "password_reset", { ...vars, gymName: "Iron <Co> & Sons", message: "Set it here: https://x.test/reset/abc (valid 1 hour)" });
+  expect(link.html).toContain("<!DOCTYPE html>");
+  expect(link.html).toContain("Iron &lt;Co&gt; &amp; Sons");
+  expect(link.html).not.toContain("<Co>");
+  expect(link.html).toContain("Reset your password");
+  // The button goes to the first link, labelled for this kind of message.
+  expect(link.html).toMatch(/<a href="https:\/\/x\.test\/reset\/abc"[^>]*>Choose a new password<\/a>/);
+
+  // A receipt has no link, so no button; a type with a button label but no link in the text gets none either.
+  expect(renderEmail([], null, "payment_receipt", vars).html).not.toContain("<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:8px");
+  expect(htmlEmail({ text: "No link at all.", type: "member_activation", gymName: "G", gymAddress: "" })).not.toContain("Set your password");
+  // Messages we don't know are still wrapped, under the generic heading.
+  expect(htmlEmail({ text: "Hello", type: "something_new", gymName: "G", gymAddress: "" })).toContain("A message from your gym");
+  // A hostile name or message can't inject markup.
+  expect(htmlEmail({ text: "<script>alert(1)</script>", type: "default", gymName: "<img src=x>", gymAddress: "" })).not.toMatch(/<script|<img/);
 });
