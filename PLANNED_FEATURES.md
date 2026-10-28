@@ -288,11 +288,7 @@ line (price × quantity). Items without one are charged in full.
 Real-camera scanning was the least-tested part of the app, so it was hardened.
 
 - **Codes unchanged**: compact tokens were tried and reverted; member, ticket and poster QRs keep their original format, so nothing issued or printed is affected.
-- **Sturdier scanner** (`src/lib/scanner.ts`, used by staff `/[slug]/checkin` and member `/check-in`):
-  QR-only decoding, the browser's native detector when available, 720p video, 15 fps, and **no scan box**,
-  so the whole frame is searched (a 70% box cropped a code held close and it never read). A "Turn light on"
-  button appears when the camera has a torch. Camera failures give plain messages (blocked, no camera,
-  busy, not https). Start/stop is serialized so a remount never tears the video out from under the scanner.
+- **Scanner**: the scanner itself is the one on main (native detector, HD camera, scaling scan box); the earlier helper was dropped in favour of it.
 - Tests: `e2e/41-scan.spec.ts` plays a QR through Chromium's **fake camera** into the real scanner page
   (valid member code gives "Checked in" and a `CheckIn` row; an unknown code gives "Invalid QR code"), and
   checks token signature and tampering.
