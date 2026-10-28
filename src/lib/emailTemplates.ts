@@ -1,8 +1,8 @@
 import {
   DEFAULT_EMAIL_TEMPLATES,
   EMAIL_LIMITS,
-  EMAIL_MESSAGE_TYPES,
   EMAIL_PLACEHOLDERS,
+  isEmailMessageType,
   type EmailMessageType,
   type EmailTemplate,
 } from "@/config/email";
@@ -11,9 +11,6 @@ export type EmailVars = Record<keyof typeof EMAIL_PLACEHOLDERS, string>;
 
 const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z]+)\s*\}\}/g;
 
-export function isEmailMessageType(type: string): type is EmailMessageType {
-  return type in EMAIL_MESSAGE_TYPES;
-}
 
 /** The first reason a template can't be saved, or null. Only known placeholders are allowed. */
 export function templateError(t: { subject: string; body: string }): string | null {

@@ -1,3 +1,4 @@
+import type { NotificationType } from "@/config/email";
 import { prisma } from "./prisma";
 import { sendGymWhatsapp } from "./whatsapp";
 import { emailConfigured, sendEmail } from "./email";
@@ -12,7 +13,7 @@ export function notificationChannels(settings: unknown): { whatsapp: boolean; em
 async function emailMember(
   gymId: string,
   gym: { name: string; address: string | null; settings: unknown },
-  opts: { message: string; type: string; memberId: string },
+  opts: { message: string; type: NotificationType; memberId: string },
 ) {
   const member = await prisma.member.findUnique({ where: { id: opts.memberId }, select: { email: true, fullName: true, anonymizedAt: true } });
   if (!member || member.anonymizedAt) return;
@@ -50,7 +51,7 @@ async function emailMember(
  */
 export async function notifyMember(
   gymId: string,
-  opts: { to: string; message: string; type: string; memberId: string },
+  opts: { to: string; message: string; type: NotificationType; memberId: string },
 ): Promise<void> {
   const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, address: true, settings: true } });
   if (!gym) return;

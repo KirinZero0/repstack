@@ -1,3 +1,4 @@
+import type { NotificationType } from "@/config/email";
 import { prisma } from "./prisma";
 import { decrypt } from "./crypto";
 
@@ -105,7 +106,7 @@ async function gymGateway(gymId: string): Promise<{ provider: GatewayProvider; a
  */
 export async function sendGymWhatsapp(
   gymId: string,
-  opts: { to: string; message: string; type: string; memberId?: string },
+  opts: { to: string; message: string; type: NotificationType; memberId?: string },
 ): Promise<SendResult> {
   const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, saasPlan: { select: { maxWhatsappPerMonth: true } } } });
   const own = gym ? await gymGateway(gymId) : null;

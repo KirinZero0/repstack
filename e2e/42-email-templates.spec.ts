@@ -3,6 +3,8 @@ import bcrypt from "bcryptjs";
 import { prisma } from "./helpers";
 import { renderEmail, resolveTemplate, templateError, textToHtml } from "../src/lib/emailTemplates";
 import { sendEmail } from "../src/lib/email";
+import { MessageType } from "@prisma/client";
+import { MESSAGE_TYPES, EMAIL_MESSAGE_TYPES, DEFAULT_EMAIL_TEMPLATES } from "../src/config/email";
 
 let seq = 0;
 const uniq = (tag: string) => `${tag}-${Date.now()}-${seq++}`;
@@ -88,6 +90,8 @@ test("the owner saves, edits and resets a gym's templates, stored against that g
     { type: "member_activation", subject: "x", body: "no message" },
     { type: "member_activation", subject: "{{bogus}}", body: "{{message}}" },
     { type: "not_a_type", subject: "x", body: "{{message}}" },
+    // Guests have no email, so their WhatsApp-only messages have no email template.
+    { type: "guest_ticket", subject: "x", body: "{{message}}" },
     { type: "member_activation", subject: "a\nb", body: "{{message}}" },
   ]) {
     expect((await tpl(request, baseURL!, f.slug, bad)).status()).toBe(400);
@@ -198,4 +202,11 @@ test("the owner edits a template on the settings page and sees the preview", asy
 
   await page.getByRole("button", { name: "Back to default" }).click();
   await expect(page.getByLabel("Email subject")).toHaveValue("{{gymName}}: Payment received");
+});
+
+test("the message types in code are exactly the database enum, and every emailable one has default wording", async () => {
+  expect([...MESSAGE_TYPES].sort()).toEqual(Object.values(MessageType).sort());
+  expect(Object.keys(DEFAULT_EMAIL_TEMPLATES).sort()).toEqual(Object.keys(EMAIL_MESSAGE_TYPES).sort());
+  // The database itself refuses a type that isn't in the enum.
+  await expect(prisma.$executeRawUnsafe(`INSERT INTO "EmailTemplate" (id, type, subject, body, "updatedAt") VALUES ('x', 'bogus', 's', 'b', now())`)).rejects.toThrow();
 });

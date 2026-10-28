@@ -7,9 +7,9 @@ test("gym messages send from the platform account and are logged SENT", async ()
   const gym = await prisma.gym.findUniqueOrThrow({ where: { slug: "test-gym-a" } });
   const member = await prisma.member.findFirstOrThrow({ where: { gymId: gym.id } });
 
-  const result = await sendGymWhatsapp(gym.id, { to: "081200004444", message: "hi", type: "e2e_platform_send", memberId: member.id });
+  const result = await sendGymWhatsapp(gym.id, { to: "081200004444", message: "hi", type: "manual_reminder", memberId: member.id });
   expect(result.ok).toBe(true);
-  const log = await prisma.notificationLog.findFirstOrThrow({ where: { gymId: gym.id, type: "e2e_platform_send" } });
+  const log = await prisma.notificationLog.findFirstOrThrow({ where: { gymId: gym.id, type: "manual_reminder" }, orderBy: { sentAt: "desc" } });
   expect(log.status).toBe("SENT");
 });
 
@@ -25,14 +25,14 @@ test("a gym over its plan's monthly WhatsApp allowance is not sent to, and logge
     data: { gymId: gym.id, planId: memberPlan.id, fullName: "Tiny Member", email: `tiny-${Date.now()}@test.local`, phoneWhatsapp: "x", phoneWhatsappLookup: `tiny-${Date.now()}` },
   });
 
-  const send = () => sendGymWhatsapp(gym.id, { to: "081200005555", message: "hi", type: "e2e_limit", memberId: member.id });
+  const send = () => sendGymWhatsapp(gym.id, { to: "081200005555", message: "hi", type: "manual_reminder", memberId: member.id });
   expect((await send()).ok).toBe(true);
   expect((await send()).ok).toBe(true);
   const third = await send();
   expect(third.ok).toBe(false);
   expect(third.skipped).toBe(true);
 
-  const statuses = (await prisma.notificationLog.findMany({ where: { gymId: gym.id, type: "e2e_limit" }, orderBy: { sentAt: "asc" } })).map((n) => n.status);
+  const statuses = (await prisma.notificationLog.findMany({ where: { gymId: gym.id, type: "manual_reminder" }, orderBy: { sentAt: "asc" } })).map((n) => n.status);
   expect(statuses).toEqual(["SENT", "SENT", "LIMIT"]);
 });
 

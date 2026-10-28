@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireTenantSession, SessionError } from "@/lib/session";
+import type { MessageType } from "@prisma/client";
 import { emailTemplateSchema } from "@/lib/validation/tenant";
-import { isEmailMessageType, templateError } from "@/lib/emailTemplates";
+import { isEmailMessageType } from "@/config/email";
+import { templateError } from "@/lib/emailTemplates";
 
 /** The owner writes (or resets) one of their gym's email templates. Staff can't. */
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   await db.emailTemplate.upsert({
     where: { gymId_type: { gymId: gym.id, type: input.type } },
-    create: { gymId: gym.id, type: input.type, subject: input.subject, body: input.body },
+    create: { gymId: gym.id, type: input.type as MessageType, subject: input.subject, body: input.body },
     update: { subject: input.subject, body: input.body },
   });
   return NextResponse.json({ ok: true });

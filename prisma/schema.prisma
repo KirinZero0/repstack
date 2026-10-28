@@ -612,11 +612,31 @@ model EmailTemplate {
   id        String   @id @default(uuid())
   gymId     String?
   gym       Gym?     @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  type      String
+  type      MessageType
   subject   String
   body      String
   updatedAt DateTime @updatedAt
 
   @@unique([gymId, type])
   @@index([type])
+}
+
+// Every kind of message sent to a member or guest. Mirrors MESSAGE_TYPES in src/config/email.ts (a test
+// keeps them identical). `default` is the "everything else" template slot, not a message.
+enum MessageType {
+  default
+  member_activation
+  member_welcome
+  renewal_confirmed
+  payment_receipt
+  expiry_reminder
+  expired_notice
+  manual_reminder
+  password_reset
+  qr_fallback
+  class_confirmation
+  class_reminder
+  class_cancelled
+  guest_ticket
+  guest_rejected
 }

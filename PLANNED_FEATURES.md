@@ -306,6 +306,10 @@ Real-camera scanning was the least-tested part of the app, so it was hardened.
   the gym's template for the type, the gym's "everything else", the platform's template for the type, the
   platform's "everything else", then the wording built into the app. One platform row per type is enforced by
   a partial unique index. Deleting a gym deletes its templates.
+- **Message types are an enum**: the 14 kinds of message the system sends (plus `default`, the "everything else" slot) are the
+  `MessageType` enum in the database (`EmailTemplate.type`) and `MESSAGE_TYPES` in code, kept identical by a test;
+  WhatsApp and email sends are typed with it, so a made-up type won't compile. `guest_ticket` and `guest_rejected` are
+  WhatsApp-only (guests have no email), so they have no template.
 - **Config-driven** (`src/config/email.ts`): message types, placeholders (`{{gymName}}`, `{{memberName}}`,
   `{{gymAddress}}`, `{{message}}`) and the built-in wording are data. Adding a message type is one line.
 - **Editing**: owners edit in Settings, "Email templates" (`POST /api/[slug]/email-templates`, owner only), with
