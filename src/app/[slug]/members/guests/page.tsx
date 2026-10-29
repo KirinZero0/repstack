@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
-import { decrypt, maskPhone } from "@/lib/crypto";
-import { passTitle, passWhen, ticketTokenFor, ticketUrl } from "@/lib/guestPass";
+import { decrypt, maskEmail, maskPhone } from "@/lib/crypto";
+import { passIsCancelled, passTitle, passWhen, passWindow, ticketTokenFor, ticketUrl } from "@/lib/guestPass";
 import GymNav from "@/components/GymNav";
 import GuestPassList, { type GuestPassRow } from "./GuestPassList";
 
@@ -34,12 +34,15 @@ export default async function GuestPassesPage({ params }: { params: { slug: stri
     id: p.id,
     fullName: p.fullName,
     phone: maskPhone(decrypt(p.phoneWhatsapp)),
+    email: p.email ? maskEmail(decrypt(p.email)) : null,
     className: passTitle(p),
     when: passWhen(p, gym.timezone),
     amount: p.amount === null ? 0 : Number(p.amount),
     hasProof: Boolean(p.proofImageUrl),
     status: p.status,
     ticketLink: p.status === "APPROVED" ? ticketUrl(ticketTokenFor(p)) : null,
+    // A lost ticket can be sent again only while it still gets the guest in.
+    canResend: p.status === "APPROVED" && !passIsCancelled(p) && passWindow(p, gym.timezone) !== "OVER",
   }));
 
   return (

@@ -7,13 +7,15 @@ import { deleteBlob } from "@/lib/blob";
 import { guestPassActionSchema } from "@/lib/validation/tenant";
 import { countSeatsTaken, effectiveCapacity } from "@/lib/classes";
 import { dayPassExpiry, passIsCancelled, passWindow, sendGuestRejection, sendGuestTicket } from "@/lib/guestPass";
+import { channelProblem } from "@/lib/notify";
 
 class FullError extends Error {}
 class StateError extends Error {}
 
 /**
  * Owner or staff decides on a guest's request (class spot or day pass). Approve → seat held, one-time ticket link sent over
- * WhatsApp. Reject → guest told. Resend → same ticket link again (approved, not yet used).
+ * WhatsApp and by email (if the guest left one). Reject → guest told. Resend → same ticket link again, on the channel
+ * staff picked, while the ticket can still be used (approved, not used, not expired or cancelled).
  */
 export async function POST(req: NextRequest, { params }: { params: { slug: string; passId: string } }) {
   let session, gym, db;
@@ -29,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const parsed = guestPassActionSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-  const { action } = parsed.data;
+  const { action, channel } = parsed.data;
 
   // Tenant isolation: the pass must belong to the session's gym.
   const pass = await db.guestPass.findUnique({ where: { id: params.passId }, include: { session: { include: { class: true } }, dayPassPlan: true } });
@@ -52,7 +54,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   if (action === "resend") {
     if (pass.status !== "APPROVED") return NextResponse.json({ error: "Only an approved, unused ticket can be re-sent." }, { status: 409 });
-    await sendGuestTicket(pass.id);
+    if (passIsCancelled(pass) || passWindow(pass, gym.timezone) === "OVER") {
+      return NextResponse.json({ error: pass.session ? "That session is cancelled or over, so the ticket can't be used." : "This day pass has expired, so the ticket can't be used." }, { status: 409 });
+    }
+    if (channel === "email" && !pass.email) return NextResponse.json({ error: "This guest didn't leave an email. Send it on WhatsApp instead." }, { status: 409 });
+    const result = await sendGuestTicket(pass.id, channel ?? "whatsapp");
+    const problem = channelProblem(result, channel ?? "whatsapp");
+    if (problem) return NextResponse.json({ error: problem }, { status: 409 });
     return NextResponse.json({ ok: true });
   }
 

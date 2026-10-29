@@ -38,6 +38,8 @@ const SAMPLE_MESSAGES: Record<EmailMessageType | SystemEmailType, string> = {
   staff_invite: `Hi ${memberName}, you've been added to ${gymName} on Liftmora. Set your password here: ${app}/reset/5c2e9a7d1b8f46039e1a (valid 7 days)`,
   staff_password_reset: `Hi ${memberName}, use this link to set a new password for ${gymName}: ${app}/reset/a91d3e6f0c7b42158d2e (valid 1 hour). If you didn't ask for this, ignore it.`,
   class_cancelled: `Hi ${memberName}, Morning Yoga at ${gymName} on Sat, 31 Oct, 07:00 has been cancelled. Sorry for the inconvenience.`,
+  guest_ticket: `Hi ${memberName}, you're approved for Day pass (Daily Pass) at ${gymName}, valid until Kamis, 26 November. Show this one-time QR ticket at the front desk: ${app}/ticket/ticket.eyJneW1JZCI6IjEifQ.4f2a`,
+  guest_rejected: `Hi ${memberName}, sorry — we couldn't confirm your Day pass (Daily Pass). Please contact the front desk.`,
 };
 
 /** Swaps each image URL (logo, badge) for the file itself so the page works from disk. */

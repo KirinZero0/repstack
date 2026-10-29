@@ -2,11 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import ChannelPicker, { type Channel } from "@/components/ChannelPicker";
 
 export interface GuestPassRow {
   id: string;
   fullName: string;
   phone: string;
+  /** Masked; null when the guest didn't leave one. */
+  email: string | null;
   className: string;
   when: string;
   /** What the guest owes (0 = free). Staff confirm the money arrived before approving. */
@@ -14,6 +17,8 @@ export interface GuestPassRow {
   hasProof: boolean;
   status: "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "ATTENDED" | "VOIDED";
   ticketLink: string | null;
+  /** Approved and still usable (not expired, class not cancelled or over), so a lost ticket can be sent again. */
+  canResend: boolean;
 }
 
 const LABEL: Record<GuestPassRow["status"], string> = {
@@ -44,7 +49,7 @@ export default function GuestPassList({ slug, rows, isOwner }: { slug: string; r
     router.refresh();
   }
 
-  async function act(id: string, action: "approve" | "reject" | "resend" | "void") {
+  async function act(id: string, action: "approve" | "reject" | "resend" | "void", channel?: Channel) {
     if (action === "void" && !window.confirm("Void this ticket? The QR stops working and the payment no longer counts as revenue. The record stays.")) return;
     setBusy(id);
     setError(null);
@@ -52,12 +57,12 @@ export default function GuestPassList({ slug, rows, isOwner }: { slug: string; r
     const res = await fetch(`/api/${slug}/guest-passes/${id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify(channel ? { action, channel } : { action }),
     });
     const body = await res.json().catch(() => ({}));
     setBusy(null);
     if (!res.ok) return setError(body.error ?? "Something went wrong.");
-    if (action === "resend") setNote("Ticket link sent again.");
+    if (action === "resend") setNote(`Ticket sent again by ${channel === "email" ? "email" : "WhatsApp"}.`);
     router.refresh();
   }
 
@@ -76,7 +81,7 @@ export default function GuestPassList({ slug, rows, isOwner }: { slug: string; r
         {sorted.map((r) => (
           <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-4" data-testid="guest-row" data-status={r.status}>
             <div>
-              <p className="font-medium">{r.fullName} <span className="text-sm text-neutral-500">{r.phone}</span></p>
+              <p className="font-medium">{r.fullName} <span className="text-sm text-neutral-500">{r.phone}{r.email ? ` · ${r.email}` : ""}</span></p>
               <p className="text-sm text-neutral-400">{r.className} · {r.when}{r.amount > 0 ? ` · Rp ${r.amount.toLocaleString("id-ID")}` : " · free"}</p>
               {r.amount > 0 && r.status === "PENDING_REVIEW" && (
                 <p className="text-sm text-neutral-500">
@@ -91,7 +96,7 @@ export default function GuestPassList({ slug, rows, isOwner }: { slug: string; r
               )}
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-neutral-400">{LABEL[r.status]}</span>
+              {!(r.status === "APPROVED" && !r.canResend) && <span className="text-sm text-neutral-400">{LABEL[r.status]}</span>}
               {r.status === "PENDING_REVIEW" && (
                 <>
                   <button className={btn} disabled={busy === r.id} onClick={() => act(r.id, "approve")}>{r.amount > 0 ? "Payment received — approve" : "Approve"}</button>
@@ -104,9 +109,14 @@ export default function GuestPassList({ slug, rows, isOwner }: { slug: string; r
               {(r.status === "PENDING_REVIEW" || r.status === "REJECTED" || ((r.status === "APPROVED" || r.status === "ATTENDED") && r.amount === 0)) && (
                 <button className={`${btn} hover:border-red-800 hover:text-red-400`} disabled={busy === r.id} onClick={() => remove(r)}>Delete</button>
               )}
-              {r.status === "APPROVED" && (
+              {r.status === "APPROVED" && !r.canResend && <span className="text-sm text-amber-400">Expired</span>}
+              {r.canResend && (
                 <>
-                  <button className={btn} disabled={busy === r.id} onClick={() => act(r.id, "resend")}>Resend</button>
+                  {r.email ? (
+                    <ChannelPicker label="Resend ticket" className={btn} busy={busy === r.id} onPick={(c) => act(r.id, "resend", c)} />
+                  ) : (
+                    <button className={btn} disabled={busy === r.id} onClick={() => act(r.id, "resend", "whatsapp")}>Resend on WhatsApp</button>
+                  )}
                   {r.ticketLink && (
                     <button className={btn} onClick={() => navigator.clipboard?.writeText(r.ticketLink!).then(() => setNote("Ticket link copied."))}>Copy link</button>
                   )}

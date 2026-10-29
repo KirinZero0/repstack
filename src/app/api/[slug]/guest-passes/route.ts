@@ -34,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const v = form.get(k);
       return typeof v === "string" && v !== "" ? v : undefined;
     };
-    raw = { sessionId: field("sessionId"), dayPassPlanId: field("dayPassPlanId"), fullName: field("fullName"), phone: field("phone") };
+    raw = { sessionId: field("sessionId"), dayPassPlanId: field("dayPassPlanId"), fullName: field("fullName"), phone: field("phone"), email: field("email") };
     const f = form.get("proof");
     const bad = proofFileError(f);
     if (bad) return bad;
@@ -105,6 +105,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       fullName: d.fullName,
       phoneWhatsapp: encrypt(d.phone),
       phoneWhatsappLookup: lookup,
+      email: d.email ? encrypt(d.email) : null,
       ipHash,
       proofImageUrl,
       proofSubmittedAt: proofImageUrl ? new Date() : null,

@@ -94,8 +94,6 @@ test("the owner saves, edits and resets a gym's templates, stored against that g
     { type: "member_activation", subject: "x", body: "no message" },
     { type: "member_activation", subject: "{{bogus}}", body: "{{message}}" },
     { type: "not_a_type", subject: "x", body: "{{message}}" },
-    // Guests have no email, so their WhatsApp-only messages have no email template.
-    { type: "guest_ticket", subject: "x", body: "{{message}}" },
     { type: "member_activation", subject: "a\nb", body: "{{message}}" },
   ]) {
     expect((await tpl(request, baseURL!, f.slug, bad)).status()).toBe(400);
@@ -213,8 +211,8 @@ test("the message types in code are exactly the database enum, and every emailab
   expect(Object.keys(DEFAULT_EMAIL_TEMPLATES).sort()).toEqual(Object.keys(EMAIL_MESSAGE_TYPES).sort());
   expect(Object.keys(DEFAULT_SYSTEM_EMAIL_TEMPLATES).sort()).toEqual(Object.keys(SYSTEM_EMAIL_TYPES).sort());
   expect(Object.keys(SYSTEM_EMAIL_DESIGN).sort()).toEqual(Object.keys(SYSTEM_EMAIL_TYPES).sort());
-  // Every message type is either a member email (or the default slot), a system email, or WhatsApp-only.
-  const known = new Set<string>([...Object.keys(EMAIL_MESSAGE_TYPES), ...Object.keys(SYSTEM_EMAIL_TYPES), "guest_ticket", "guest_rejected"]);
+  // Every message type is either a gym email (or the default slot) or a system email.
+  const known = new Set<string>([...Object.keys(EMAIL_MESSAGE_TYPES), ...Object.keys(SYSTEM_EMAIL_TYPES)]);
   expect([...MESSAGE_TYPES].filter((t) => !known.has(t))).toEqual([]);
   // The database itself refuses a type that isn't in the enum.
   await expect(prisma.$executeRawUnsafe(`INSERT INTO "EmailTemplate" (id, type, subject, body, "updatedAt") VALUES ('x', 'bogus', 's', 'b', now())`)).rejects.toThrow();

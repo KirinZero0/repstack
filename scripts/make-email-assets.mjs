@@ -37,11 +37,15 @@ const GLYPHS = {
   staff_invite: `<circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5M19 8v6M16 11h6"/>`,
   staff_password_reset: `<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/><path d="M12 15v2"/>`,
   class_cancelled: `<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/><path d="M10 14l4 4M14 14l-4 4"/>`,
+  guest_ticket: `<path d="M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z"/><path d="M15 7v10" stroke-dasharray="2 2"/><path d="M7 12l1.5 1.5L11 11"/>`,
+  guest_rejected: `<path d="M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z"/><path d="M15 7v10" stroke-dasharray="2 2"/><path d="M7.5 10.5l3 3M10.5 10.5l-3 3"/>`,
 };
 
 mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
-for (const [type, glyph] of Object.entries(GLYPHS)) {
+// `node scripts/make-email-assets.mjs guest_ticket guest_rejected` redraws only those; no arguments redraws all.
+const only = process.argv.slice(2);
+for (const [type, glyph] of Object.entries(GLYPHS).filter(([t]) => only.length === 0 || only.includes(t))) {
   const page = await browser.newPage({ viewport: { width: SIZE, height: SIZE } });
   await page.setContent(
     `<body style="margin:0;background:transparent"><svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 112 112">

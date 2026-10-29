@@ -1,8 +1,7 @@
 import { prisma } from "./prisma";
 import { decrypt } from "./crypto";
 import { buildTicketToken } from "./qr";
-import { notificationChannels } from "./notify";
-import { sendGymWhatsapp } from "./whatsapp";
+import { notifyGuest, type Channel, type NotifyResult } from "./notify";
 import { whenLabel } from "./classes";
 import { dayKeyInTimezone } from "./date";
 
@@ -82,23 +81,30 @@ export function passIsCancelled(pass: PassTarget): boolean {
 
 const PASS_INCLUDE = { gym: true, session: { include: { class: true } }, dayPassPlan: true } as const;
 
+/** Who to reach for a pass: the guest's WhatsApp number and, if they left one, their email. */
+function guestContact(pass: { fullName: string; phoneWhatsapp: string; email: string | null }) {
+  return { name: pass.fullName, phone: decrypt(pass.phoneWhatsapp), email: pass.email ? decrypt(pass.email) : null };
+}
+
 /**
- * WhatsApps the guest their ticket link. Runs as the system client, so callers must already have
- * checked the pass belongs to the gym. Honours the gym's WhatsApp switch. Never throws.
+ * Sends the guest their ticket link: over WhatsApp and by email (if they left one), or on just `channel` when
+ * staff resend it. Runs as the system client, so callers must already have checked the pass belongs to the
+ * gym. Honours the gym's channel switches. Never throws.
  */
-export async function sendGuestTicket(passId: string): Promise<void> {
+export async function sendGuestTicket(passId: string, channel?: Channel): Promise<NotifyResult> {
   try {
     const pass = await prisma.guestPass.findUnique({ where: { id: passId }, include: PASS_INCLUDE });
-    if (!pass || pass.status !== "APPROVED") return;
+    if (!pass || pass.status !== "APPROVED") return {};
     const { gym } = pass;
-    if (!notificationChannels(gym.settings).whatsapp) return;
-    await sendGymWhatsapp(pass.gymId, {
-      to: decrypt(pass.phoneWhatsapp),
+    return await notifyGuest(pass.gymId, {
+      ...guestContact(pass),
+      channel,
       message: `Hi ${pass.fullName}, you're approved for ${passTitle(pass)} at ${gym.name}${pass.session || pass.visitDate ? ` on ${passWhen(pass, gym.timezone)}` : `, ${passWhen(pass, gym.timezone)}`}. Show this one-time QR ticket at the front desk: ${ticketUrl(ticketTokenFor(pass))}`,
       type: "guest_ticket",
     });
   } catch (err) {
     console.error("Guest ticket message failed", err);
+    return channel ? { [channel]: "FAILED" } : {};
   }
 }
 
@@ -108,9 +114,8 @@ export async function sendGuestRejection(passId: string): Promise<void> {
     const pass = await prisma.guestPass.findUnique({ where: { id: passId }, include: PASS_INCLUDE });
     if (!pass || pass.status !== "REJECTED") return;
     const { gym } = pass;
-    if (!notificationChannels(gym.settings).whatsapp) return;
-    await sendGymWhatsapp(pass.gymId, {
-      to: decrypt(pass.phoneWhatsapp),
+    await notifyGuest(pass.gymId, {
+      ...guestContact(pass),
       message: `Hi ${pass.fullName}, sorry — we couldn't confirm your ${passTitle(pass)}${pass.session || pass.visitDate ? ` on ${passWhen(pass, gym.timezone)}` : ""}. Please contact the front desk.`,
       type: "guest_rejected",
     });

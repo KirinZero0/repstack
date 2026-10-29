@@ -253,6 +253,7 @@ export const guestPassRequestSchema = z
     dayPassPlanId: z.string().uuid().optional(),
     fullName: z.string().trim().min(2, "Enter your name").max(80),
     phone: z.string().trim().min(6, "Enter a valid WhatsApp number").max(30),
+    email: z.string().trim().toLowerCase().email("Enter a valid email or leave it blank").max(120).optional(),
   })
   .refine((v) => Boolean(v.sessionId) !== Boolean(v.dayPassPlanId), "Pick a class or a day pass");
 
@@ -271,7 +272,11 @@ export const createDayPassPlanSchema = z.object({
 export const updateDayPassPlanSchema = z.object(dayPassPlanFields).partial().refine((v) => Object.keys(v).length > 0, "Nothing to update");
 
 /** Staff decides on a request, or re-sends an approved guest's ticket link. */
-export const guestPassActionSchema = z.object({ action: z.enum(["approve", "reject", "resend", "void"]) });
+export const guestPassActionSchema = z.object({
+  action: z.enum(["approve", "reject", "resend", "void"]),
+  /** Resend only: the one channel staff picked. */
+  channel: z.enum(["whatsapp", "email"]).optional(),
+});
 
 /** Front desk logs a walk-in who pays for a day pass on the spot. Phone is optional; amount defaults to the plan price. */
 export const walkInSchema = z.object({

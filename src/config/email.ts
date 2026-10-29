@@ -55,9 +55,6 @@ export type MessageType = (typeof MESSAGE_TYPES)[number];
 /** A message that is actually sent (not the `default` template slot). */
 export type NotificationType = Exclude<MessageType, "default">;
 
-/** Guests give a WhatsApp number but no email, so these two are WhatsApp-only. */
-const WHATSAPP_ONLY: readonly MessageType[] = ["guest_ticket", "guest_rejected"];
-
 /**
  * Liftmora's own emails, sent to a gym's owner or staff (signing up, billing, access). They belong to the
  * platform: a gym can't rewrite them. The wording is here, and a platform template row (no gym) overrides it.
@@ -92,12 +89,14 @@ export const EMAIL_MESSAGE_TYPES = {
   class_confirmation: "Class booking",
   class_reminder: "Class reminder",
   class_cancelled: "Class cancelled",
+  guest_ticket: "Guest ticket (class or day pass)",
+  guest_rejected: "Guest request declined",
 } as const satisfies Partial<Record<MessageType, string>>;
 
 export type EmailMessageType = keyof typeof EMAIL_MESSAGE_TYPES;
 
 export function isEmailMessageType(type: string): type is EmailMessageType {
-  return type in EMAIL_MESSAGE_TYPES && !WHATSAPP_ONLY.includes(type as MessageType);
+  return type in EMAIL_MESSAGE_TYPES;
 }
 
 export const EMAIL_LIMITS = { subject: 150, body: 5000 } as const;
@@ -120,6 +119,8 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailMessageType, EmailTemplate> = 
   class_reminder: { subject: "{{gymName}}: Your class is tomorrow", body: "{{message}}" },
   class_cancelled: { subject: "{{gymName}}: A class was cancelled", body: "{{message}}" },
   renewal_confirmed: { subject: "{{gymName}}: Membership renewed", body: "{{message}}" },
+  guest_ticket: { subject: "{{gymName}}: Your ticket", body: "{{message}}" },
+  guest_rejected: { subject: "{{gymName}}: About your request", body: "{{message}}" },
 };
 
 /** How the HTML version of each email looks: Liftmora's black and plate yellow, dark all the way through. */
@@ -155,6 +156,8 @@ export const EMAIL_DESIGN: Record<EmailMessageType, { heading: string; cta?: str
   class_confirmation: { heading: "You're booked" },
   class_reminder: { heading: "Your class is coming up" },
   class_cancelled: { heading: "A class was cancelled" },
+  guest_ticket: { heading: "You're approved", cta: "Show my ticket" },
+  guest_rejected: { heading: "We couldn't confirm your request" },
 };
 
 /** Default wording for the system emails. */

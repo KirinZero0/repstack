@@ -428,3 +428,68 @@ test("flexible day pass: valid until it expires, never-expiring plans work, and 
   const live = await mk(def.planId, { status: "APPROVED", expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) });
   expect((await (await request.post(`${baseURL}/api/checkin`, { data: { token: ticketTokenFor(live) } })).json()).result).toBe("SUCCESS");
 });
+
+test("a guest who leaves an email gets the ticket and a decline by email too, stored encrypted", async ({ request, baseURL, playwright }) => {
+  const f = await makeGym();
+  const anon = await newVisitor(playwright);
+  const ask = (name: string, email?: string) =>
+    anon.post(`${baseURL}/api/${f.slug}/guest-passes`, { data: { sessionId: f.session.id, fullName: name, phone: phoneN(), ...(email !== undefined ? { email } : {}) } });
+
+  expect((await ask("Bad Email", "not-an-email")).status()).toBe(400);
+  expect((await ask("Emma", "Emma@Guest.test")).status()).toBe(201);
+  expect((await ask("Noel")).status()).toBe(201);
+  const emma = await prisma.guestPass.findFirstOrThrow({ where: { gymId: f.gym.id, fullName: "Emma" } });
+  const noel = await prisma.guestPass.findFirstOrThrow({ where: { gymId: f.gym.id, fullName: "Noel" } });
+  expect(emma.email?.startsWith("v1:")).toBeTruthy();
+  expect(noel.email).toBeNull();
+
+  await login(request, baseURL!, f.slug, f.staff);
+  const log = (passType: string, channel: string) => prisma.notificationLog.count({ where: { gymId: f.gym.id, type: passType, channel, memberId: null } });
+  expect((await request.post(`${baseURL}/api/${f.slug}/guest-passes/${emma.id}`, { data: { action: "approve" } })).ok()).toBeTruthy();
+  expect((await request.post(`${baseURL}/api/${f.slug}/guest-passes/${noel.id}`, { data: { action: "reject" } })).ok()).toBeTruthy();
+  // Emma: WhatsApp and email. Noel left no email: WhatsApp only.
+  expect(await log("guest_ticket", "whatsapp")).toBe(1);
+  expect(await log("guest_ticket", "email")).toBe(1);
+  expect(await log("guest_rejected", "whatsapp")).toBe(1);
+  expect(await log("guest_rejected", "email")).toBe(0);
+});
+
+test("staff resend a lost ticket on the channel they pick, only while it can still be used", async ({ request, baseURL }) => {
+  const f = await makeGym();
+  const plan = await prisma.dayPassPlan.create({ data: { gymId: f.gym.id, name: "Daily", price: 0, validityDays: 30 } });
+  const mk = (over: object) =>
+    prisma.guestPass.create({ data: { gymId: f.gym.id, dayPassPlanId: plan.id, fullName: "Lost", phoneWhatsapp: encrypt("081200000001"), phoneWhatsappLookup: `l-${seq++}`, status: "APPROVED", ...over } });
+  const withEmail = await mk({ email: encrypt("lost@guest.test"), expiresAt: new Date(Date.now() + 24 * HOUR) });
+  const noEmail = await mk({ expiresAt: new Date(Date.now() + 24 * HOUR) });
+  const expired = await mk({ email: encrypt("old@guest.test"), expiresAt: new Date(Date.now() - 60 * 1000) });
+  const used = await mk({ status: "ATTENDED", expiresAt: new Date(Date.now() + 24 * HOUR) });
+
+  await login(request, baseURL!, f.slug, f.staff);
+  const resend = (id: string, channel?: string) => request.post(`${baseURL}/api/${f.slug}/guest-passes/${id}`, { data: { action: "resend", ...(channel ? { channel } : {}) } });
+  const count = (channel: string) => prisma.notificationLog.count({ where: { gymId: f.gym.id, type: "guest_ticket", channel } });
+
+  expect((await resend(withEmail.id, "email")).ok()).toBeTruthy();
+  expect(await count("email")).toBe(1);
+  expect(await count("whatsapp")).toBe(0);
+  expect((await resend(withEmail.id, "whatsapp")).ok()).toBeTruthy();
+  expect(await count("whatsapp")).toBe(1);
+
+  // No email on file: email is refused with a clear reason, WhatsApp works.
+  const r = await resend(noEmail.id, "email");
+  expect(r.status()).toBe(409);
+  expect((await r.json()).error).toContain("didn't leave an email");
+  expect((await resend(noEmail.id)).ok()).toBeTruthy();
+
+  // An expired or already used ticket isn't sent again.
+  const e = await resend(expired.id, "email");
+  expect(e.status()).toBe(409);
+  expect((await e.json()).error).toContain("expired");
+  expect((await resend(used.id, "whatsapp")).status()).toBe(409);
+  expect(await count("email")).toBe(1);
+
+  // The list offers the picker only for a usable ticket, and labels the expired one.
+  const html = await (await request.get(`${baseURL}/${f.slug}/members/guests`)).text();
+  expect(html).toContain("Resend ticket");
+  expect(html).toContain("Resend on WhatsApp");
+  expect(html).toContain("Expired");
+});

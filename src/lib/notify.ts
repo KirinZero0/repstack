@@ -40,14 +40,12 @@ export function notificationChannels(settings: unknown): { whatsapp: boolean; em
   return { whatsapp: s.notifyWhatsapp !== false, email: s.notifyEmail !== false };
 }
 
-async function emailMember(
+/** Emails one person on the gym's behalf using the gym's templates, and logs the attempt. */
+async function emailOne(
   gymId: string,
   gym: { name: string; address: string | null; settings: unknown },
-  opts: { message: string; type: NotificationType; memberId: string },
+  opts: { to: string; name: string; message: string; type: NotificationType; memberId?: string },
 ): Promise<ChannelStatus> {
-  const member = await prisma.member.findUnique({ where: { id: opts.memberId }, select: { email: true, fullName: true, anonymizedAt: true } });
-  if (!member || member.anonymizedAt) return "SKIPPED";
-
   let status: "SENT" | "FAILED" | "SKIPPED";
   if (!emailConfigured()) {
     status = "SKIPPED";
@@ -55,13 +53,13 @@ async function emailMember(
     const rows = await prisma.emailTemplate.findMany({ where: { OR: [{ gymId }, { gymId: null }] } });
     const { subject, text, html } = renderEmail(rows, gymId, opts.type, {
       gymName: gym.name,
-      memberName: member.fullName,
+      memberName: opts.name,
       gymAddress: gym.address ?? "",
       message: opts.message,
     });
     const replyTo = (gym.settings as { emailReplyTo?: unknown } | null)?.emailReplyTo;
     const result = await sendEmail({
-      to: member.email,
+      to: opts.to,
       subject,
       text,
       html,
@@ -70,9 +68,19 @@ async function emailMember(
     status = result.ok ? "SENT" : "FAILED";
   }
   await prisma.notificationLog.create({
-    data: { gymId, memberId: opts.memberId, type: opts.type, channel: "email", status },
+    data: { gymId, memberId: opts.memberId ?? null, type: opts.type, channel: "email", status },
   });
   return status;
+}
+
+async function emailMember(
+  gymId: string,
+  gym: { name: string; address: string | null; settings: unknown },
+  opts: { message: string; type: NotificationType; memberId: string },
+): Promise<ChannelStatus> {
+  const member = await prisma.member.findUnique({ where: { id: opts.memberId }, select: { email: true, fullName: true, anonymizedAt: true } });
+  if (!member || member.anonymizedAt) return "SKIPPED";
+  return emailOne(gymId, gym, { ...opts, to: member.email, name: member.fullName });
 }
 
 /**
@@ -108,6 +116,41 @@ export async function notifyMember(
   ]);
   // A WhatsApp the person asked for but the gym has switched off is reported, not silently dropped.
   if (manual && opts.channel === "whatsapp" && !allowed.whatsapp) result.whatsapp = "SKIPPED";
+  return result;
+}
+
+/**
+ * Tells a guest (class ticket or day pass) something. Guests aren't members: the WhatsApp number and the
+ * optional email come from their request. Without `channel` (approve or decline) it goes over WhatsApp, which
+ * is what the guest signed up with, if the gym allows it, and also by email when they left one and the gym
+ * has email on. With `channel` (staff resending a ticket) it goes on that one only. Logged per channel with
+ * no member.
+ */
+export async function notifyGuest(
+  gymId: string,
+  opts: { phone: string; email: string | null; name: string; message: string; type: NotificationType; channel?: Channel },
+): Promise<NotifyResult> {
+  const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, address: true, settings: true } });
+  if (!gym) return {};
+  const allowed = notificationChannels(gym.settings);
+  const wantWhatsapp = Boolean(opts.phone) && (opts.channel ? opts.channel === "whatsapp" : allowed.whatsapp);
+  const wantEmail = Boolean(opts.email) && (opts.channel ? opts.channel === "email" : allowed.email);
+
+  const result: NotifyResult = {};
+  await Promise.all([
+    wantWhatsapp && allowed.whatsapp
+      ? sendGymWhatsapp(gymId, { to: opts.phone, message: opts.message, type: opts.type }).then((r) => {
+          result.whatsapp = r.ok ? "SENT" : r.skipped ? "SKIPPED" : "FAILED";
+        })
+      : undefined,
+    wantEmail
+      ? emailOne(gymId, gym, { to: opts.email!, name: opts.name, message: opts.message, type: opts.type }).then((status) => {
+          result.email = status;
+        })
+      : undefined,
+  ]);
+  // A WhatsApp staff asked for but the gym has switched off is reported, not silently dropped.
+  if (opts.channel === "whatsapp" && !allowed.whatsapp) result.whatsapp = "SKIPPED";
   return result;
 }
 
