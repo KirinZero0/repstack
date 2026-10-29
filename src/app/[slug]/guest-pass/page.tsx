@@ -39,7 +39,7 @@ export default async function GuestPassPage({ params }: { params: { slug: string
         ) : (
           <>
             <p className="mt-3 max-w-md text-neutral-400">
-              Not a member? Ask for a class spot. Once the gym approves, you get a one-time QR ticket on WhatsApp.
+              Not a member? Ask for a class spot. Once the gym approves, you get a one-time QR ticket on WhatsApp and by email.
             </p>
             <div className="mt-10">
               <GuestPassForm

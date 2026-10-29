@@ -36,7 +36,7 @@ export default function DayPassForm({ slug, plans, bank }: { slug: string; plans
       fd.set("dayPassPlanId", dayPassPlanId);
       fd.set("fullName", fullName);
       fd.set("phone", phone);
-      if (email.trim()) fd.set("email", email.trim());
+      fd.set("email", email.trim());
       if (proof && price > 0) fd.set("proof", proof);
       const res = await fetch(`/api/${slug}/guest-passes`, { method: "POST", body: fd });
       const body = await res.json().catch(() => ({}));
@@ -53,7 +53,7 @@ export default function DayPassForm({ slug, plans, bank }: { slug: string; plans
       <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6" data-testid="guest-request-sent">
         <p className="text-lg font-medium">Request sent</p>
         <p className="mt-2 text-neutral-400">
-          The gym will check your payment and approve it. Your one-time QR ticket then arrives on WhatsApp (and by email, if you added one) — show it at the front desk.
+          The gym will check your payment and approve it. Your one-time QR ticket then arrives on WhatsApp and by email — show it at the front desk.
         </p>
       </div>
     );
@@ -84,8 +84,8 @@ export default function DayPassForm({ slug, plans, bank }: { slug: string; plans
         <input required type="tel" minLength={6} maxLength={30} value={phone} onChange={(e) => setPhone(e.target.value)} className={input} placeholder="0812…" />
       </label>
       <label className="block text-sm text-neutral-300">
-        <span className="mb-1 block">Email <span className="text-neutral-500">(optional, we&apos;ll send your ticket there too)</span></span>
-        <input type="email" maxLength={120} value={email} onChange={(e) => setEmail(e.target.value)} className={input} placeholder="you@example.com" />
+        <span className="mb-1 block">Email</span>
+        <input required type="email" maxLength={120} value={email} onChange={(e) => setEmail(e.target.value)} className={input} placeholder="you@example.com" />
       </label>
       <TransferPayment amount={price} bank={bank} onProof={setProof} />
       {error && <p className="text-sm text-red-400" role="alert">{error}</p>}

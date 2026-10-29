@@ -268,7 +268,7 @@ export const guestPassRequestSchema = z
     dayPassPlanId: z.string().uuid().optional(),
     fullName: personName("Enter your name"),
     phone: z.string().trim().min(6, "Enter a valid WhatsApp number").max(30),
-    email: z.string().trim().toLowerCase().email("Enter a valid email or leave it blank").max(120).optional(),
+    email: z.string("Enter your email").trim().toLowerCase().email("Enter a valid email").max(120),
   })
   .refine((v) => Boolean(v.sessionId) !== Boolean(v.dayPassPlanId), "Pick a class or a day pass");
 

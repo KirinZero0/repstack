@@ -31,7 +31,7 @@ export default async function DayPassPage({ params }: { params: { slug: string }
         ) : (
           <>
             <p className="mt-3 max-w-md text-neutral-400">
-              Just visiting? No membership needed. Ask for a day pass; once the gym approves, you get a one-time QR ticket on WhatsApp that you can use any day before it expires.
+              Just visiting? No membership needed. Ask for a day pass; once the gym approves, you get a one-time QR ticket on WhatsApp and by email that you can use any day before it expires.
             </p>
             <div className="mt-10">
               <DayPassForm

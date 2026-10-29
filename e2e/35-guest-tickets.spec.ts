@@ -26,7 +26,7 @@ async function login(request: APIRequestContext, baseURL: string, slug: string, 
 }
 
 async function requestSpot(request: APIRequestContext, baseURL: string, f: { slug: string; session: { id: string } }, phone: string, name = "Guest Gina") {
-  return request.post(`${baseURL}/api/${f.slug}/guest-passes`, { data: { sessionId: f.session.id, fullName: name, phone } });
+  return request.post(`${baseURL}/api/${f.slug}/guest-passes`, { data: { sessionId: f.session.id, fullName: name, phone, email: "guest@guest.test" } });
 }
 
 /** An anonymous visitor with their own IP, so the public form's per-IP rate limit doesn't couple the tests. */
@@ -59,7 +59,7 @@ test("guest requests, staff approves, ticket scans once", async ({ request, base
 
   // Approve → WhatsApp logged, ticket page shows the QR.
   expect((await request.post(`${baseURL}/api/${f.slug}/guest-passes/${pass.id}`, { data: { action: "approve" } })).ok()).toBeTruthy();
-  expect(await prisma.notificationLog.count({ where: { gymId: f.gym.id, type: "guest_ticket", memberId: null } })).toBe(1);
+  expect(await prisma.notificationLog.count({ where: { gymId: f.gym.id, type: "guest_ticket", channel: "whatsapp", memberId: null } })).toBe(1);
   expect((await request.post(`${baseURL}/api/${f.slug}/guest-passes/${pass.id}`, { data: { action: "approve" } })).status()).toBe(409);
   const page = await anon.get(`${baseURL}/ticket/${token}`);
   expect(await page.text()).toContain("ticket-qr");
@@ -125,7 +125,7 @@ test("approval respects capacity, and declining sends no ticket", async ({ reque
   expect(full.status()).toBe(409);
   expect((await request.post(`${baseURL}/api/${f.slug}/guest-passes/${second.id}`, { data: { action: "reject" } })).ok()).toBeTruthy();
   expect((await prisma.guestPass.findUniqueOrThrow({ where: { id: second.id } })).status).toBe("REJECTED");
-  expect(await prisma.notificationLog.count({ where: { gymId: f.gym.id, type: "guest_ticket" } })).toBe(1);
+  expect(await prisma.notificationLog.count({ where: { gymId: f.gym.id, type: "guest_ticket", channel: "whatsapp" } })).toBe(1);
   // A declined guest's ticket never scans.
   const res = await request.post(`${baseURL}/api/checkin`, { data: { token: ticketTokenFor(second) } });
   expect((await res.json()).result).toBe("INVALID");
@@ -172,7 +172,7 @@ test("day pass: owner sets it up, guest requests, staff approves, ticket scans o
   expect(await (await request.get(`${baseURL}/${f.slug}/members/guests`)).text()).toContain("Guest tickets");
   const phone = phoneN();
   // No date to pick: the visitor just asks. The same phone can't have two open requests for one plan.
-  const ask = () => anon.post(`${baseURL}/api/${f.slug}/guest-passes`, { data: { dayPassPlanId: planId, fullName: "Day Dave", phone } });
+  const ask = () => anon.post(`${baseURL}/api/${f.slug}/guest-passes`, { data: { dayPassPlanId: planId, fullName: "Day Dave", phone, email: "dave@guest.test" } });
   expect((await ask()).status()).toBe(201);
   expect((await ask()).status()).toBe(409);
 
@@ -186,7 +186,7 @@ test("day pass: owner sets it up, guest requests, staff approves, ticket scans o
   const validDays = (approved.expiresAt!.getTime() - Date.now()) / (24 * 60 * 60 * 1000);
   expect(validDays).toBeGreaterThan(6.9);
   expect(validDays).toBeLessThanOrEqual(7);
-  expect(await prisma.notificationLog.count({ where: { gymId: f.gym.id, type: "guest_ticket", memberId: null } })).toBe(1);
+  expect(await prisma.notificationLog.count({ where: { gymId: f.gym.id, type: "guest_ticket", channel: "whatsapp", memberId: null } })).toBe(1);
   const ticketPage = await (await anon.get(`${baseURL}/ticket/${token}`)).text();
   expect(ticketPage).toContain("ticket-qr");
   expect(ticketPage).toContain("valid until");
@@ -235,7 +235,7 @@ test("day pass requests are tenant-scoped and validated", async ({ baseURL, play
   const planB = await makeDayPass(b.gym.id);
   const hidden = await prisma.dayPassPlan.create({ data: { gymId: a.gym.id, name: "Hidden", price: 1000, isActive: false } });
   const anon = await newVisitor(playwright);
-  const post = (slug: string, data: object) => anon.post(`${baseURL}/api/${slug}/guest-passes`, { data: { fullName: "Eve", phone: phoneN(), ...data } });
+  const post = (slug: string, data: object) => anon.post(`${baseURL}/api/${slug}/guest-passes`, { data: { fullName: "Eve", phone: phoneN(), email: "eve@guest.test", ...data } });
 
   expect((await post(a.slug, { dayPassPlanId: planB.id })).status()).toBe(400); // another gym's plan
   expect((await post(a.slug, { dayPassPlanId: hidden.id })).status()).toBe(400); // hidden plan
@@ -267,11 +267,11 @@ test("guest pays a day pass by transfer: proof attached, staff verify, approve, 
 
   // A non-image proof is refused; a real one is stored (privately) and the price is snapshotted.
   const bad = await anon.post(`${baseURL}/api/${f.slug}/guest-passes`, {
-    multipart: { dayPassPlanId: plan.id, fullName: "Transfer Tina", phone: phoneN(), proof: { name: "x.txt", mimeType: "text/plain", buffer: Buffer.from("hi") } },
+    multipart: { dayPassPlanId: plan.id, fullName: "Transfer Tina", phone: phoneN(), email: "tina@guest.test", proof: { name: "x.txt", mimeType: "text/plain", buffer: Buffer.from("hi") } },
   });
   expect(bad.status()).toBe(400);
   const ok = await anon.post(`${baseURL}/api/${f.slug}/guest-passes`, {
-    multipart: { dayPassPlanId: plan.id, fullName: "Transfer Tina", phone: phoneN(), proof: proofFile },
+    multipart: { dayPassPlanId: plan.id, fullName: "Transfer Tina", phone: phoneN(), email: "tina@guest.test", proof: proofFile },
   });
   expect(ok.status()).toBe(201);
   const pass = await prisma.guestPass.findFirstOrThrow({ where: { gymId: f.gym.id } });
@@ -312,10 +312,10 @@ test("declined paid request is not revenue; free tickets take no proof; class gu
   const free = await prisma.dayPassPlan.create({ data: { gymId: f.gym.id, name: "Free trial", price: 0 } });
   const anon = await newVisitor(playwright);
 
-  const paid = await anon.post(`${baseURL}/api/${f.slug}/guest-passes`, { multipart: { sessionId: f.session.id, fullName: "Class Carl", phone: phoneN(), proof: proofFile } });
+  const paid = await anon.post(`${baseURL}/api/${f.slug}/guest-passes`, { multipart: { sessionId: f.session.id, fullName: "Class Carl", phone: phoneN(), email: "carl@guest.test", proof: proofFile } });
   expect(paid.status()).toBe(201);
   const freeReq = await anon.post(`${baseURL}/api/${f.slug}/guest-passes`, {
-    multipart: { dayPassPlanId: free.id, fullName: "Free Fred", phone: phoneN(), proof: proofFile },
+    multipart: { dayPassPlanId: free.id, fullName: "Free Fred", phone: phoneN(), email: "fred@guest.test", proof: proofFile },
   });
   expect(freeReq.status()).toBe(201);
   const carl = await prisma.guestPass.findFirstOrThrow({ where: { fullName: "Class Carl", gymId: f.gym.id } });
@@ -429,32 +429,32 @@ test("flexible day pass: valid until it expires, never-expiring plans work, and 
   expect((await (await request.post(`${baseURL}/api/checkin`, { data: { token: ticketTokenFor(live) } })).json()).result).toBe("SUCCESS");
 });
 
-test("a guest who leaves an email gets the ticket and a decline by email too, stored encrypted", async ({ request, baseURL, playwright }) => {
+test("a guest must give an email, and gets the ticket and a decline by email too, stored encrypted", async ({ request, baseURL, playwright }) => {
   const f = await makeGym();
   const anon = await newVisitor(playwright);
   const ask = (name: string, email?: string) =>
     anon.post(`${baseURL}/api/${f.slug}/guest-passes`, { data: { sessionId: f.session.id, fullName: name, phone: phoneN(), ...(email !== undefined ? { email } : {}) } });
 
   expect((await ask("Bad Email", "not-an-email")).status()).toBe(400);
+  expect((await ask("No Email")).status()).toBe(400);
   // A name is only name text: no links, domains or symbols that would ride along in the gym's messages.
-  for (const bad of ["https://evil.test", "Visit evil.com", "win <b>now</b>", "a@b"]) expect((await ask(bad)).status()).toBe(400);
-  expect((await ask("M. Rizki O'Neil-Putra")).status()).toBe(201);
+  for (const bad of ["https://evil.test", "Visit evil.com", "win <b>now</b>", "a@b"]) expect((await ask(bad, "x@guest.test")).status()).toBe(400);
+  expect((await ask("M. Rizki O'Neil-Putra", "rizki@guest.test")).status()).toBe(201);
   expect((await ask("Emma", "Emma@Guest.test")).status()).toBe(201);
-  expect((await ask("Noel")).status()).toBe(201);
+  expect((await ask("Noel", "noel@guest.test")).status()).toBe(201);
   const emma = await prisma.guestPass.findFirstOrThrow({ where: { gymId: f.gym.id, fullName: "Emma" } });
   const noel = await prisma.guestPass.findFirstOrThrow({ where: { gymId: f.gym.id, fullName: "Noel" } });
   expect(emma.email?.startsWith("v1:")).toBeTruthy();
-  expect(noel.email).toBeNull();
 
   await login(request, baseURL!, f.slug, f.staff);
   const log = (passType: string, channel: string) => prisma.notificationLog.count({ where: { gymId: f.gym.id, type: passType, channel, memberId: null } });
   expect((await request.post(`${baseURL}/api/${f.slug}/guest-passes/${emma.id}`, { data: { action: "approve" } })).ok()).toBeTruthy();
   expect((await request.post(`${baseURL}/api/${f.slug}/guest-passes/${noel.id}`, { data: { action: "reject" } })).ok()).toBeTruthy();
-  // Emma: WhatsApp and email. Noel left no email: WhatsApp only.
+  // Both channels for the ticket and for the decline.
   expect(await log("guest_ticket", "whatsapp")).toBe(1);
   expect(await log("guest_ticket", "email")).toBe(1);
   expect(await log("guest_rejected", "whatsapp")).toBe(1);
-  expect(await log("guest_rejected", "email")).toBe(0);
+  expect(await log("guest_rejected", "email")).toBe(1);
 });
 
 test("staff resend a lost ticket on the channel they pick, only while it can still be used", async ({ request, baseURL }) => {
