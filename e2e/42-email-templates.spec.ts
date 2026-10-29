@@ -7,6 +7,9 @@ import { MessageType } from "@prisma/client";
 import { MESSAGE_TYPES, EMAIL_MESSAGE_TYPES, DEFAULT_EMAIL_TEMPLATES, SYSTEM_EMAIL_TYPES, DEFAULT_SYSTEM_EMAIL_TEMPLATES, SYSTEM_EMAIL_DESIGN } from "../src/config/email";
 import { notifyOwner } from "../src/lib/notify";
 
+// Logins are throttled per address across the whole run, so this file uses its own.
+test.use({ extraHTTPHeaders: { "x-forwarded-for": "10.42.7.1" } });
+
 let seq = 0;
 const uniq = (tag: string) => `${tag}-${Date.now()}-${seq++}`;
 
@@ -140,7 +143,7 @@ test("a member email is logged as sent, and staff can't edit templates", async (
   const logs = await prisma.notificationLog.findMany({ where: { gymId: f.gym.id, channel: "email" } });
   expect(logs.map((l) => `${l.type}:${l.status}`)).toContain("member_activation:SENT");
 
-  const staffReq = await playwrightRequest.newContext({ baseURL });
+  const staffReq = await playwrightRequest.newContext({ baseURL, extraHTTPHeaders: { "x-forwarded-for": "10.42.7.2" } });
   await staffReq.post(`${baseURL}/api/${f.slug}/login`, { data: staff });
   expect((await tpl(staffReq, baseURL!, f.slug, { type: "default", subject: "x", body: "{{message}}" })).status()).toBe(403);
 });

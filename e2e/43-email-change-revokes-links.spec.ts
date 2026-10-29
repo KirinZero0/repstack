@@ -5,6 +5,9 @@ import { encrypt, hmacLookup, normalizePhone } from "../src/lib/crypto";
 import { createMagicLink } from "../src/lib/magicLink";
 import { createPasswordReset } from "../src/lib/passwordReset";
 
+// Logins are throttled per address across the whole run, so this file uses its own.
+test.use({ extraHTTPHeaders: { "x-forwarded-for": "10.43.7.1" } });
+
 let seq = 0;
 const uniq = (tag: string) => `${tag}-${Date.now()}-${seq++}`;
 
