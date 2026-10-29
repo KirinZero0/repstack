@@ -88,6 +88,8 @@ export function textToHtml(text: string): string {
 }
 
 const URL_RE = /https?:\/\/[^\s<]+/;
+/** Besides the app itself, the only place an email button may open: Xendit's hosted invoice page. */
+const BUTTON_HOSTS = ["https://checkout.xendit.co/", "https://checkout-staging.xendit.co/"];
 
 function paragraphs(text: string): string {
   return text
@@ -140,7 +142,9 @@ export function htmlEmail(opts: { text: string; type: string; gymName: string; g
   const key: MessageType = system ? (opts.type as MessageType) : isEmailMessageType(opts.type) ? opts.type : "default";
   const design = isSystemEmailType(key) ? SYSTEM_EMAIL_DESIGN[key] : EMAIL_DESIGN[key as EmailMessageType];
   const b = EMAIL_BRAND;
-  const link = design.cta ? opts.text.match(URL_RE)?.[0] : undefined;
+  // The button only ever opens Liftmora or its payment page: text in the message (a name, a note) can't choose where it goes.
+  const trusted = [assetBase() + "/", ...BUTTON_HOSTS];
+  const link = design.cta ? opts.text.match(new RegExp(URL_RE.source, "g"))?.find((u) => trusted.some((t) => u.startsWith(t))) : undefined;
   const button = link
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 28px 0"><tr><td style="border-radius:8px;background:${b.accent}"><a href="${escapeHtml(link)}" style="display:inline-block;padding:15px 30px;font-size:16px;font-weight:bold;color:${b.buttonText};text-decoration:none">${escapeHtml(design.cta!)} &rarr;</a></td></tr></table>`
     : "";

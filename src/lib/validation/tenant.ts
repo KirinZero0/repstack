@@ -10,6 +10,21 @@ export const memberLoginSchema = z.object({
   password: z.string().min(1),
 });
 
+/**
+ * A person's name typed into a public form. It is echoed into WhatsApp and email the gym sends, so it may
+ * only hold name characters: no links, addresses or markup that could turn the gym's message into phishing.
+ * A dot must be followed by a space ("M. Rizki"), so "evil.com" can't pass as a name.
+ */
+// Any script's letters, accents and digits, spaces, dots, apostrophes and hyphens (built with RegExp: the TS target predates the u flag literal).
+const NAME_CHARS = new RegExp("^[\\p{L}\\p{M}\\p{N} .'-]+$", "u");
+const personName = (message: string) =>
+  z
+    .string()
+    .trim()
+    .min(2, message)
+    .max(80)
+    .refine((v) => NAME_CHARS.test(v) && !/\.\S/.test(v), "Use letters only for the name (no links or symbols).");
+
 export const addMemberSchema = z.object({
   fullName: z.string().min(2).max(120),
   email: z.string().email(),
@@ -121,7 +136,7 @@ export const recordPaymentSchema = z.object({
 
 export const joinSchema = z.object({
   planId: z.string().uuid(),
-  fullName: z.string().trim().min(2).max(80),
+  fullName: personName("Enter your name"),
   email: z.string().trim().toLowerCase().email().max(120),
   phone: z.string().trim().min(6).max(30),
   password: z.string().min(8).max(72),
@@ -251,7 +266,7 @@ export const guestPassRequestSchema = z
   .object({
     sessionId: z.string().uuid().optional(),
     dayPassPlanId: z.string().uuid().optional(),
-    fullName: z.string().trim().min(2, "Enter your name").max(80),
+    fullName: personName("Enter your name"),
     phone: z.string().trim().min(6, "Enter a valid WhatsApp number").max(30),
     email: z.string().trim().toLowerCase().email("Enter a valid email or leave it blank").max(120).optional(),
   })

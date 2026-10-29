@@ -436,6 +436,9 @@ test("a guest who leaves an email gets the ticket and a decline by email too, st
     anon.post(`${baseURL}/api/${f.slug}/guest-passes`, { data: { sessionId: f.session.id, fullName: name, phone: phoneN(), ...(email !== undefined ? { email } : {}) } });
 
   expect((await ask("Bad Email", "not-an-email")).status()).toBe(400);
+  // A name is only name text: no links, domains or symbols that would ride along in the gym's messages.
+  for (const bad of ["https://evil.test", "Visit evil.com", "win <b>now</b>", "a@b"]) expect((await ask(bad)).status()).toBe(400);
+  expect((await ask("M. Rizki O'Neil-Putra")).status()).toBe(201);
   expect((await ask("Emma", "Emma@Guest.test")).status()).toBe(201);
   expect((await ask("Noel")).status()).toBe(201);
   const emma = await prisma.guestPass.findFirstOrThrow({ where: { gymId: f.gym.id, fullName: "Emma" } });

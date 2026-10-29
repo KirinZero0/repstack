@@ -259,7 +259,8 @@ test("Mailjet gets a v3.1 JSON post with basic auth, and a per-message error cou
 });
 
 test("the HTML email has the gym header, a heading, a button only where there is a link, and escapes everything", () => {
-  const link = renderEmail([], null, "password_reset", { ...vars, gymName: "Iron <Co> & Sons", message: "Set it here: https://x.test/reset/abc (valid 1 hour)" });
+  const app = process.env.NEXT_PUBLIC_APP_URL!.replace(/\/$/, "");
+  const link = renderEmail([], null, "password_reset", { ...vars, gymName: "Iron <Co> & Sons", message: `Set it here: ${app}/reset/abc (valid 1 hour)` });
   expect(link.html).toContain("<!DOCTYPE html>");
   expect(link.html).toContain("Iron &lt;Co&gt; &amp; Sons");
   expect(link.html).not.toContain("<Co>");
@@ -270,8 +271,14 @@ test("the HTML email has the gym header, a heading, a button only where there is
   expect(link.html).toMatch(/<img src="https?:\/\/[^"]+\/email\/password_reset\.png" width="56"/);
   expect(link.html).toContain(">Liftmora</td>");
   expect(link.html).toContain("Choose a new password &rarr;");
-  // The button goes to the first link, labelled for this kind of message.
-  expect(link.html).toMatch(/<a href="https:\/\/x\.test\/reset\/abc"[^>]*>Choose a new password &rarr;<\/a>/);
+  // The button goes to the app's own link, labelled for this kind of message.
+  expect(link.html).toContain(`<a href="${app}/reset/abc" style="display:inline-block`);
+  expect(link.html).toMatch(/>Choose a new password &rarr;<\/a>/);
+  // A foreign link earlier in the text (say, in a name) never becomes the button; with no own link there is none.
+  const hijack = htmlEmail({ text: `Hi https://evil.test/x, your ticket: ${app}/ticket/t1`, type: "guest_ticket", gymName: "G", gymAddress: "" });
+  expect(hijack).toContain(`<a href="${app}/ticket/t1" style="display:inline-block`);
+  expect(hijack).not.toContain('<a href="https://evil.test/x" style="display:inline-block');
+  expect(htmlEmail({ text: "Pay at https://evil.test/pay", type: "member_activation", gymName: "G", gymAddress: "" })).not.toContain("Set your password &rarr;");
 
   // A receipt has no link, so no button; a type with a button label but no link in the text gets none either.
   expect(renderEmail([], null, "payment_receipt", vars).html).not.toContain("<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:8px");
@@ -290,7 +297,7 @@ test("system emails use the platform's wording, never a gym's, and a platform ro
   expect(resolveTemplate(rows, "g1", "gym_welcome").subject).toBe("Welcome to Liftmora, {{gymName}} is ready");
   expect(resolveTemplate([...rows, { gymId: null, type: "gym_welcome", subject: "Platform {{gymName}}", body: "{{message}}" }], "g1", "gym_welcome").subject).toBe("Platform {{gymName}}");
 
-  const out = renderEmail([], null, "subscription_due", { ...vars, message: "Pay here: https://x.test/pay/1" });
+  const out = renderEmail([], null, "subscription_due", { ...vars, message: "Pay here: https://checkout.xendit.co/web/inv-1" });
   expect(out.subject).toBe("Your Liftmora subscription for Iron Co is due");
   expect(out.html).toContain("Your subscription is due");
   expect(out.html).toContain("Pay your invoice &rarr;");
