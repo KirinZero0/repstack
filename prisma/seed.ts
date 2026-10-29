@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { encrypt, hmacLookup } from "../src/lib/crypto";
 import { PLAN_SEEDS } from "./plans";
+import { seedEmailTemplates } from "./email-templates";
 
 const prisma = new PrismaClient();
 
@@ -127,6 +128,8 @@ async function main() {
   console.log(`  email: ${superadmin.email}`);
   console.log(`  password: ${superadminPassword}`);
   console.log(`  id: ${superadmin.id}`);
+  await seedEmailTemplates(prisma);
+
   console.log("\nDemo gym (slug: demo) — staff login (/demo/login):");
   console.log(`  email: ${demoOwner.email}`);
   console.log(`  password: ${demoOwnerPassword}`);

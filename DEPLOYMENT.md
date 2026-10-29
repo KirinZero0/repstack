@@ -62,6 +62,8 @@ npm run db:migrate          # applies every pending migration; never resets
 
 - [ ] Migrations applied without errors (the last two this release are `platform_transfer_proof` and
       `member_gym_board_privacy`).
+- [ ] Platform default email templates written: `npm run db:seed:templates` (adds any that are missing and keeps
+      edits; safe to re-run).
 
 ```powershell
 $env:APP_DB_PASSWORD = "<the long password from step 2>"

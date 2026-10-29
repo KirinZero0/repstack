@@ -390,3 +390,13 @@ Migration: the `MessageType` enum gained the six values (same new migration as t
 - **Guest passes stay WhatsApp**: guests have no email, and approve, decline and resend are button clicks anyway.
 - Public and demo copy that promised automatic WhatsApp now says email, with WhatsApp on a click.
 - No migration. Tests: `e2e/26-notification-channels.spec.ts`.
+
+## 13. Seeding the platform default email templates
+
+The platform defaults are rows with no gym (`EmailTemplate.gymId` null). `npm run db:seed:templates` writes one for
+every message type (13 member emails and 6 system emails) from the wording built into the app
+(`src/config/email.ts`). It is safe to run any time: a type that already has a platform row is kept, so edits made
+in the database survive; `npm run db:seed:templates -- --overwrite` resets them all to the built-in wording. The
+normal dev seed (`npm run db:seed`) runs it too. Without these rows nothing breaks: the built-in wording is the
+last fallback. Run it once on production after `db:migrate` (and again with `--overwrite` if you change the built-in
+text and want the stored defaults to follow). Test: `e2e/42-email-templates.spec.ts`.

@@ -331,3 +331,30 @@ test("setting up a gym emails its owner a welcome from Liftmora", async ({ reque
   const logs = await prisma.notificationLog.findMany({ where: { gymId: gym.id } });
   expect(logs.map((l) => `${l.type}:${l.channel}:${l.status}`)).toContain("gym_welcome:email:SENT");
 });
+
+test("the seeder writes a platform default for every email, keeps edits, and can reset them", async () => {
+  const { seedEmailTemplates } = await import("../prisma/email-templates");
+  const all = Object.keys({ ...DEFAULT_EMAIL_TEMPLATES, ...DEFAULT_SYSTEM_EMAIL_TEMPLATES });
+  await prisma.emailTemplate.deleteMany({ where: { gymId: null } });
+  try {
+    const first = await seedEmailTemplates(prisma);
+    expect(first.created.sort()).toEqual([...all].sort());
+    expect(await prisma.emailTemplate.count({ where: { gymId: null } })).toBe(all.length);
+
+    // Running it again adds nothing, and an edited default is left alone.
+    await prisma.emailTemplate.updateMany({ where: { gymId: null, type: "payment_receipt" }, data: { subject: "Edited {{gymName}}" } });
+    const second = await seedEmailTemplates(prisma);
+    expect(second.created).toEqual([]);
+    expect(second.kept).toHaveLength(all.length);
+    const rows = await prisma.emailTemplate.findMany({ where: { gymId: null } });
+    expect(resolveTemplate(rows, "any-gym", "payment_receipt").subject).toBe("Edited {{gymName}}");
+    expect(resolveTemplate(rows, "any-gym", "class_reminder").subject).toBe("{{gymName}}: Your class is tomorrow");
+
+    // --overwrite puts the built-in wording back.
+    const third = await seedEmailTemplates(prisma, { overwrite: true });
+    expect(third.updated).toHaveLength(all.length);
+    expect((await prisma.emailTemplate.findFirstOrThrow({ where: { gymId: null, type: "payment_receipt" } })).subject).toBe("{{gymName}}: Payment received");
+  } finally {
+    await prisma.emailTemplate.deleteMany({ where: { gymId: null } });
+  }
+});

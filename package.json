@@ -17,6 +17,7 @@
     "db:seed:showcase": "tsx prisma/seed-showcase.ts",
     "db:seed:history": "tsx prisma/seed-history.ts",
     "db:seed:plans": "tsx prisma/seed-plans.ts",
+    "db:seed:templates": "tsx prisma/seed-email-templates.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {
