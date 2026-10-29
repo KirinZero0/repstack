@@ -43,6 +43,6 @@ export async function POST(_req: Request, { params }: { params: { slug: string; 
       return NextResponse.json({ error: "This member is frozen or cancelled, so there's nothing to remind them about." }, { status: 409 });
   }
 
-  await notifyMember(gym.id, { to: decrypt(member.phoneWhatsapp), message, type: "manual_reminder", memberId: member.id });
+  await notifyMember(gym.id, { to: decrypt(member.phoneWhatsapp), message, type: "manual_reminder", memberId: member.id, trigger: "manual" });
   return NextResponse.json({ ok: true });
 }

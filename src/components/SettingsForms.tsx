@@ -404,21 +404,6 @@ export function NotificationsForm({
       <label className="flex items-start gap-3 text-sm text-neutral-300">
         <input
           type="checkbox"
-          checked={whatsapp}
-          onChange={(e) => {
-            setWhatsapp(e.target.checked);
-            save({ notifyWhatsapp: e.target.checked });
-          }}
-          className="mt-0.5 h-4 w-4"
-        />
-        <span>
-          Send members WhatsApp messages
-          <span className="mt-1 block text-neutral-500">Activation links, payment receipts, expiry reminders and class updates.</span>
-        </span>
-      </label>
-      <label className="flex items-start gap-3 text-sm text-neutral-300">
-        <input
-          type="checkbox"
           checked={email}
           onChange={(e) => {
             setEmail(e.target.checked);
@@ -427,18 +412,33 @@ export function NotificationsForm({
           className="mt-0.5 h-4 w-4"
         />
         <span>
-          Send members emails
-          <span className="mt-1 block text-neutral-500">The same messages, sent to each member&apos;s email address. Turn on both to reach them either way.</span>
+          Email members automatically
+          <span className="mt-1 block text-neutral-500">Activation links, payment receipts, expiry reminders and class updates go to each member&apos;s email address on their own.</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-3 text-sm text-neutral-300">
+        <input
+          type="checkbox"
+          checked={whatsapp}
+          onChange={(e) => {
+            setWhatsapp(e.target.checked);
+            save({ notifyWhatsapp: e.target.checked });
+          }}
+          className="mt-0.5 h-4 w-4"
+        />
+        <span>
+          Allow WhatsApp from the send buttons
+          <span className="mt-1 block text-neutral-500">WhatsApp is never sent automatically. It goes out only when you click a button like Send reminder, Send QR link or Send password link, alongside the email.</span>
         </span>
       </label>
       {email && !emailReady && (
         <p className="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2 text-xs text-amber-400">
-          Email isn&apos;t set up on Liftmora yet, so this won&apos;t take effect until it is.
+          Email isn&apos;t set up on Liftmora yet, so members won&apos;t get automatic messages until it is.
         </p>
       )}
-      {!whatsapp && !email && (
+      {!email && (
         <p className="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2 text-xs text-amber-400">
-          Both are off, so members won&apos;t get activation or password-reset links. You&apos;d have to share those yourself.
+          Email is off, so members won&apos;t get activation or password-reset links on their own. You&apos;d have to share those yourself.
         </p>
       )}
       {error && <p className="text-sm text-red-400">{error}</p>}

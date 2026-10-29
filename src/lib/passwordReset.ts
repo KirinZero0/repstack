@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 import { decrypt } from "./crypto";
 import { generateMagicToken, hashMagicToken } from "./magicLink";
 import { sendPlatformWhatsapp } from "./whatsapp";
-import { notifyMember, notifyOwner } from "./notify";
+import { notifyMember, notifyOwner, type Trigger } from "./notify";
 
 export const RESET_TTL_MS = 60 * 60 * 1000; // self-service "forgot password" links
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // staff invites created by an owner
@@ -111,6 +111,8 @@ export async function deliverResetLink(target: {
   gymId?: string;
   member?: { id: string; gymId: string; encryptedPhone: string };
   gymName: string;
+  /** "manual" when someone clicked a send button (also goes over WhatsApp); "auto" for a self-service request or an invite. */
+  trigger?: Trigger;
 }): Promise<void> {
   const url = resetUrl(target.token);
   const message =
@@ -125,9 +127,10 @@ export async function deliverResetLink(target: {
           gymName: target.gymName,
           to: { name: target.name, email: target.staffEmail, phone: target.staffPhone },
           type: target.purpose === "invite" ? "staff_invite" : "staff_password_reset",
+          trigger: target.trigger,
           message,
         });
-      } else if (target.staffPhone) {
+      } else if (target.staffPhone && target.trigger === "manual") {
         await sendPlatformWhatsapp({ to: target.staffPhone, message });
       }
     } else if (target.member) {
@@ -136,6 +139,7 @@ export async function deliverResetLink(target: {
         message,
         type: "password_reset",
         memberId: target.member.id,
+        trigger: target.trigger,
       });
     }
   } catch (err) {

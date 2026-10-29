@@ -25,7 +25,7 @@ export async function POST(_req: Request, { params }: { params: { gymId: string 
   if (!owner) return NextResponse.json({ error: "This gym has no active owner account." }, { status: 404 });
 
   const token = await createPasswordReset({ kind: "staff", subjectId: owner.id, purpose: "reset" });
-  waitUntil(deliverResetLink({ kind: "staff", name: owner.name, token, purpose: "reset", staffPhone: owner.phone, staffEmail: owner.email, gymId: gym.id, gymName: gym.name }));
+  waitUntil(deliverResetLink({ kind: "staff", name: owner.name, token, purpose: "reset", staffPhone: owner.phone, staffEmail: owner.email, gymId: gym.id, gymName: gym.name, trigger: "manual" }));
 
   await writeAuditLog({
     superadminId: session.superadminId,

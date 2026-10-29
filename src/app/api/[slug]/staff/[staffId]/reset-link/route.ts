@@ -24,6 +24,6 @@ export async function POST(_req: Request, { params }: { params: { slug: string; 
   if (!staff.isActive) return NextResponse.json({ error: "Reactivate this account first." }, { status: 409 });
 
   const token = await createPasswordReset({ kind: "staff", subjectId: staff.id, purpose: "reset" });
-  waitUntil(deliverResetLink({ kind: "staff", name: staff.name, token, purpose: "reset", staffPhone: staff.phone, staffEmail: staff.email, gymId: gym.id, gymName: gym.name }));
+  waitUntil(deliverResetLink({ kind: "staff", name: staff.name, token, purpose: "reset", staffPhone: staff.phone, staffEmail: staff.email, gymId: gym.id, gymName: gym.name, trigger: "manual" }));
   return NextResponse.json({ url: resetUrl(token) });
 }

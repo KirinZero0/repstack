@@ -38,6 +38,7 @@ export async function POST(
     message: `Hi ${member.fullName}, here's your gym QR code link (no login needed, valid 24h): ${fallbackUrl}`,
     type: "qr_fallback",
     memberId: member.id,
+    trigger: "manual",
   });
 
   return NextResponse.json({ ok: true });

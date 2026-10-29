@@ -28,6 +28,7 @@ export async function POST(_req: Request, { params }: { params: { slug: string; 
       purpose: "reset",
       member: { id: member.id, gymId: member.gymId, encryptedPhone: member.phoneWhatsapp },
       gymName: gym.name,
+      trigger: "manual",
     }),
   );
   return NextResponse.json({ url: resetUrl(token) });
