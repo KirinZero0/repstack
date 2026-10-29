@@ -370,3 +370,23 @@ the platform's, never a gym's: `DEFAULT_SYSTEM_EMAIL_TEMPLATES` and `SYSTEM_EMAI
 screen for that yet). A gym's own templates are ignored for them. `{{recipientName}}` is a new placeholder.
 Migration: the `MessageType` enum gained the six values (same new migration as the email templates, so
 `npm run db:migrate` and `npm run db:rls` as before). Tests: `e2e/42-email-templates.spec.ts`.
+
+## 12. Email is automatic; WhatsApp only from a button, and you pick
+
+- **Automatic messages are email only.** Anything the system sends on its own (a member added, a payment, expiry
+  and class reminders and cancellations, a self-service password request, and Liftmora's billing, welcome and
+  suspension emails to owners) goes by email. WhatsApp is never sent automatically.
+- **Email is on by default** for every gym (`notifyEmail` is now opt-out). The settings page says so: "Email
+  members automatically", and "Allow WhatsApp from the send buttons" (the switch for the buttons, not for
+  automatic sends). If email isn't set up on Liftmora, automatic messages are logged as skipped and nothing
+  is sent, so set up Mailjet (or Mailgun) before going live.
+- **Send buttons ask how to send.** Each manual send button (member Send reminder, Resend QR link, Send password
+  link; staff New password link; class Remind and Remind everyone; superadmin Owner link) opens "Send by
+  WhatsApp | Email | cancel"; nothing goes out until one is picked. The server sends on only that channel
+  (`channel` in the request body), and if it couldn't, says why on screen (WhatsApp switched off or no
+  sending number, email not set up, or the address bounced). Email from a button works even if automatic email is
+  off; WhatsApp from a button needs the gym's switch on. Code: `ChannelPicker`, `notifyMember` / `notifyOwner`
+  with `trigger` and `channel`, `channelProblem`.
+- **Guest passes stay WhatsApp**: guests have no email, and approve, decline and resend are button clicks anyway.
+- Public and demo copy that promised automatic WhatsApp now says email, with WhatsApp on a click.
+- No migration. Tests: `e2e/26-notification-channels.spec.ts`.

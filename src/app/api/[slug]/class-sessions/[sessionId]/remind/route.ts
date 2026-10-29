@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { remindClassSessionSchema } from "@/lib/validation/tenant";
 import { sendClassReminder } from "@/lib/classes";
+import { channelProblem, type NotifyResult } from "@/lib/notify";
 
 /**
  * Owner or staff nudges the members booked on a session, on demand: one member (registrationId) or
@@ -39,6 +40,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ error: parsed.data.registrationId ? "That booking isn't active." : "Nobody is booked on this session." }, { status: 409 });
   }
 
-  for (const id of targets) await sendClassReminder(id);
-  return NextResponse.json({ ok: true, reminded: targets.length });
+  const channel = parsed.data.channel;
+  let reminded = 0;
+  let lastResult: NotifyResult = {};
+  for (const id of targets) {
+    lastResult = await sendClassReminder(id, channel);
+    // Without a chosen channel a reminder counts if either one went; with one, only that one.
+    if (channel ? lastResult[channel] === "SENT" : lastResult.email === "SENT" || lastResult.whatsapp === "SENT") reminded++;
+  }
+  if (channel && reminded === 0) return NextResponse.json({ error: channelProblem(lastResult, channel) }, { status: 409 });
+  return NextResponse.json({ ok: true, reminded, notSent: targets.length - reminded });
 }

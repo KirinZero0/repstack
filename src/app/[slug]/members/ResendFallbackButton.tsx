@@ -1,27 +1,30 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import ChannelPicker, { type Channel } from "@/components/ChannelPicker";
 
 export default function ResendFallbackButton({ slug, memberId }: { slug: string; memberId: string }) {
-  const [isPending, startTransition] = useTransition();
+  const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function handleClick() {
-    startTransition(async () => {
-      const res = await fetch(`/api/${slug}/members/${memberId}/resend-fallback`, {
-        method: "POST",
-      });
-      setSent(res.ok);
+  async function send(channel: Channel) {
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/${slug}/members/${memberId}/resend-fallback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel }),
     });
+    setBusy(false);
+    setSent(res.ok);
+    if (!res.ok) setError(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "Couldn't send. Try again.");
   }
 
   return (
-    <button
-      onClick={handleClick}
-      disabled={isPending}
-      className="whitespace-nowrap rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
-    >
-      {sent ? "Sent" : "Resend QR link"}
-    </button>
+    <>
+      {sent ? <span className="whitespace-nowrap text-xs text-emerald-400">Sent</span> : <ChannelPicker label="Resend QR link" busy={busy} onPick={send} />}
+      {error && <p className="mt-1 max-w-[16rem] whitespace-normal text-xs text-red-400">{error}</p>}
+    </>
   );
 }

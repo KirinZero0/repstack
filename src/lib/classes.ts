@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { decrypt } from "./crypto";
-import { notifyMember } from "./notify";
+import { notifyMember, type Channel, type NotifyResult } from "./notify";
 import { expireInvoice } from "./gateway";
 
 /** Registrations that hold a seat: confirmed ones, plus pending ones so a seat can't be sold twice mid-payment. */
@@ -66,16 +66,16 @@ export async function sendClassConfirmation(registrationId: string): Promise<voi
  * Staff-triggered reminder for one booking. Confirmed → see-you-there nudge; unpaid → the seat is
  * held but needs payment. Same caller rules as sendClassConfirmation. Never throws.
  */
-export async function sendClassReminder(registrationId: string): Promise<void> {
+export async function sendClassReminder(registrationId: string, channel?: Channel): Promise<NotifyResult> {
   try {
     const reg = await prisma.classRegistration.findUnique({
       where: { id: registrationId },
       include: { member: true, session: { include: { class: true, gym: true } } },
     });
-    if (!reg || reg.member.anonymizedAt || reg.status === "CANCELLED") return;
+    if (!reg || reg.member.anonymizedAt || reg.status === "CANCELLED") return {};
     const { session } = reg;
     const when = `${whenLabel(session.startsAt, session.gym.timezone)}${session.class.instructor ? ` with ${session.class.instructor}` : ""}`;
-    await notifyMember(reg.gymId, {
+    return await notifyMember(reg.gymId, {
       to: decrypt(reg.member.phoneWhatsapp),
       message:
         reg.status === "CONFIRMED"
@@ -83,9 +83,12 @@ export async function sendClassReminder(registrationId: string): Promise<void> {
           : `Hi ${reg.member.fullName}, your spot in ${session.class.name} at ${session.gym.name} on ${when} is waiting for payment. Please pay to keep it.`,
       type: "class_reminder",
       memberId: reg.memberId,
+      trigger: "manual",
+      channel,
     });
   } catch (err) {
     console.error("Class reminder failed", err);
+    return {};
   }
 }
 

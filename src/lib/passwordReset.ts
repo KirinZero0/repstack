@@ -4,7 +4,7 @@ import { prisma } from "./prisma";
 import { decrypt } from "./crypto";
 import { generateMagicToken, hashMagicToken } from "./magicLink";
 import { sendPlatformWhatsapp } from "./whatsapp";
-import { notifyMember, notifyOwner, type Trigger } from "./notify";
+import { notifyMember, notifyOwner, type Channel, type NotifyResult, type Trigger } from "./notify";
 
 export const RESET_TTL_MS = 60 * 60 * 1000; // self-service "forgot password" links
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // staff invites created by an owner
@@ -98,7 +98,7 @@ export async function unusablePasswordHash(): Promise<string> {
   return bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
 }
 
-/** Sends the link over WhatsApp where there's a channel for it. Never throws. */
+/** Sends the link by email, and over WhatsApp when someone chose to. Returns what happened per channel. Never throws. */
 export async function deliverResetLink(target: {
   kind: ResetKind;
   name: string;
@@ -113,7 +113,9 @@ export async function deliverResetLink(target: {
   gymName: string;
   /** "manual" when someone clicked a send button (also goes over WhatsApp); "auto" for a self-service request or an invite. */
   trigger?: Trigger;
-}): Promise<void> {
+  /** With a manual send, the one channel the person picked. */
+  channel?: Channel;
+}): Promise<NotifyResult> {
   const url = resetUrl(target.token);
   const message =
     target.purpose === "invite"
@@ -122,27 +124,31 @@ export async function deliverResetLink(target: {
   try {
     if (target.kind === "staff") {
       if (target.gymId && (target.staffPhone || target.staffEmail)) {
-        await notifyOwner({
+        return await notifyOwner({
           gymId: target.gymId,
           gymName: target.gymName,
           to: { name: target.name, email: target.staffEmail, phone: target.staffPhone },
           type: target.purpose === "invite" ? "staff_invite" : "staff_password_reset",
           trigger: target.trigger,
+          channel: target.channel,
           message,
         });
       } else if (target.staffPhone && target.trigger === "manual") {
-        await sendPlatformWhatsapp({ to: target.staffPhone, message });
+        const r = await sendPlatformWhatsapp({ to: target.staffPhone, message });
+        return { whatsapp: r.ok ? "SENT" : r.skipped ? "SKIPPED" : "FAILED" };
       }
     } else if (target.member) {
-      await notifyMember(target.member.gymId, {
+      return await notifyMember(target.member.gymId, {
         to: decrypt(target.member.encryptedPhone),
         message,
         type: "password_reset",
         memberId: target.member.id,
         trigger: target.trigger,
+        channel: target.channel,
       });
     }
   } catch (err) {
     console.error("Password reset delivery failed", err);
   }
+  return {};
 }

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { waitUntil } from "@vercel/functions";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { createPasswordReset, deliverResetLink, resetUrl } from "@/lib/passwordReset";
+import { channelProblem } from "@/lib/notify";
+import { readChannel } from "@/lib/channel";
 
 /** Owner generates a fresh password link for a staff member (forgotten password, or a lost invite). */
-export async function POST(_req: Request, { params }: { params: { slug: string; staffId: string } }) {
+export async function POST(req: Request, { params }: { params: { slug: string; staffId: string } }) {
   let session, gym, db;
   try {
     ({ session, gym, db } = await requireTenantSession(params.slug));
@@ -24,6 +25,7 @@ export async function POST(_req: Request, { params }: { params: { slug: string; 
   if (!staff.isActive) return NextResponse.json({ error: "Reactivate this account first." }, { status: 409 });
 
   const token = await createPasswordReset({ kind: "staff", subjectId: staff.id, purpose: "reset" });
-  waitUntil(deliverResetLink({ kind: "staff", name: staff.name, token, purpose: "reset", staffPhone: staff.phone, staffEmail: staff.email, gymId: gym.id, gymName: gym.name, trigger: "manual" }));
-  return NextResponse.json({ url: resetUrl(token) });
+  const channel = await readChannel(req);
+  const sent = await deliverResetLink({ kind: "staff", name: staff.name, token, purpose: "reset", staffPhone: staff.phone, staffEmail: staff.email, gymId: gym.id, gymName: gym.name, trigger: "manual", channel });
+  return NextResponse.json({ url: resetUrl(token), sendError: channel ? channelProblem(sent, channel) : null });
 }

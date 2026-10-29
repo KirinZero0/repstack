@@ -14,7 +14,9 @@ test("owner-triggered fallback link lets a member view /my-qr without a session"
   await page.goto(`${baseURL}/test-gym-a/members`);
   const row = page.locator("tr", { hasText: "Active Member" });
   await row.getByRole("button", { name: "Resend QR link" }).click();
-  await expect(row.getByRole("button", { name: "Sent" })).toBeVisible();
+  // The button asks how to send; nothing goes out until a channel is picked.
+  await row.getByRole("button", { name: "WhatsApp" }).click();
+  await expect(row.getByText("Sent", { exact: true })).toBeVisible();
 
   const link = await prisma.magicLink.findFirstOrThrow({
     where: { memberId: member.id, purpose: "qr_fallback" },

@@ -41,7 +41,7 @@ const STEPS: TourStep[] = [
   },
   {
     title: "See who's about to lapse",
-    body: "Members whose plan ends within 7 days show up here. They also get an automatic WhatsApp reminder three days before, so you don't have to chase anyone.",
+    body: "Members whose plan ends within 7 days show up here. They also get an automatic email reminder three days before, so you don't have to chase anyone.",
     target: "expiring",
     tab: "dashboard",
   },
@@ -82,7 +82,7 @@ const STEPS: TourStep[] = [
     tab: "members",
   },
   {
-    title: "They get everything on WhatsApp",
+    title: "They get everything by email",
     body: "Saving sends the new member a link to set their password and get their check-in QR. If you've turned on online payments it also carries an invoice. Either way, their membership switches on once you record or receive the payment.",
     target: "whatsapp",
     tab: "members",
@@ -105,7 +105,7 @@ const STEPS: TourStep[] = [
   },
   {
     title: "Their membership is back on",
-    body: "Andi is active again and his new dates are set. He gets a WhatsApp receipt, the payment shows in your revenue as recorded manually with your name on it, and an owner can void it if you typed something wrong.",
+    body: "Andi is active again and his new dates are set. He gets an emailed receipt, the payment shows in your revenue as recorded manually with your name on it, and an owner can void it if you typed something wrong.",
     target: "paid-row",
     tab: "members",
   },
@@ -133,7 +133,7 @@ const STEPS: TourStep[] = [
   },
   {
     title: "They're in",
-    body: "Rizky is now an active member with the login he chose. He gets a WhatsApp welcome message and can open his check-in QR straight away. You didn't have to type anything.",
+    body: "Rizky is now an active member with the login he chose. He gets a welcome email and can open his check-in QR straight away. You didn't have to type anything.",
     target: "approved-row",
     tab: "members",
   },
@@ -456,7 +456,7 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
             {sent && (
               <div data-tour="whatsapp" className="mb-6 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
                 <p className="mb-3 text-sm text-neutral-300">
-                  {sent.name} was added. This WhatsApp message is on its way to them:
+                  {sent.name} was added. This message is on its way to them by email (you can also send it by WhatsApp from a button):
                 </p>
                 <div className="max-w-sm rounded-2xl rounded-tl-sm bg-[#d9fdd3] p-3 text-sm leading-relaxed text-[#111b21] shadow">
                   Hi {sent.name.split(" ")[0]}! You&apos;ve been added to Demo Gym.
@@ -495,7 +495,7 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
 
             {paidName && !payFor && (
               <p className="mb-6 rounded-lg border border-emerald-800 bg-emerald-950 px-4 py-3 text-sm text-emerald-400">
-                Recorded. {paidName} is active for 30 days, and a WhatsApp receipt is on its way.
+                Recorded. {paidName} is active for 30 days, and a receipt is on its way by email.
               </p>
             )}
 

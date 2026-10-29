@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { waitUntil } from "@vercel/functions";
 import { prisma } from "@/lib/prisma";
 import { requireSuperadminSession, SessionError } from "@/lib/session";
 import { writeAuditLog } from "@/lib/audit";
 import { createPasswordReset, deliverResetLink, resetUrl } from "@/lib/passwordReset";
+import { channelProblem } from "@/lib/notify";
+import { readChannel } from "@/lib/channel";
 
 /** Superadmin creates a password link for a gym's owner, for owners who can't recover on their own. */
-export async function POST(_req: Request, { params }: { params: { gymId: string } }) {
+export async function POST(req: Request, { params }: { params: { gymId: string } }) {
   let session;
   try {
     ({ session } = await requireSuperadminSession());
@@ -25,7 +26,8 @@ export async function POST(_req: Request, { params }: { params: { gymId: string 
   if (!owner) return NextResponse.json({ error: "This gym has no active owner account." }, { status: 404 });
 
   const token = await createPasswordReset({ kind: "staff", subjectId: owner.id, purpose: "reset" });
-  waitUntil(deliverResetLink({ kind: "staff", name: owner.name, token, purpose: "reset", staffPhone: owner.phone, staffEmail: owner.email, gymId: gym.id, gymName: gym.name, trigger: "manual" }));
+  const channel = await readChannel(req);
+  const sent = await deliverResetLink({ kind: "staff", name: owner.name, token, purpose: "reset", staffPhone: owner.phone, staffEmail: owner.email, gymId: gym.id, gymName: gym.name, trigger: "manual", channel });
 
   await writeAuditLog({
     superadminId: session.superadminId,
@@ -34,5 +36,5 @@ export async function POST(_req: Request, { params }: { params: { gymId: string 
     metadata: { ownerId: owner.id, ownerEmail: owner.email },
   });
 
-  return NextResponse.json({ url: resetUrl(token), ownerName: owner.name, ownerEmail: owner.email });
+  return NextResponse.json({ url: resetUrl(token), ownerName: owner.name, ownerEmail: owner.email, sendError: channel ? channelProblem(sent, channel) : null });
 }

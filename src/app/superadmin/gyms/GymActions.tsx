@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import ChannelPicker, { type Channel } from "@/components/ChannelPicker";
 import WhatsAppPanel from "./WhatsAppPanel";
 import TransferReview, { type TransferInfo } from "./TransferReview";
 
@@ -27,7 +28,7 @@ export default function GymActions({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [link, setLink] = useState<{ url: string; ownerEmail: string } | null>(null);
+  const [link, setLink] = useState<{ url: string; ownerEmail: string; note: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [waOpen, setWaOpen] = useState(false);
 
@@ -65,17 +66,21 @@ export default function GymActions({
     });
   }
 
-  function ownerLink() {
+  function ownerLink(channel: Channel) {
     setError(null);
     setCopied(false);
     startTransition(async () => {
-      const res = await fetch(`/api/superadmin/gyms/${gymId}/owner-reset`, { method: "POST" });
+      const res = await fetch(`/api/superadmin/gyms/${gymId}/owner-reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel }),
+      });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(body.error ?? "Could not create a link");
         return;
       }
-      setLink({ url: body.url, ownerEmail: body.ownerEmail });
+      setLink({ url: body.url, ownerEmail: body.ownerEmail, note: body.sendError ?? `Sent by ${channel === "email" ? "email" : "WhatsApp"}.` });
     });
   }
 
@@ -97,13 +102,13 @@ export default function GymActions({
         >
           WhatsApp{waNumber ? " ✓" : ""}
         </button>
-        <button
-          onClick={ownerLink}
-          disabled={isPending}
+        <ChannelPicker
+          label="Owner link"
+          busy={isPending}
+          busyLabel="Owner link…"
+          onPick={ownerLink}
           className="whitespace-nowrap rounded-md border border-neutral-700 px-3 py-1 text-sm text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
-        >
-          Owner link
-        </button>
+        />
         {status === "SUSPENDED" ? (
           <button
             onClick={() => callAction("reactivate")}
@@ -135,7 +140,7 @@ export default function GymActions({
       {error && <span className="text-xs text-red-400">{error}</span>}
       {link && (
         <div className="max-w-xs rounded-md border border-neutral-700 bg-neutral-950 p-2 text-left text-xs">
-          <p className="text-neutral-400">One-time link for {link.ownerEmail} (1 hour):</p>
+          <p className="text-neutral-400">One-time link for {link.ownerEmail} (1 hour). {link.note}</p>
           <p className="mt-1 break-all text-white">{link.url}</p>
           <button
             onClick={() => {

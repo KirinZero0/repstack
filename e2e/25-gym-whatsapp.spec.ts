@@ -40,7 +40,7 @@ const testSend = async (baseURL: string, slug: string) =>
   admin.post(`${baseURL}/api/superadmin/gyms/${await gymIdOf(slug)}/whatsapp/test`, { data: { phone: "081200001111" } });
 const removeToken = async (baseURL: string, slug: string) => admin.delete(`${baseURL}/api/superadmin/gyms/${await gymIdOf(slug)}/whatsapp`);
 
-/** Adds a member (which sends an activation WhatsApp) and returns the statuses logged for that send. */
+/** Adds a member, then clicks "send reminder by WhatsApp" for them (WhatsApp is only ever sent on a click), and returns the statuses logged for that WhatsApp. */
 async function addMemberAndGetStatuses(request: APIRequestContext, baseURL: string, f: Awaited<ReturnType<typeof makeGym>>) {
   const marker = new Date();
   const res = await request.post(`${baseURL}/api/${f.slug}/members`, {
@@ -52,7 +52,9 @@ async function addMemberAndGetStatuses(request: APIRequestContext, baseURL: stri
     },
   });
   expect(res.status()).toBe(201);
-  const logs = await prisma.notificationLog.findMany({ where: { gymId: f.gym.id, sentAt: { gte: marker } } });
+  const { memberId } = await res.json();
+  await request.post(`${baseURL}/api/${f.slug}/members/${memberId}/remind`, { data: { channel: "whatsapp" } });
+  const logs = await prisma.notificationLog.findMany({ where: { gymId: f.gym.id, channel: "whatsapp", sentAt: { gte: marker } } });
   expect(logs.length).toBeGreaterThan(0);
   return Array.from(new Set(logs.map((l) => l.status)));
 }

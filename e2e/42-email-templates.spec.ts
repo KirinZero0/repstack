@@ -302,10 +302,14 @@ test("system emails use the platform's wording, never a gym's, and a platform ro
 test("notifyOwner emails and messages the owner, logs both against the gym, and skips what it can't reach", async () => {
   const f = await makeGym();
   const marker = new Date();
-  await notifyOwner({ gymId: f.gym.id, gymName: f.gym.name, to: { name: "Owner", email: f.owner.email, phone: "081200009999" }, type: "subscription_due", message: "Pay here: https://x.test/pay" });
+  // An automatic send is email only; a person clicking a button can also use WhatsApp.
+  await notifyOwner({ gymId: f.gym.id, gymName: f.gym.name, to: { name: "Owner", email: f.owner.email, phone: "081200009999" }, type: "subscription_paid", message: "Thanks." });
+  await notifyOwner({ gymId: f.gym.id, gymName: f.gym.name, to: { name: "Owner", email: f.owner.email, phone: "081200009999" }, type: "subscription_due", trigger: "manual", message: "Pay here: https://x.test/pay" });
   await notifyOwner({ gymId: f.gym.id, gymName: f.gym.name, to: { name: "Owner", email: `bad+bounce@x.test` }, type: "gym_suspended", message: "Suspended." });
   await notifyOwner({ gymId: f.gym.id, gymName: f.gym.name, to: { name: "Owner" }, type: "staff_invite", message: "No way to reach them." });
   const logs = (await prisma.notificationLog.findMany({ where: { gymId: f.gym.id, sentAt: { gte: marker } } })).map((l) => `${l.type}:${l.channel}:${l.status}`).sort();
+  expect(logs).toContain("subscription_paid:email:SENT");
+  expect(logs.filter((l) => l.startsWith("subscription_paid:whatsapp"))).toEqual([]);
   expect(logs).toContain("subscription_due:email:SENT");
   expect(logs.some((l) => l.startsWith("subscription_due:whatsapp:"))).toBe(true);
   expect(logs).toContain("gym_suspended:email:FAILED");

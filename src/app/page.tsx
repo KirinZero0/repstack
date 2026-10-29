@@ -34,7 +34,7 @@ const JSON_LD = {
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       description:
-        "Gym management software for independent gyms: memberships, QR door check-in, payments, classes and WhatsApp reminders.",
+        "Gym management software for independent gyms: memberships, QR door check-in, payments, classes and email reminders.",
       publisher: { "@id": `${SITE_URL}/#organization` },
     },
   ],
@@ -70,7 +70,7 @@ async function loadTiers(): Promise<Tier[]> {
 const steps = [
   {
     title: "Bring your members over",
-    body: "Import the spreadsheet you already keep, or add people one at a time. Each member gets a WhatsApp link to set a password and see their QR.",
+    body: "Import the spreadsheet you already keep, or add people one at a time. Each member gets an email link to set a password and see their QR.",
   },
   {
     title: "They pay the way they already do",
@@ -111,7 +111,7 @@ const faqs = [
   },
   {
     q: "What if a member forgets their password at the door?",
-    a: "Send a one-time QR link over WhatsApp from their member page, or scan their QR yourself from the staff scanner.",
+    a: "Send a one-time QR link by WhatsApp or email from their member page, or scan their QR yourself from the staff scanner.",
   },
   {
     q: "What happens to my data if I stop?",

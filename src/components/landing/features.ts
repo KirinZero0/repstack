@@ -27,7 +27,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       },
       {
         title: "Members activate themselves",
-        body: "A new member gets a WhatsApp link, sets their own password, adds a photo, and sees their check-in QR. No passwords typed over the counter.",
+        body: "A new member gets an email link, sets their own password, adds a photo, and sees their check-in QR. No passwords typed over the counter.",
       },
       {
         title: "A public join page",
@@ -67,7 +67,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       },
       {
         title: "Forgot their password at the door?",
-        body: "Send a one-time QR link over WhatsApp from their member page. They open it and scan. No account recovery at 6 am.",
+        body: "Send a one-time QR link by WhatsApp or email from their member page. They open it and scan. No account recovery at 6 am.",
       },
     ],
   },
@@ -83,7 +83,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       },
       {
         title: "Record desk payments in seconds",
-        body: "Cash or a transfer you saw land: pick the plan, confirm the amount, done. The membership extends, the member gets a receipt on WhatsApp, and a mistaken entry can be voided.",
+        body: "Cash or a transfer you saw land: pick the plan, confirm the amount, done. The membership extends, the member gets a receipt by email, and a mistaken entry can be voided.",
       },
       {
         title: "Members renew by bank transfer from their phone",
@@ -95,7 +95,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       },
       {
         title: "Nobody slips through",
-        body: "A WhatsApp reminder three days before a membership ends. Lapsed memberships are marked expired automatically and the member is told.",
+        body: "An email reminder three days before a membership ends. Lapsed memberships are marked expired automatically and the member is told.",
       },
     ],
   },
@@ -119,7 +119,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       },
       {
         title: "A reminder the evening before",
-        body: "Everyone confirmed for tomorrow's classes gets a WhatsApp nudge in the evening. Once, automatically.",
+        body: "Everyone confirmed for tomorrow's classes gets an email nudge in the evening. Once, automatically.",
       },
     ],
   },
@@ -145,13 +145,13 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
   },
   {
     id: "notifications",
-    title: "WhatsApp and email",
+    title: "Email, with WhatsApp on a click",
     lede: "Members hear from your gym, not from a stranger.",
     color: "green",
     items: [
       {
         title: "A number that works from day one",
-        body: "Activation links, receipts, reminders and class updates go out over WhatsApp from the start, within your plan's monthly allowance.",
+        body: "Activation links, receipts, reminders and class updates go out by email on their own. Need to nudge someone now? Send it by WhatsApp from a button, within your plan's monthly allowance.",
       },
       {
         title: "Or connect your own",

@@ -13,7 +13,7 @@ for end-to-end tests. Deployed on Vercel.
 **For gym owners and staff** (`/<slug>/…`)
 
 - Members: add one at a time, import a spreadsheet, export the roster as CSV. Activation links,
-  password resets and fallback QR links go out over WhatsApp (and optionally email).
+  password resets and fallback QR links go out by email on their own; WhatsApp is sent only when someone clicks a send button and picks it.
 - Check-in: members scan a printed station QR with their phone, or staff scan the member's QR.
   One visit per member per day; expired or frozen memberships are refused. "Who's in the gym now"
   on the dashboard, with check-out.

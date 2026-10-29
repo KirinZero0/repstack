@@ -228,7 +228,11 @@ export const confirmClassRegistrationSchema = z.object({
 export const addClassRegistrationSchema = z.object({ memberId: z.string().uuid() });
 
 /** Staff sends a reminder: to one registration, or to everyone booked when omitted. */
-export const remindClassSessionSchema = z.object({ registrationId: z.string().uuid().optional() });
+export const remindClassSessionSchema = z.object({
+  registrationId: z.string().uuid().optional(),
+  /** How the person chose to send it. */
+  channel: z.enum(["whatsapp", "email"]).optional(),
+});
 
 export const registerForClassSchema = z.object({ sessionId: z.string().uuid() });
 

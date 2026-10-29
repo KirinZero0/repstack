@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import ChannelPicker, { type Channel } from "@/components/ChannelPicker";
 
 export interface RegistrationRow {
   id: string;
@@ -231,15 +232,15 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
 
   const [notice, setNotice] = useState<string | null>(null);
 
-  async function remind(r?: RegistrationRow) {
-    if (!r && !window.confirm(`Send a reminder to everyone booked (${session.taken})?`)) return;
+  async function remind(r: RegistrationRow | undefined, channel: Channel) {
     setBusy(r ? `remind-${r.id}` : "remind-all");
     setError(null);
     setNotice(null);
-    const { error, data } = await call(`/api/${slug}/class-sessions/${session.id}/remind`, "POST", r ? { registrationId: r.id } : {});
+    const { error, data } = await call(`/api/${slug}/class-sessions/${session.id}/remind`, "POST", r ? { registrationId: r.id, channel } : { channel });
     setBusy(null);
     if (error) return setError(error);
-    setNotice(`Reminder sent to ${data.reminded as number} ${data.reminded === 1 ? "member" : "members"}.`);
+    const left = (data.notSent as number) ?? 0;
+    setNotice(`Reminder sent to ${data.reminded as number} ${data.reminded === 1 ? "member" : "members"}${left ? `; ${left} couldn't be reached` : ""}.`);
   }
 
   async function removeBooking(r: RegistrationRow) {
@@ -338,9 +339,7 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
                   </span>
                 )}
                 {r.status !== "CANCELLED" && session.status === "SCHEDULED" && !session.past && (
-                  <button onClick={() => remind(r)} disabled={busy === `remind-${r.id}`} className={ghostCls}>
-                    {busy === `remind-${r.id}` ? "Sending…" : "Remind"}
-                  </button>
+                  <ChannelPicker label="Remind" busy={busy === `remind-${r.id}`} onPick={(c) => remind(r, c)} className={ghostCls} />
                 )}
                 {r.status === "CANCELLED" ? (
                   <>
@@ -384,9 +383,9 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
         </ul>
       )}
       {session.status === "SCHEDULED" && !session.past && session.taken > 0 && (
-        <button onClick={() => remind()} disabled={busy === "remind-all"} className={`${ghostCls} mt-3`}>
-          {busy === "remind-all" ? "Sending…" : "Remind everyone"}
-        </button>
+        <div className="mt-3">
+          <ChannelPicker label="Remind everyone" busy={busy === "remind-all"} onPick={(c) => remind(undefined, c)} className={ghostCls} />
+        </div>
       )}
       {session.status === "SCHEDULED" && !session.past && <AddMember slug={slug} session={session} members={members} onChanged={onChanged} />}
       {isOwner && session.status === "SCHEDULED" && (

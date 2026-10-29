@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { createMagicLink } from "@/lib/magicLink";
-import { notifyMember } from "@/lib/notify";
+import { channelProblem, notifyMember } from "@/lib/notify";
+import { readChannel } from "@/lib/channel";
 import { decrypt } from "@/lib/crypto";
 
 const FALLBACK_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: { slug: string; memberId: string } },
 ) {
   let gym, db;
@@ -33,13 +34,17 @@ export async function POST(
   });
   const fallbackUrl = `${process.env.NEXT_PUBLIC_APP_URL}/my-qr?token=${token}`;
 
-  await notifyMember(gym.id, {
+  const channel = await readChannel(req);
+  const result = await notifyMember(gym.id, {
     to: decrypt(member.phoneWhatsapp),
     message: `Hi ${member.fullName}, here's your gym QR code link (no login needed, valid 24h): ${fallbackUrl}`,
     type: "qr_fallback",
     memberId: member.id,
     trigger: "manual",
+    channel,
   });
+  const problem = channel ? channelProblem(result, channel) : null;
+  if (problem) return NextResponse.json({ error: problem }, { status: 409 });
 
   return NextResponse.json({ ok: true });
 }

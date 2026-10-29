@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { waitUntil } from "@vercel/functions";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { createPasswordReset, deliverResetLink, resetUrl } from "@/lib/passwordReset";
+import { channelProblem } from "@/lib/notify";
+import { readChannel } from "@/lib/channel";
 
 /** Owner or staff creates a password link for a member, e.g. one who forgot it at the front desk. */
-export async function POST(_req: Request, { params }: { params: { slug: string; memberId: string } }) {
+export async function POST(req: Request, { params }: { params: { slug: string; memberId: string } }) {
   let gym, db;
   try {
     ({ gym, db } = await requireTenantSession(params.slug));
@@ -20,8 +21,8 @@ export async function POST(_req: Request, { params }: { params: { slug: string; 
   if (!member || member.gymId !== gym.id) return NextResponse.json({ error: "Member not found" }, { status: 404 });
 
   const token = await createPasswordReset({ kind: "member", subjectId: member.id, purpose: "reset" });
-  waitUntil(
-    deliverResetLink({
+  const channel = await readChannel(req);
+  const sent = await deliverResetLink({
       kind: "member",
       name: member.fullName,
       token,
@@ -29,7 +30,7 @@ export async function POST(_req: Request, { params }: { params: { slug: string; 
       member: { id: member.id, gymId: member.gymId, encryptedPhone: member.phoneWhatsapp },
       gymName: gym.name,
       trigger: "manual",
-    }),
-  );
-  return NextResponse.json({ url: resetUrl(token) });
+      channel,
+    });
+  return NextResponse.json({ url: resetUrl(token), sendError: channel ? channelProblem(sent, channel) : null });
 }

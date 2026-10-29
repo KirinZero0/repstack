@@ -11,6 +11,25 @@ import { renderEmail } from "./emailTemplates";
  */
 export type Trigger = "auto" | "manual";
 
+export type Channel = "whatsapp" | "email";
+export type ChannelStatus = "SENT" | "FAILED" | "SKIPPED";
+/** What happened on each channel that was tried. */
+export type NotifyResult = Partial<Record<Channel, ChannelStatus>>;
+
+/** Why a message the person chose to send did not go, in words for the screen; null when it was sent. */
+export function channelProblem(result: NotifyResult, channel: Channel): string | null {
+  const status = result[channel];
+  if (status === "SENT") return null;
+  if (channel === "email") {
+    return status === "FAILED"
+      ? "The email couldn't be sent. Check the address and try again."
+      : "Email isn't set up on Liftmora yet, so nothing was sent.";
+  }
+  return status === "FAILED"
+    ? "WhatsApp couldn't send. Check the number and try again."
+    : "WhatsApp isn't available: it's switched off in Settings, or no sending number is set up.";
+}
+
 /**
  * Per-gym channel switches live in Gym.settings. Email is how the system messages members and is on unless
  * turned off. WhatsApp is only ever sent when someone clicks a send button; this switch lets a gym turn
@@ -25,9 +44,9 @@ async function emailMember(
   gymId: string,
   gym: { name: string; address: string | null; settings: unknown },
   opts: { message: string; type: NotificationType; memberId: string },
-) {
+): Promise<ChannelStatus> {
   const member = await prisma.member.findUnique({ where: { id: opts.memberId }, select: { email: true, fullName: true, anonymizedAt: true } });
-  if (!member || member.anonymizedAt) return;
+  if (!member || member.anonymizedAt) return "SKIPPED";
 
   let status: "SENT" | "FAILED" | "SKIPPED";
   if (!emailConfigured()) {
@@ -53,26 +72,43 @@ async function emailMember(
   await prisma.notificationLog.create({
     data: { gymId, memberId: opts.memberId, type: opts.type, channel: "email", status },
   });
+  return status;
 }
 
 /**
- * Tells a member something. Email goes out whenever the gym has it on; WhatsApp only when `trigger` is
- * "manual" (someone clicked a send button) and the gym allows it. `to` is the member's WhatsApp number; the
- * email address is looked up from the member record. Every attempt is logged per channel. With both
- * channels off nothing is sent: the owner can still hand over links by hand.
+ * Tells a member something. By default (`auto`) that is an email, if the gym has email on. When someone
+ * clicked a send button (`trigger: "manual"`) they pick the channel: `channel` sends on that one only, WhatsApp
+ * (if the gym allows it) or email (even if the gym turned automatic email off); without `channel` a manual
+ * send goes on both. `to` is the member's WhatsApp number; the email address comes from the member record.
+ * Every attempt is logged per channel, and the result says what happened on each.
  */
 export async function notifyMember(
   gymId: string,
-  opts: { to: string; message: string; type: NotificationType; memberId: string; trigger?: Trigger },
-): Promise<void> {
+  opts: { to: string; message: string; type: NotificationType; memberId: string; trigger?: Trigger; channel?: Channel },
+): Promise<NotifyResult> {
   const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, address: true, settings: true } });
-  if (!gym) return;
-  const channels = notificationChannels(gym.settings);
+  if (!gym) return {};
+  const allowed = notificationChannels(gym.settings);
+  const manual = opts.trigger === "manual";
+  const wantWhatsapp = manual && allowed.whatsapp && (opts.channel ? opts.channel === "whatsapp" : true);
+  const wantEmail = opts.channel && manual ? opts.channel === "email" : allowed.email;
 
-  const sends: Promise<unknown>[] = [];
-  if (channels.whatsapp && opts.trigger === "manual") sends.push(sendGymWhatsapp(gymId, opts));
-  if (channels.email) sends.push(emailMember(gymId, gym, opts));
-  await Promise.all(sends);
+  const result: NotifyResult = {};
+  await Promise.all([
+    wantWhatsapp
+      ? sendGymWhatsapp(gymId, opts).then((r) => {
+          result.whatsapp = r.ok ? "SENT" : r.skipped ? "SKIPPED" : "FAILED";
+        })
+      : undefined,
+    wantEmail
+      ? emailMember(gymId, gym, opts).then((status) => {
+          result.email = status;
+        })
+      : undefined,
+  ]);
+  // A WhatsApp the person asked for but the gym has switched off is reported, not silently dropped.
+  if (manual && opts.channel === "whatsapp" && !allowed.whatsapp) result.whatsapp = "SKIPPED";
+  return result;
 }
 
 /**
@@ -89,14 +125,20 @@ export async function notifyOwner(opts: {
   message: string;
   type: SystemEmailType;
   trigger?: Trigger;
-}): Promise<void> {
-  const log = (channel: "whatsapp" | "email", status: "SENT" | "FAILED" | "SKIPPED") =>
-    prisma.notificationLog
+  /** With a manual send, the one channel the person picked. */
+  channel?: Channel;
+}): Promise<NotifyResult> {
+  const result: NotifyResult = {};
+  const log = (channel: Channel, status: ChannelStatus) => {
+    result[channel] = status;
+    return prisma.notificationLog
       .create({ data: { gymId: opts.gymId, type: opts.type, channel, status } })
       .catch((err) => console.error("System message log failed", err));
+  };
+  const manual = opts.trigger === "manual";
 
   const sends: Promise<unknown>[] = [];
-  if (opts.to.phone && opts.trigger === "manual") {
+  if (opts.to.phone && manual && (!opts.channel || opts.channel === "whatsapp")) {
     sends.push(
       sendPlatformWhatsapp({ to: opts.to.phone, message: opts.message })
         .then((r) => log("whatsapp", r.ok ? "SENT" : r.skipped ? "SKIPPED" : "FAILED"))
@@ -106,7 +148,7 @@ export async function notifyOwner(opts: {
         }),
     );
   }
-  if (opts.to.email) {
+  if (opts.to.email && (!manual || !opts.channel || opts.channel === "email")) {
     const email = opts.to.email;
     sends.push(
       (async () => {
@@ -128,4 +170,5 @@ export async function notifyOwner(opts: {
     );
   }
   await Promise.all(sends);
+  return result;
 }

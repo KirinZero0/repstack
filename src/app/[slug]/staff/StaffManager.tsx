@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import ChannelPicker, { type Channel } from "@/components/ChannelPicker";
 
 export interface StaffRow {
   id: string;
@@ -17,13 +18,13 @@ const inputCls =
   "w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-white outline-none focus:border-plate-blue";
 const ghost = "whitespace-nowrap rounded-lg border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800 disabled:opacity-50";
 
-function LinkBox({ title, url, onClose }: { title: string; url: string; onClose: () => void }) {
+function LinkBox({ title, url, note, onClose }: { title: string; url: string; note?: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="rounded-lg border border-plate-yellow/60 bg-neutral-950 p-4">
       <p className="text-sm font-medium text-white">{title}</p>
       <p className="mt-1 text-xs text-neutral-500">
-        This link works once and is shown only now. If they have a WhatsApp number on file it was sent there too; otherwise give it to them yourself.
+        This link works once and is shown only now. {note ?? "Give it to them yourself."}
       </p>
       <p className="mt-3 break-all rounded bg-neutral-900 px-3 py-2 text-sm text-white">{url}</p>
       <div className="mt-3 flex gap-3">
@@ -50,7 +51,7 @@ export default function StaffManager({ slug, staff, limit }: { slug: string; sta
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
   const [error, setError] = useState<{ field?: string; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [link, setLink] = useState<{ title: string; url: string } | null>(null);
+  const [link, setLink] = useState<{ title: string; url: string; note?: string } | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
 
   const activeCount = staff.filter((s) => s.isActive).length;
@@ -99,12 +100,16 @@ export default function StaffManager({ slug, staff, limit }: { slug: string; sta
     router.refresh();
   }
 
-  async function newLink(id: string, name: string) {
+  async function newLink(id: string, name: string, channel: Channel) {
     setRowError(null);
-    const res = await fetch(`/api/${slug}/staff/${id}/reset-link`, { method: "POST" });
+    const res = await fetch(`/api/${slug}/staff/${id}/reset-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel }),
+    });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) return setRowError(body.error ?? "Could not create a link.");
-    setLink({ title: `Password link for ${name}`, url: body.url });
+    setLink({ title: `Password link for ${name}`, url: body.url, note: body.sendError ?? `Sent to their ${channel === "email" ? "email" : "WhatsApp"}.` });
   }
 
   return (
@@ -175,9 +180,7 @@ export default function StaffManager({ slug, staff, limit }: { slug: string; sta
                 </td>
                 <td className="flex justify-end gap-2 px-4 py-3">
                   {s.role === "STAFF" && s.isActive && (
-                    <button onClick={() => newLink(s.id, s.name)} className={ghost}>
-                      New password link
-                    </button>
+                    <ChannelPicker label="New password link" onPick={(c) => newLink(s.id, s.name, c)} className={ghost} />
                   )}
                   {s.role === "STAFF" && (
                     <button onClick={() => setActive(s.id, !s.isActive)} className={ghost}>

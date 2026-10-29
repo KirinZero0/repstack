@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireTenantSession, SessionError } from "@/lib/session";
-import { notifyMember } from "@/lib/notify";
+import { channelProblem, notifyMember } from "@/lib/notify";
+import { readChannel } from "@/lib/channel";
 import { decrypt } from "@/lib/crypto";
 
 /**
  * Owner or staff nudges one gym member about their membership: coming up to expiry, expired, or
  * not yet paid. Frozen and cancelled members are left alone.
  */
-export async function POST(_req: Request, { params }: { params: { slug: string; memberId: string } }) {
+export async function POST(req: Request, { params }: { params: { slug: string; memberId: string } }) {
   let gym, db;
   try {
     ({ gym, db } = await requireTenantSession(params.slug));
@@ -43,6 +44,9 @@ export async function POST(_req: Request, { params }: { params: { slug: string; 
       return NextResponse.json({ error: "This member is frozen or cancelled, so there's nothing to remind them about." }, { status: 409 });
   }
 
-  await notifyMember(gym.id, { to: decrypt(member.phoneWhatsapp), message, type: "manual_reminder", memberId: member.id, trigger: "manual" });
+  const channel = await readChannel(req);
+  const result = await notifyMember(gym.id, { to: decrypt(member.phoneWhatsapp), message, type: "manual_reminder", memberId: member.id, trigger: "manual", channel });
+  const problem = channel ? channelProblem(result, channel) : null;
+  if (problem) return NextResponse.json({ error: problem }, { status: 409 });
   return NextResponse.json({ ok: true });
 }

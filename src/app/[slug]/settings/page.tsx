@@ -108,7 +108,7 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
         <div className="mb-6">
           <Card title="WhatsApp messages">
             <p className="mb-4 text-sm text-neutral-400">
-              Activation links, payment receipts and expiry reminders go to your members over WhatsApp.
+              WhatsApp is never sent automatically. It goes out only when you click a send button (Send reminder, Send QR link, Send password link, Remind), and counts toward the allowance below.
             </p>
             <p className="text-sm text-neutral-400">
               {waConfig?.isActive ? (
