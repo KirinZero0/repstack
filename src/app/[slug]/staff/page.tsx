@@ -35,7 +35,7 @@ export default async function StaffPage({ params }: { params: { slug: string } }
             <h1 className="text-2xl font-semibold">Staff</h1>
             <p className="text-sm text-neutral-400">{gym.name}</p>
           </div>
-          <GymNav slug={params.slug} role={session.role} current="staff" />
+          <GymNav slug={params.slug} role={session.role} current="staff" features={gym.features} />
         </div>
         <StaffManager
           slug={params.slug}

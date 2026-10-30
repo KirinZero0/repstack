@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { gymFeatures, type GymFeature } from "@/config/features";
 
 export type GymNavPage = "dashboard" | "members" | "classes" | "fields" | "checkin-station" | "checkin" | "attendance" | "staff" | "plans" | "finance" | "billing" | "settings";
 
@@ -11,6 +12,8 @@ interface Props {
   current: GymNavPage;
   /** True while a gym suspended for non-payment lets its owner in to billing only — every other link is hidden. */
   billingOnly?: boolean;
+  /** The gym's `features` column; optional sections (Fields) appear only when granted. */
+  features?: unknown;
 }
 
 interface Item {
@@ -18,6 +21,8 @@ interface Item {
   label: string;
   href: (slug: string) => string;
   ownerOnly?: boolean;
+  /** Only shown when the gym has been granted this feature. */
+  feature?: GymFeature;
   /** The plate colour this section wears in the nav: floor work is yellow, people blue, classes and plans green, money red. */
   tone: string;
 }
@@ -27,7 +32,7 @@ const ITEMS: Item[] = [
   { page: "members", label: "Members", href: (s) => `/${s}/members`, tone: "var(--plate-blue)" },
   // Staff see the roster and confirm front-desk payments; only the owner gets the set-up controls on the page itself.
   { page: "classes", label: "Classes", href: (s) => `/${s}/classes`, tone: "var(--plate-green)" },
-  { page: "fields", label: "Fields", href: (s) => `/${s}/fields`, tone: "var(--plate-green)" },
+  { page: "fields", label: "Fields", href: (s) => `/${s}/fields`, tone: "var(--plate-green)", feature: "fieldBooking" },
   { page: "checkin-station", label: "Check-in poster", href: (s) => `/${s}/checkin-station`, tone: "var(--plate-yellow)" },
   { page: "checkin", label: "Staff scanner", href: (s) => `/${s}/checkin`, tone: "var(--plate-yellow)" },
   { page: "attendance", label: "Attendance", href: (s) => `/${s}/attendance`, tone: "var(--plate-yellow)" },
@@ -44,13 +49,13 @@ const ITEMS: Item[] = [
  * (e.g. finance only linked back to dashboard). On narrow screens it collapses to a menu button
  * instead of wrapping or getting clipped.
  */
-export default function GymNav({ slug, role, current, billingOnly = false }: Props) {
+export default function GymNav({ slug, role, current, billingOnly = false, features }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
   const items = billingOnly
     ? ITEMS.filter((i) => i.page === "billing")
-    : ITEMS.filter((i) => role === "OWNER" || !i.ownerOnly);
+    : ITEMS.filter((i) => (role === "OWNER" || !i.ownerOnly) && (!i.feature || gymFeatures(features)[i.feature]));
 
   async function logout() {
     await fetch(`/api/${slug}/staff-logout`, { method: "POST" });

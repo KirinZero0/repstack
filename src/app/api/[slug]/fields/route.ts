@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireTenantSession, SessionError } from "@/lib/session";
+import { featureOff, gymHasFeature } from "@/lib/features";
 import { fieldSchema } from "@/lib/validation/tenant";
 import { hoursProblem, parseClock } from "@/lib/fieldBooking";
 
@@ -16,6 +17,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     throw err;
   }
   if (session.role !== "OWNER") return NextResponse.json({ error: "Only the owner can set up fields" }, { status: 403 });
+
+  if (!gymHasFeature(gym, "fieldBooking")) return featureOff("fieldBooking");
 
   const parsed = fieldSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the form." }, { status: 400 });

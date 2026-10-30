@@ -39,7 +39,7 @@ export default async function PlansPage({ params }: { params: { slug: string } }
             <h1 className="text-2xl font-semibold">Membership plans</h1>
             <p className="text-sm text-neutral-400">{gym.name}</p>
           </div>
-          <GymNav slug={params.slug} role={session.role} current="plans" />
+          <GymNav slug={params.slug} role={session.role} current="plans" features={gym.features} />
         </div>
         <PlansManager
           slug={params.slug}

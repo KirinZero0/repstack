@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireTenantSession, SessionError } from "@/lib/session";
+import { featureOff, gymHasFeature } from "@/lib/features";
 import { updateFieldSchema } from "@/lib/validation/tenant";
 import { hoursProblem, parseClock } from "@/lib/fieldBooking";
 
@@ -22,6 +23,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   const o = await owner(params.slug);
   if (o.error) return o.error;
   const { gym, db } = o.t!;
+  if (!gymHasFeature(gym, "fieldBooking")) return featureOff("fieldBooking");
 
   const parsed = updateFieldSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the form." }, { status: 400 });

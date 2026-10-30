@@ -56,7 +56,7 @@ export default async function GuestPassesPage({ params }: { params: { slug: stri
               Non-members asking for a class spot or a day pass. Approve to send their one-time QR ticket; scan it on the check-in scanner.
             </p>
           </div>
-          <GymNav slug={params.slug} role={session.role} current="members" />
+          <GymNav slug={params.slug} role={session.role} current="members" features={gym.features} />
         </div>
         <p className="mb-6 text-sm text-neutral-500">
           Guests request day passes at <span className="text-neutral-300">/{params.slug}/join/day-pass</span> and class spots at <span className="text-neutral-300">/{params.slug}/guest-pass</span>.

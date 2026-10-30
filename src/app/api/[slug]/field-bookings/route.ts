@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { prisma } from "@/lib/prisma";
+import { featureOff, gymHasFeature } from "@/lib/features";
 import { putPrivateFile } from "@/lib/blob";
 import { proofFileError } from "@/lib/transferProof";
 import { fieldBookingRequestSchema } from "@/lib/validation/tenant";
@@ -21,6 +22,7 @@ function clientIp(req: NextRequest): string {
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const gym = await prisma.gym.findUnique({ where: { slug: params.slug } });
   if (!gym) return NextResponse.json({ error: "Gym not found" }, { status: 404 });
+  if (!gymHasFeature(gym, "fieldBooking")) return featureOff("fieldBooking", true);
   if (gym.subscriptionStatus === "SUSPENDED" || gym.subscriptionStatus === "CANCELLED") {
     return NextResponse.json({ error: "This gym isn't taking bookings right now." }, { status: 403 });
   }

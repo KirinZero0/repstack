@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { EMAIL_LIMITS, EMAIL_MESSAGE_TYPES, EMAIL_PLACEHOLDERS, type EmailMessageType } from "@/config/email";
 import { renderEmail, resolveTemplate, type EmailVars, type TemplateRow } from "@/lib/emailTemplates";
 
@@ -9,6 +9,19 @@ const selectCls =
   "w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-white outline-none focus:border-neutral-500";
 const btnCls =
   "rounded-md bg-white px-4 py-2 text-sm font-medium text-neutral-950 hover:bg-neutral-200 disabled:opacity-50";
+
+/**
+ * Where these forms post. The owner's settings page leaves it alone (their own gym's route); the superadmin's
+ * gym page wraps the same forms in this to point them at the superadmin route for that gym.
+ */
+const EndpointContext = createContext<string | null>(null);
+export function SettingsEndpoint({ url, children }: { url: string; children: React.ReactNode }) {
+  return <EndpointContext.Provider value={url}>{children}</EndpointContext.Provider>;
+}
+function useSettingsSave(slug: string) {
+  const override = useContext(EndpointContext);
+  return useSave(override ?? `/api/${slug}/settings`);
+}
 
 function useSave(url: string) {
   const router = useRouter();
@@ -122,7 +135,7 @@ export function GymThemeForm({
   initial: "inherit" | "light" | "dark" | "system";
 }) {
   const [theme, setTheme] = useState(initial);
-  const { state, error, save } = useSave(`/api/${slug}/settings`);
+  const { state, error, save } = useSettingsSave(slug);
 
   return (
     <form
@@ -162,7 +175,7 @@ export function BankDetailsForm({
   const [bankName, setBankName] = useState(initial.bankName);
   const [bankAccountNumber, setBankAccountNumber] = useState(initial.bankAccountNumber);
   const [bankAccountHolder, setBankAccountHolder] = useState(initial.bankAccountHolder);
-  const { state, error, save } = useSave(`/api/${slug}/settings`);
+  const { state, error, save } = useSettingsSave(slug);
 
   return (
     <form
@@ -200,7 +213,7 @@ export function BankDetailsForm({
 
 export function JoinSettingsForm({ slug, initial, joinUrl }: { slug: string; initial: boolean; joinUrl: string }) {
   const [on, setOn] = useState(initial);
-  const { state, error, save } = useSave(`/api/${slug}/settings`);
+  const { state, error, save } = useSettingsSave(slug);
 
   return (
     <div className="space-y-4">
@@ -247,7 +260,7 @@ export function JoinSettingsForm({ slug, initial, joinUrl }: { slug: string; ini
 
 export function OnlinePaymentsForm({ slug, initial, providerReady }: { slug: string; initial: boolean; providerReady: boolean }) {
   const [on, setOn] = useState(initial);
-  const { state, error, save } = useSave(`/api/${slug}/settings`);
+  const { state, error, save } = useSettingsSave(slug);
 
   return (
     <div className="space-y-4">
@@ -292,7 +305,7 @@ export function GymProfileForm({
 }) {
   const [description, setDescription] = useState(initial.description);
   const [address, setAddress] = useState(initial.address);
-  const { state, error, save } = useSave(`/api/${slug}/settings`);
+  const { state, error, save } = useSettingsSave(slug);
 
   return (
     <form
@@ -347,7 +360,7 @@ const TIMEZONES: { id: string; label: string }[] = [
 export function GymDetailsForm({ slug, initialName, initialTimezone }: { slug: string; initialName: string; initialTimezone: string }) {
   const [name, setName] = useState(initialName);
   const [timezone, setTimezone] = useState(initialTimezone);
-  const { state, error, save } = useSave(`/api/${slug}/settings`);
+  const { state, error, save } = useSettingsSave(slug);
   const options = TIMEZONES.some((t) => t.id === initialTimezone) ? TIMEZONES : [{ id: initialTimezone, label: initialTimezone }, ...TIMEZONES];
 
   return (
@@ -397,7 +410,7 @@ export function NotificationsForm({
 }) {
   const [whatsapp, setWhatsapp] = useState(initialWhatsapp);
   const [email, setEmail] = useState(initialEmail);
-  const { state, error, save } = useSave(`/api/${slug}/settings`);
+  const { state, error, save } = useSettingsSave(slug);
 
   return (
     <div className="space-y-4">
@@ -450,7 +463,7 @@ export function NotificationsForm({
 export function CheckinRulesForm({ slug, initialPerDay, initialGap }: { slug: string; initialPerDay: number; initialGap: number }) {
   const [perDay, setPerDay] = useState(initialPerDay);
   const [gap, setGap] = useState(initialGap);
-  const { state, error, save } = useSave(`/api/${slug}/settings`);
+  const { state, error, save } = useSettingsSave(slug);
 
   return (
     <div className="space-y-4">
@@ -505,7 +518,7 @@ export function CheckinRulesForm({ slug, initialPerDay, initialGap }: { slug: st
 
 export function OccupancyForm({ slug, initialHours }: { slug: string; initialHours: number }) {
   const [hours, setHours] = useState(initialHours);
-  const { state, error, save } = useSave(`/api/${slug}/settings`);
+  const { state, error, save } = useSettingsSave(slug);
 
   return (
     <div className="space-y-3">
@@ -539,7 +552,7 @@ export function OccupancyForm({ slug, initialHours }: { slug: string; initialHou
 
 export function WhoIsInForm({ slug, initial }: { slug: string; initial: boolean }) {
   const [on, setOn] = useState(initial);
-  const { state, error, save } = useSave(`/api/${slug}/settings`);
+  const { state, error, save } = useSettingsSave(slug);
 
   return (
     <div className="space-y-3 border-t border-neutral-800 pt-4">
@@ -599,7 +612,7 @@ export function EmailTemplatesForm({
   const current = resolveTemplate(rowsOf(saved), slug, type);
   const [subject, setSubject] = useState(current.subject);
   const [body, setBody] = useState(current.body);
-  const { state, error, save } = useSave(`/api/${slug}/settings`);
+  const { state, error, save } = useSettingsSave(slug);
   const templates = useSave(`/api/${slug}/email-templates`);
   const saveTemplateApi = templates.save;
 

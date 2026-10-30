@@ -21,7 +21,7 @@ const DAY2 = dayKeyInTimezone(new Date(Date.now() + 74 * HOUR), TZ);
 async function makeGym() {
   const tag = uniq("fld");
   const saasPlan = await prisma.saasPlan.findFirstOrThrow({ where: { isActive: true } });
-  const gym = await prisma.gym.create({ data: { name: `Field Gym ${tag}`, slug: tag, saasPlanId: saasPlan.id, subscriptionStatus: "ACTIVE" } });
+  const gym = await prisma.gym.create({ data: { name: `Field Gym ${tag}`, slug: tag, saasPlanId: saasPlan.id, subscriptionStatus: "ACTIVE", features: { fieldBooking: true } } });
   const owner = { email: `owner-${tag}@test.local`, password: "owner-pass-123" };
   const staff = { email: `staff-${tag}@test.local`, password: "staff-pass-123" };
   await prisma.staffUser.create({ data: { gymId: gym.id, name: "Owner", email: owner.email, passwordHash: await bcrypt.hash(owner.password, 10), role: "OWNER" } });

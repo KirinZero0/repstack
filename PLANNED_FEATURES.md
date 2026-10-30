@@ -434,3 +434,26 @@ staff approve, but the thing being booked is a stretch of time on one field, so 
 - **Deploy**: `npm run db:migrate` (new tables, enum values, the overlap rule), `npm run db:rls`, then
   `npm run db:seed:templates` for the four new default templates.
 - Tests: `e2e/44-field-bookings.spec.ts`.
+
+## 15. Superadmin gym settings and per-gym features
+
+- **Features** (`src/config/features.ts`, `Gym.features` JSON column, migration `gym_features`): optional features
+  Liftmora grants each gym. The first is **Field booking**, off by default. Adding a feature is one entry in the
+  registry plus a `gymHasFeature(gym, "...")` check where it is used. Only a superadmin can change them
+  (`POST /api/superadmin/gyms/[gymId]/features`, audited as `GYM_FEATURE_CHANGED` with what it was and is). The owner's
+  settings route ignores a `features` key, so a gym can't grant itself anything.
+- **What "off" does for field booking**: the Fields menu item and public "Book a field" link disappear, the public booking
+  page and availability say it isn't available, and new requests, field set-up, staff-made bookings and approvals are
+  refused (403 for staff, 404 for the public). What already happened stays: existing fields and bookings are kept,
+  an approved booking's ticket still shows and scans, and staff can still cancel, decline or mark attended. The owner's
+  Settings page lists each feature as On or "Ask Liftmora to turn it on".
+- **Superadmin gym page** `/superadmin/gyms/[gymId]` (the "Settings" button on each gym in the gyms list; superadmin
+  session only, the owner is sent to the superadmin login): the Features switches, and every setting the owner has on
+  their own page (gym details and timezone, public page, notifications, bank details, online payments, sign-up, check-in
+  rules, who's-in, appearance), using the same forms and the same validation. Changes go through
+  `POST /api/superadmin/gyms/[gymId]/settings` (audited as `GYM_SETTINGS_CHANGED` with the setting names, never their
+  values, so bank details stay out of the log). The owner's route and this one share one merge
+  (`gymSettingsUpdate` in `src/lib/gymSettings.ts`), which keeps any settings not being changed.
+- **Deploy**: `npm run db:migrate` (adds `Gym.features`), then **grant Field booking to each gym that should have it**
+  from its page in the superadmin panel; nobody has it until you do.
+- Tests: `e2e/45-gym-features.spec.ts` (and `e2e/44` now grants the feature to its test gyms).

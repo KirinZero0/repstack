@@ -87,7 +87,7 @@ export default async function ClassesPage({ params }: { params: { slug: string }
             <h1 className="text-2xl font-semibold">Classes</h1>
             <p className="text-sm text-neutral-400">{gym.name}</p>
           </div>
-          <GymNav slug={params.slug} role={session.role} current="classes" />
+          <GymNav slug={params.slug} role={session.role} current="classes" features={gym.features} />
         </div>
         <a href={`/${params.slug}/members/guests`} className="mb-6 inline-block text-sm text-neutral-300 underline underline-offset-2 hover:text-white">
           Guest tickets (non-members) →

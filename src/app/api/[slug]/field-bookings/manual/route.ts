@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireTenantSession, SessionError } from "@/lib/session";
+import { featureOff, gymHasFeature } from "@/lib/features";
 import { manualFieldBookingSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
 import { bookingInstants, bookingPrice, parseClock, timeProblem } from "@/lib/fieldBooking";
@@ -20,6 +21,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     }
     throw err;
   }
+
+  if (!gymHasFeature(gym, "fieldBooking")) return featureOff("fieldBooking");
 
   const parsed = manualFieldBookingSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the form." }, { status: 400 });

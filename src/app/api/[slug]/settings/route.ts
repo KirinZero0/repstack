@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { gymSettingsSchema } from "@/lib/validation/tenant";
+import { gymSettingsUpdate } from "@/lib/gymSettings";
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   let session, gym, db;
@@ -21,36 +21,6 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const parsed = gymSettingsSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const next = { ...((gym.settings ?? {}) as Record<string, unknown>) };
-  if (parsed.data.theme !== undefined) {
-    if (parsed.data.theme === "inherit") delete next.theme;
-    else next.theme = parsed.data.theme;
-  }
-  if (parsed.data.acceptSignups !== undefined) next.acceptSignups = parsed.data.acceptSignups;
-  if (parsed.data.paymentsEnabled !== undefined) next.paymentsEnabled = parsed.data.paymentsEnabled;
-  if (parsed.data.notifyWhatsapp !== undefined) next.notifyWhatsapp = parsed.data.notifyWhatsapp;
-  if (parsed.data.notifyEmail !== undefined) next.notifyEmail = parsed.data.notifyEmail;
-  if (parsed.data.emailReplyTo !== undefined) {
-    if (parsed.data.emailReplyTo) next.emailReplyTo = parsed.data.emailReplyTo;
-    else delete next.emailReplyTo;
-  }
-  if (parsed.data.occupancyWindowHours !== undefined) next.occupancyWindowHours = parsed.data.occupancyWindowHours;
-  if (parsed.data.checkinsPerDay !== undefined) next.checkinsPerDay = parsed.data.checkinsPerDay;
-  if (parsed.data.checkinGapMinutes !== undefined) next.checkinGapMinutes = parsed.data.checkinGapMinutes;
-  if (parsed.data.whoIsInEnabled !== undefined) next.whoIsInEnabled = parsed.data.whoIsInEnabled;
-
-  await db.gym.update({
-    where: { id: gym.id },
-    data: {
-      settings: next as Prisma.InputJsonValue,
-      ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
-      ...(parsed.data.timezone !== undefined ? { timezone: parsed.data.timezone } : {}),
-      ...(parsed.data.bankName !== undefined ? { bankName: parsed.data.bankName || null } : {}),
-      ...(parsed.data.bankAccountNumber !== undefined ? { bankAccountNumber: parsed.data.bankAccountNumber || null } : {}),
-      ...(parsed.data.bankAccountHolder !== undefined ? { bankAccountHolder: parsed.data.bankAccountHolder || null } : {}),
-      ...(parsed.data.description !== undefined ? { description: parsed.data.description || null } : {}),
-      ...(parsed.data.address !== undefined ? { address: parsed.data.address || null } : {}),
-    },
-  });
+  await db.gym.update({ where: { id: gym.id }, data: gymSettingsUpdate(gym.settings, parsed.data) });
   return NextResponse.json({ ok: true });
 }

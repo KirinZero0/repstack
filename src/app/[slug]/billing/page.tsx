@@ -96,7 +96,7 @@ export default async function BillingPage({
             <h1 className="text-2xl font-semibold">Billing</h1>
             <p className="text-sm text-neutral-400">{gym.name}</p>
           </div>
-          <GymNav slug={params.slug} role={session.role} current="billing" billingOnly={suspended} />
+          <GymNav slug={params.slug} role={session.role} current="billing" features={gym.features} billingOnly={suspended} />
         </div>
 
         {mockPayment && (

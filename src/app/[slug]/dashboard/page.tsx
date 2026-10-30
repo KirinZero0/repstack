@@ -74,7 +74,7 @@ export default async function DashboardPage({ params }: { params: { slug: string
               View gym page ↗
             </a>
           </div>
-          <GymNav slug={params.slug} role={session.role} current="dashboard" />
+          <GymNav slug={params.slug} role={session.role} current="dashboard" features={gym.features} />
         </div>
 
         <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">

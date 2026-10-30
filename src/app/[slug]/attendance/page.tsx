@@ -65,7 +65,7 @@ export default async function AttendancePage({ params }: { params: { slug: strin
             <h1 className="text-2xl font-semibold">Attendance</h1>
             <p className="text-sm text-neutral-400">{gym.name} · log visits by hand when there&apos;s no QR to scan.</p>
           </div>
-          <GymNav slug={params.slug} role={session.role} current="attendance" />
+          <GymNav slug={params.slug} role={session.role} current="attendance" features={gym.features} />
         </div>
         <AttendanceDesk slug={params.slug} plans={planOptions} members={memberOptions} entries={entries} />
       </div>

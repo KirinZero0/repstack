@@ -56,6 +56,7 @@ model Gym {
   nextBillingDate    DateTime?
   isLifetime         Boolean            @default(false) // true = never billed by subscription cron (e.g. founding/investor deals)
   settings           Json               @default("{}")
+  features           Json               @default("{}") // optional features Liftmora grants this gym (see src/config/features.ts); only a superadmin changes it
   termsAcceptedAt    DateTime?          // when the owner accepted the terms and privacy policy
   bankName           String? // shown on the public join page for manual bank-transfer requests
   bankAccountNumber  String?

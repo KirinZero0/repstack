@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
+import { gymHasFeature } from "@/lib/features";
 import { gymAcceptsSignups } from "@/lib/memberSignup";
 import BrandMark from "@/components/BrandMark";
 
@@ -28,6 +29,7 @@ export default async function GymProfilePage({ params }: { params: { slug: strin
       address: true,
       photoUrls: true,
       settings: true,
+      features: true,
       subscriptionStatus: true,
     },
   });
@@ -40,7 +42,7 @@ export default async function GymProfilePage({ params }: { params: { slug: strin
   });
 
   const hasDayPass = (await prisma.dayPassPlan.count({ where: { gymId: gym.id, isActive: true } })) > 0;
-  const hasFields = (await prisma.field.count({ where: { gymId: gym.id, isActive: true } })) > 0;
+  const hasFields = gymHasFeature(gym, "fieldBooking") && (await prisma.field.count({ where: { gymId: gym.id, isActive: true } })) > 0;
   const live = gym.subscriptionStatus !== "SUSPENDED" && gym.subscriptionStatus !== "CANCELLED";
   const canJoin = live && gymAcceptsSignups(gym.settings);
   const [hero, ...rest] = gym.photoUrls;

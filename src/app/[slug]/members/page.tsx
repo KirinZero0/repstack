@@ -58,7 +58,7 @@ export default async function MembersPage({ params }: { params: { slug: string }
               )}
             </p>
           </div>
-          <GymNav slug={params.slug} role={session.role} current="members" />
+          <GymNav slug={params.slug} role={session.role} current="members" features={gym.features} />
         </div>
 
         {pendingCount > 0 && (

@@ -40,7 +40,7 @@ export default async function FinancePage({ params }: { params: { slug: string }
             <h1 className="text-2xl font-semibold">Financials</h1>
             <p className="text-sm text-neutral-400">{gym.name}</p>
           </div>
-          <GymNav slug={params.slug} role={session.role} current="finance" />
+          <GymNav slug={params.slug} role={session.role} current="finance" features={gym.features} />
         </div>
 
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">

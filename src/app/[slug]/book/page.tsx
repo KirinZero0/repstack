@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
+import { gymHasFeature } from "@/lib/features";
 import { gymBank } from "@/lib/transferProof";
 import { dayKeyInTimezone } from "@/lib/date";
 import { MAX_DAYS_AHEAD } from "@/lib/fieldBooking";
@@ -18,7 +19,7 @@ export default async function BookPage({ params }: { params: { slug: string } })
   const gym = await prisma.gym.findUnique({ where: { slug: params.slug } });
   if (!gym) notFound();
 
-  const open = gym.subscriptionStatus !== "SUSPENDED" && gym.subscriptionStatus !== "CANCELLED";
+  const open = gym.subscriptionStatus !== "SUSPENDED" && gym.subscriptionStatus !== "CANCELLED" && gymHasFeature(gym, "fieldBooking");
   const fields = open ? await prisma.field.findMany({ where: { gymId: gym.id, isActive: true }, orderBy: { name: "asc" } }) : [];
   const today = dayKeyInTimezone(new Date(), gym.timezone);
   const last = dayKeyInTimezone(new Date(Date.now() + MAX_DAYS_AHEAD * 24 * 3600 * 1000), gym.timezone);

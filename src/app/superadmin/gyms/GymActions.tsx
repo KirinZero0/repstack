@@ -102,6 +102,12 @@ export default function GymActions({
         >
           WhatsApp{waNumber ? " ✓" : ""}
         </button>
+        <a
+          href={`/superadmin/gyms/${gymId}`}
+          className="whitespace-nowrap rounded-md border border-neutral-700 px-3 py-1 text-sm text-neutral-300 hover:bg-neutral-800"
+        >
+          Settings
+        </a>
         <ChannelPicker
           label="Owner link"
           busy={isPending}

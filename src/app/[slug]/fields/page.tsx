@@ -4,6 +4,7 @@ import { decrypt, maskEmail, maskPhone } from "@/lib/crypto";
 import { dayKeyInTimezone } from "@/lib/date";
 import { bookingInstants, bookingWindow, clock, isDateKey } from "@/lib/fieldBooking";
 import GymNav from "@/components/GymNav";
+import { gymHasFeature } from "@/lib/features";
 import FieldsManager, { type BookingRow, type FieldRow } from "./FieldsManager";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,22 @@ export default async function FieldsPage({ params, searchParams }: { params: { s
   } catch (err) {
     if (err instanceof SessionError) redirect(`/${params.slug}/login`);
     throw err;
+  }
+
+  if (!gymHasFeature(gym, "fieldBooking")) {
+    return (
+      <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
+        <div className="mx-auto max-w-5xl">
+          <div className="gym-head mb-8 flex flex-wrap items-center justify-between gap-4">
+            <h1 className="text-2xl font-semibold">Fields</h1>
+            <GymNav slug={params.slug} role={session.role} current="dashboard" features={gym.features} />
+          </div>
+          <p className="rounded-xl border border-neutral-800 bg-neutral-900 p-6 text-neutral-300" data-testid="feature-off">
+            Field booking isn&apos;t enabled for {gym.name}. Ask Liftmora to turn it on.
+          </p>
+        </div>
+      </main>
+    );
   }
 
   const today = dayKeyInTimezone(new Date(), gym.timezone);
@@ -82,7 +99,7 @@ export default async function FieldsPage({ params, searchParams }: { params: { s
               Courts and pitches people book by the hour. A booking takes its time once you approve it. Public booking page: <a className="underline underline-offset-2" href={`/${params.slug}/book`}>/{params.slug}/book</a>
             </p>
           </div>
-          <GymNav slug={params.slug} role={session.role} current="fields" />
+          <GymNav slug={params.slug} role={session.role} current="fields" features={gym.features} />
         </div>
         <FieldsManager
           slug={params.slug}

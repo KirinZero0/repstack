@@ -7,6 +7,7 @@ import { fieldBookingActionSchema } from "@/lib/validation/tenant";
 import { bookingWindow } from "@/lib/fieldBooking";
 import { HOLDING, isOverlapError, sendBookingApproved, sendBookingCancelled, sendBookingRejected } from "@/lib/fieldBookings";
 import { channelProblem } from "@/lib/notify";
+import { featureOff, gymHasFeature } from "@/lib/features";
 
 const TAKEN = "Another booking already holds this time. Decline this one, or cancel the other first.";
 
@@ -41,6 +42,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const paid = Number(booking.amount) > 0;
 
   if (action === "approve") {
+    // Taking new bookings needs the feature; managing ones already made (cancel, attend, resend) always works.
+    if (!gymHasFeature(gym, "fieldBooking")) return featureOff("fieldBooking");
     if (booking.status !== "PENDING_REVIEW") return NextResponse.json({ error: "This request was already reviewed." }, { status: 409 });
     if (window === "OVER") return NextResponse.json({ error: "That time has already passed." }, { status: 409 });
     const clash = await db.fieldBooking.findFirst({

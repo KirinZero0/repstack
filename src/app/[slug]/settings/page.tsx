@@ -12,6 +12,7 @@ import { emailConfigured } from "@/lib/email";
 import { gymPaymentsEnabled, onlinePaymentsEnabled } from "@/lib/gateway";
 import { MAX_GYM_PHOTOS } from "@/lib/validation/tenant";
 import GymNav from "@/components/GymNav";
+import { GYM_FEATURES, GYM_FEATURE_KEYS, gymFeatures } from "@/config/features";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +57,7 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
             <h1 className="text-2xl font-semibold">Settings</h1>
             <p className="text-sm text-neutral-400">{gym.name}</p>
           </div>
-          <GymNav slug={params.slug} role={session.role} current="settings" />
+          <GymNav slug={params.slug} role={session.role} current="settings" features={gym.features} />
         </div>
 
         <div className="gym-masonry">
@@ -64,6 +65,23 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
         <div className="mb-6">
           <Card title="Gym details">
             <GymDetailsForm slug={params.slug} initialName={gym.name} initialTimezone={gym.timezone} />
+          </Card>
+        </div>
+
+        <div className="mb-6">
+          <Card title="Features">
+            <ul className="space-y-3 text-sm" data-testid="features-list">
+              {GYM_FEATURE_KEYS.map((k) => {
+                const on = gymFeatures(gym.features)[k];
+                return (
+                  <li key={k}>
+                    <span className="font-medium text-neutral-200">{GYM_FEATURES[k].label}</span>{" "}
+                    <span className={on ? "text-emerald-400" : "text-neutral-500"}>{on ? "On" : "Off"}</span>
+                    <span className="mt-1 block text-neutral-500">{on ? GYM_FEATURES[k].description : "Not part of your plan yet. Ask Liftmora to turn it on."}</span>
+                  </li>
+                );
+              })}
+            </ul>
           </Card>
         </div>
 
