@@ -186,12 +186,12 @@ test("the monthly summary has one row per month with revenue split by type and m
   await login(request, baseURL!, f.slug, f.owner);
   const { rows, disposition } = await fetchCsv(request, baseURL!, f.slug, `?report=monthly&from=${prevKey}-01&to=${dayKeyInTimezone(now, TZ)}`);
   expect(disposition).toContain(`finance-monthly-${f.slug}-`);
-  expect(rows[0]).toEqual(["Month", "Membership revenue", "Class revenue", "Day pass revenue", "Total revenue", "Paid payments", "Cash / transfer", "Online", "Voided"]);
+  expect(rows[0]).toEqual(["Month", "Membership revenue", "Class revenue", "Day pass revenue", "Field revenue", "Total revenue", "Paid payments", "Cash / transfer", "Online", "Voided"]);
   expect(rows).toHaveLength(3);
   // Previous month: one cash payment, one voided entry.
-  expect(rows[1].slice(1)).toEqual(["300000", "0", "0", "300000", "1", "300000", "0", "1"]);
+  expect(rows[1].slice(1)).toEqual(["300000", "0", "0", "0", "300000", "1", "300000", "0", "1"]);
   // This month: cash + online membership and an online class; the pending invoice isn't revenue.
-  expect(rows[2].slice(1)).toEqual(["450000", "40000", "60000", "550000", "5", "260000", "290000", "0"]);
+  expect(rows[2].slice(1)).toEqual(["450000", "40000", "60000", "0", "550000", "5", "260000", "290000", "0"]);
   expect(rows[2][0]).toMatch(/^[A-Z][a-z]{2} \d{4}$/);
 
   // The default monthly range is twelve months, all present even when empty.
