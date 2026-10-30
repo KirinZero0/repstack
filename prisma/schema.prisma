@@ -55,6 +55,7 @@ model Gym {
   subscriptionStatus SubscriptionStatus @default(TRIALING)
   nextBillingDate    DateTime?
   isLifetime         Boolean            @default(false) // true = never billed by subscription cron (e.g. founding/investor deals)
+  isTest             Boolean            @default(false) // a superadmin's test gym: left out of platform revenue and totals, never billed, and sends nothing automatically (send buttons still work)
   settings           Json               @default("{}")
   features           Json               @default("{}") // optional features Liftmora grants this gym (see src/config/features.ts); only a superadmin changes it
   termsAcceptedAt    DateTime?          // when the owner accepted the terms and privacy policy

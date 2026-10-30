@@ -48,15 +48,17 @@ export default async function SuperadminGymsPage() {
     });
   }
 
-  const recurringGyms = gyms.filter((g) => !g.isLifetime && g.subscriptionStatus === "ACTIVE");
+  // Test gyms are listed (so they can be managed) but never counted in the totals.
+  const realGyms = gyms.filter((g) => !g.isTest);
+  const recurringGyms = realGyms.filter((g) => !g.isLifetime && g.subscriptionStatus === "ACTIVE");
   const mrr = recurringGyms.reduce(
     (sum, g) => sum + monthlyEquivalent(Number(g.saasPlan.price), g.saasPlan.billingInterval),
     0,
   );
-  const lifetimeRevenue = gyms
+  const lifetimeRevenue = realGyms
     .filter((g) => g.isLifetime)
     .reduce((sum, g) => sum + Number(g.saasPlan.price), 0);
-  const setupFees = gyms.map((g) => g.platformPayments[0]).filter((p): p is NonNullable<typeof p> => Boolean(p));
+  const setupFees = realGyms.map((g) => g.platformPayments[0]).filter((p): p is NonNullable<typeof p> => Boolean(p));
   const setupFeesCollected = setupFees.filter((p) => p.status === "PAID").reduce((sum, p) => sum + Number(p.amount), 0);
   const setupFeesDue = setupFees.filter((p) => p.status === "PENDING").reduce((sum, p) => sum + Number(p.amount), 0);
 
@@ -114,7 +116,10 @@ export default async function SuperadminGymsPage() {
                 const setupFee = gym.platformPayments[0];
                 return (
                   <tr key={gym.id} className="border-t border-neutral-800">
-                    <td className="px-4 py-3 font-medium">{gym.name}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {gym.name}
+                      {gym.isTest && <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400" data-testid="test-badge">Test</span>}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-neutral-400">{gym.slug}</td>
                     <td className="px-4 py-3">{gym.saasPlan.name}</td>
                     <td className="px-4 py-3">{gym._count.members}</td>

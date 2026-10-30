@@ -24,6 +24,7 @@ import { notificationChannels } from "@/lib/notify";
 import { emailConfigured } from "@/lib/email";
 import { gymPaymentsEnabled, onlinePaymentsEnabled } from "@/lib/gateway";
 import GymFeaturesForm from "./GymFeaturesForm";
+import TestGymForm from "./TestGymForm";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,7 @@ export default async function SuperadminGymPage({ params }: { params: { gymId: s
             <p className="text-sm text-neutral-400">
               /{gym.slug} · {gym.saasPlan.name} · {gym.subscriptionStatus.toLowerCase().replace("_", " ")}
               {gym.isLifetime ? " · lifetime" : ""}
+              {gym.isTest && <span className="ml-2 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400">Test</span>}
             </p>
           </div>
           <a href={`/${gym.slug}`} className="text-sm text-neutral-400 underline underline-offset-2 hover:text-white">Public page</a>
@@ -70,6 +72,12 @@ export default async function SuperadminGymPage({ params }: { params: { gymId: s
               gymId={gym.id}
               features={GYM_FEATURE_KEYS.map((k) => ({ key: k, label: GYM_FEATURES[k].label, description: GYM_FEATURES[k].description, enabled: enabled[k] }))}
             />
+          </Card>
+        </div>
+
+        <div className="mb-6">
+          <Card title="Test gym">
+            <TestGymForm gymId={gym.id} initial={gym.isTest} />
           </Card>
         </div>
 
