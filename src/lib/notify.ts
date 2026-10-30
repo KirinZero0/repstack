@@ -128,12 +128,14 @@ export async function notifyMember(
  */
 export async function notifyGuest(
   gymId: string,
-  opts: { phone: string; email: string | null; name: string; message: string; type: NotificationType; channel?: Channel },
+  opts: { phone: string; email: string | null; name: string; message: string; type: NotificationType; channel?: Channel; trigger?: Trigger },
 ): Promise<NotifyResult> {
   const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, address: true, settings: true } });
   if (!gym) return {};
   const allowed = notificationChannels(gym.settings);
-  const wantWhatsapp = Boolean(opts.phone) && (opts.channel ? opts.channel === "whatsapp" : allowed.whatsapp);
+  // Staff clicking approve, decline or resend is manual (the default here); an automatic "we got your request" is email only.
+  const auto = opts.trigger === "auto";
+  const wantWhatsapp = !auto && Boolean(opts.phone) && (opts.channel ? opts.channel === "whatsapp" : allowed.whatsapp);
   const wantEmail = Boolean(opts.email) && (opts.channel ? opts.channel === "email" : allowed.email);
 
   const result: NotifyResult = {};

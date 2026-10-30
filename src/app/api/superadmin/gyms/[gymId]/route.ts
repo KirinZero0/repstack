@@ -51,6 +51,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { gymId: st
     prisma.gymClass.deleteMany({ where: g }),
     prisma.dayPassPlan.deleteMany({ where: g }),
     prisma.emailTemplate.deleteMany({ where: g }),
+    prisma.fieldBooking.deleteMany({ where: g }),
+    prisma.field.deleteMany({ where: g }),
     prisma.membershipPlan.deleteMany({ where: g }),
     prisma.memberSignup.deleteMany({ where: g }),
     prisma.notificationLog.deleteMany({ where: g }),

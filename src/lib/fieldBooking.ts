@@ -34,6 +34,13 @@ export function parseClock(value: string): number | null {
   return Number(m[2]) < 60 && minutes <= 24 * 60 ? minutes : null;
 }
 
+/** Why a field's opening hours don't work, or null. Times must sit on the step so every booking can too. */
+export function hoursProblem(opensAt: number, closesAt: number, step: number): string | null {
+  if (closesAt <= opensAt) return "The field must close after it opens.";
+  if (opensAt % step !== 0 || closesAt % step !== 0) return `Opening and closing times must be on the ${step}-minute mark.`;
+  return null;
+}
+
 export function isDateKey(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
 }
@@ -54,12 +61,14 @@ export function bookingPrice(pricePerHour: number, minutes: number): number {
 }
 
 /** Why a requested time can't be booked, in words for the form; null when the time itself is fine. */
-export function timeProblem(rules: FieldRules, dateKey: string, startMin: number, endMin: number, timezone: string, now = new Date()): string | null {
+/** Pass `now = null` for staff: they may log a booking that is already under way, and aren't held to the booking horizon. */
+export function timeProblem(rules: FieldRules, dateKey: string, startMin: number, endMin: number, timezone: string, now: Date | null = new Date()): string | null {
   if (!isDateKey(dateKey)) return "Pick a date.";
   if (startMin % rules.stepMinutes !== 0 || endMin % rules.stepMinutes !== 0) return `Times must be on the ${rules.stepMinutes}-minute mark.`;
   if (endMin <= startMin) return "The end must be after the start.";
   if (startMin < rules.opensAt || endMin > rules.closesAt) return `This field is open ${clock(rules.opensAt)} to ${clock(rules.closesAt)}.`;
   if (endMin - startMin > MAX_BOOKING_MINUTES) return `A booking can be at most ${MAX_BOOKING_MINUTES / 60} hours.`;
+  if (now === null) return null;
   const { startsAt } = bookingInstants(dateKey, startMin, endMin, timezone);
   if (startsAt.getTime() <= now.getTime()) return "That time has already started or passed.";
   if (startsAt.getTime() > now.getTime() + MAX_DAYS_AHEAD * 24 * 3600 * 1000) return `Bookings open ${MAX_DAYS_AHEAD} days ahead.`;

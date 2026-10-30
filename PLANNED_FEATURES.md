@@ -400,3 +400,37 @@ in the database survive; `npm run db:seed:templates -- --overwrite` resets them 
 normal dev seed (`npm run db:seed`) runs it too. Without these rows nothing breaks: the built-in wording is the
 last fallback. Run it once on production after `db:migrate` (and again with `--overwrite` if you change the built-in
 text and want the stored defaults to follow). Test: `e2e/42-email-templates.spec.ts`.
+
+## 14. Field booking (courts and pitches)
+
+A gym can offer fields people book by the hour, such as badminton courts. Like a day pass it is a request that
+staff approve, but the thing being booked is a stretch of time on one field, so no two bookings may overlap.
+
+- **Fields** (`/[slug]/fields`, owner sets up): name, sport, price per hour, opening and closing time (24:00 =
+  midnight) and a step (15, 30 or 60 minutes). Bookings start and end on the step, anywhere inside open hours, up to
+  6 hours long, up to 60 days ahead. The price is the hourly price pro rata (90 minutes at Rp 60.000 an hour is
+  Rp 90.000). A field with bookings is switched off, not deleted.
+- **Public page** `/[slug]/book` (linked from the gym's page when it has a field): pick field, day and a free
+  stretch of time, give name, WhatsApp number and email (all required, like guest passes), attach an optional transfer
+  proof. It shows what is already booked. Per-IP and per-gym rate limits, and names can't carry links.
+- **Only an approved booking takes the time.** A request holds nothing, so several people can ask for the same hour.
+  Approving it takes the time; a request that overlaps an approved booking is refused at request time and
+  can't be approved. The rule is in the database (an exclusion constraint on `FieldBooking`, migration
+  `field_bookings`, needs the `btree_gist` extension), so two approvals at the same instant, or any direct write,
+  can't double-book: exactly one wins. Bookings that touch (ends 18:00, starts 18:00) are fine.
+- **The scan only records attendance.** A booking's QR ticket (same signed ticket as guest passes, shown at
+  `/ticket/<token>`) scans on the normal staff scanner: from 30 minutes before the start until the end it flips the booking
+  APPROVED to ATTENDED once; too early, over, used, wrong gym and forged tickets are refused. The time stays held
+  whether or not anyone scans. Staff can also mark Came, or No-show once the time is over.
+- **Staff screen**: booking requests (approve with the transfer proof beside it, decline), a day timeline per
+  field, and a form to add a booking made by phone or at the counter (approved at once, past times allowed) or to block
+  time for maintenance (no guest, no payment, never revenue). Cancel an approved booking to free the time and kill its
+  ticket; cancelling a paid one is the owner's. A paid booking is cancelled, never deleted.
+- **Money**: an approved booking with a price is revenue (Finance card "from fields", the transactions CSV with type
+  Field, and a "Field revenue" column in the monthly CSV). Blocks, declined and cancelled bookings are not.
+- **Messages**: a request sends an automatic email ("we got your request; the time is yours once we confirm"); approving
+  sends the ticket by WhatsApp and email; declining and cancelling tell the guest; Resend ticket asks WhatsApp or Email.
+  Four new `MessageType` values with templates, badges and HTML designs (gyms can edit them like other member emails).
+- **Deploy**: `npm run db:migrate` (new tables, enum values, the overlap rule), `npm run db:rls`, then
+  `npm run db:seed:templates` for the four new default templates.
+- Tests: `e2e/44-field-bookings.spec.ts`.

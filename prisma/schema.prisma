@@ -80,6 +80,8 @@ model Gym {
   classRegistrations ClassRegistration[]
   classPayments      ClassPayment[]
   guestPasses        GuestPass[]
+  fields             Field[]
+  fieldBookings      FieldBooking[]
   dayPassPlans       DayPassPlan[]
   emailTemplates     EmailTemplate[]
 
@@ -145,6 +147,8 @@ model StaffUser {
   recordedClassPayments ClassPayment[]
   reviewedGuestPasses   GuestPass[] @relation("GuestPassReviewer")
   scannedGuestPasses    GuestPass[] @relation("GuestPassScanner")
+  reviewedFieldBookings FieldBooking[] @relation("FieldBookingReviewer")
+  scannedFieldBookings  FieldBooking[] @relation("FieldBookingScanner")
 
   @@index([gymId])
 }
@@ -577,6 +581,72 @@ model GuestPass {
   @@index([ipHash, createdAt])
 }
 
+// ─── Field booking ──────────────────────────────────────────
+// A bookable field or court (a badminton court, a futsal pitch). People book a stretch of time within its
+// opening hours; staff approve it. Only an approved booking takes the time: a database rule (see the
+// field_bookings migration) refuses two held bookings that overlap on one field, so two staff approving at
+// once, or a staff-made booking against an approved one, can't double-book it.
+
+model Field {
+  id           String         @id @default(uuid())
+  gymId        String
+  gym          Gym            @relation(fields: [gymId], references: [id])
+  name         String
+  sport        String         @default("Badminton")
+  pricePerHour Decimal
+  currency     String         @default("IDR")
+  opensAt      Int            @default(480) // minutes after midnight, gym timezone (08:00)
+  closesAt     Int            @default(1320) // 22:00; 1440 = midnight
+  stepMinutes  Int            @default(30) // bookings start and end on multiples of this
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  bookings     FieldBooking[]
+
+  @@index([gymId])
+}
+
+enum FieldBookingStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+  ATTENDED
+  NO_SHOW
+}
+
+model FieldBooking {
+  id                  String             @id @default(uuid())
+  gymId               String
+  gym                 Gym                @relation(fields: [gymId], references: [id])
+  fieldId             String
+  field               Field              @relation(fields: [fieldId], references: [id])
+  startsAt            DateTime // UTC
+  endsAt              DateTime
+  fullName            String
+  phoneWhatsapp       String // encrypted
+  phoneWhatsappLookup String // HMAC blind index
+  email               String? // encrypted
+  status              FieldBookingStatus @default(PENDING_REVIEW)
+  amount              Decimal // the price for this stretch of time; revenue once approved (staff confirm the money arrived)
+  isBlock             Boolean            @default(false) // staff blocking the time (maintenance, a tournament): never revenue, never ticketed
+  note                String?
+  proofImageUrl       String? // optional bank-transfer screenshot (private blob)
+  proofSubmittedAt    DateTime?
+  ticketSecret        String             @default(uuid()) // signs the ticket QR; rotating it voids the ticket
+  ipHash              String?
+  reviewedById        String?
+  reviewedBy          StaffUser?         @relation("FieldBookingReviewer", fields: [reviewedById], references: [id])
+  reviewedAt          DateTime?
+  attendedAt          DateTime?
+  scannedById         String?
+  scannedBy           StaffUser?         @relation("FieldBookingScanner", fields: [scannedById], references: [id])
+  createdAt           DateTime           @default(now())
+
+  @@index([gymId, startsAt])
+  @@index([fieldId, startsAt])
+  @@index([ipHash, createdAt])
+}
+
 // ─── Password reset / staff invite ──────────────────────────
 // One-time links for staff and members to set a new password. Only the SHA-256 of the token is
 // stored. "invite" links are used to set the first password of a staff account created by an owner.
@@ -640,6 +710,10 @@ enum MessageType {
   class_cancelled
   guest_ticket
   guest_rejected
+  field_booking_received
+  field_booking_approved
+  field_booking_rejected
+  field_booking_cancelled
   gym_welcome
   subscription_due
   subscription_paid

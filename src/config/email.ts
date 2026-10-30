@@ -41,6 +41,10 @@ export const MESSAGE_TYPES = [
   "class_cancelled",
   "guest_ticket",
   "guest_rejected",
+  "field_booking_received",
+  "field_booking_approved",
+  "field_booking_rejected",
+  "field_booking_cancelled",
   // Liftmora's own emails to a gym's owner and staff, not to members.
   "gym_welcome",
   "subscription_due",
@@ -91,6 +95,10 @@ export const EMAIL_MESSAGE_TYPES = {
   class_cancelled: "Class cancelled",
   guest_ticket: "Guest ticket (class or day pass)",
   guest_rejected: "Guest request declined",
+  field_booking_received: "Field booking requested",
+  field_booking_approved: "Field booking approved (ticket)",
+  field_booking_rejected: "Field booking declined",
+  field_booking_cancelled: "Field booking cancelled",
 } as const satisfies Partial<Record<MessageType, string>>;
 
 export type EmailMessageType = keyof typeof EMAIL_MESSAGE_TYPES;
@@ -121,6 +129,10 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailMessageType, EmailTemplate> = 
   renewal_confirmed: { subject: "{{gymName}}: Membership renewed", body: "{{message}}" },
   guest_ticket: { subject: "{{gymName}}: Your ticket", body: "{{message}}" },
   guest_rejected: { subject: "{{gymName}}: About your request", body: "{{message}}" },
+  field_booking_received: { subject: "{{gymName}}: We got your booking request", body: "{{message}}" },
+  field_booking_approved: { subject: "{{gymName}}: Your booking is confirmed", body: "{{message}}" },
+  field_booking_rejected: { subject: "{{gymName}}: About your booking request", body: "{{message}}" },
+  field_booking_cancelled: { subject: "{{gymName}}: Your booking was cancelled", body: "{{message}}" },
 };
 
 /** How the HTML version of each email looks: Liftmora's black and plate yellow, dark all the way through. */
@@ -158,6 +170,10 @@ export const EMAIL_DESIGN: Record<EmailMessageType, { heading: string; cta?: str
   class_cancelled: { heading: "A class was cancelled" },
   guest_ticket: { heading: "You're approved", cta: "Show my ticket" },
   guest_rejected: { heading: "We couldn't confirm your request" },
+  field_booking_received: { heading: "We got your request" },
+  field_booking_approved: { heading: "Your booking is confirmed", cta: "Show my ticket" },
+  field_booking_rejected: { heading: "We couldn't confirm your booking" },
+  field_booking_cancelled: { heading: "Your booking was cancelled" },
 };
 
 /** Default wording for the system emails. */

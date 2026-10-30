@@ -40,6 +40,7 @@ export default async function GymProfilePage({ params }: { params: { slug: strin
   });
 
   const hasDayPass = (await prisma.dayPassPlan.count({ where: { gymId: gym.id, isActive: true } })) > 0;
+  const hasFields = (await prisma.field.count({ where: { gymId: gym.id, isActive: true } })) > 0;
   const live = gym.subscriptionStatus !== "SUSPENDED" && gym.subscriptionStatus !== "CANCELLED";
   const canJoin = live && gymAcceptsSignups(gym.settings);
   const [hero, ...rest] = gym.photoUrls;
@@ -76,6 +77,11 @@ export default async function GymProfilePage({ params }: { params: { slug: strin
               {live && hasDayPass && (
                 <a href={`/${params.slug}/join/day-pass`} className="rounded-lg border border-neutral-700 px-6 py-3 text-sm font-semibold text-white hover:bg-neutral-900">
                   Day pass for guests
+                </a>
+              )}
+              {live && hasFields && (
+                <a href={`/${params.slug}/book`} className="rounded-lg border border-neutral-700 px-6 py-3 text-sm font-semibold text-white hover:bg-neutral-900">
+                  Book a field
                 </a>
               )}
               <a href={`/${params.slug}/login`} className="rounded-lg border border-neutral-700 px-6 py-3 text-sm font-semibold text-white hover:bg-neutral-900">

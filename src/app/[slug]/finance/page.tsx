@@ -47,7 +47,7 @@ export default async function FinancePage({ params }: { params: { slug: string }
           <StatCard
             label="Revenue this month"
             value={rp(f.thisMonth)}
-            sub={[change, f.thisMonthClasses > 0 && `${rp(f.thisMonthClasses)} from classes`, f.thisMonthDayPasses > 0 && `${rp(f.thisMonthDayPasses)} from day passes`].filter(Boolean).join(" · ")}
+            sub={[change, f.thisMonthClasses > 0 && `${rp(f.thisMonthClasses)} from classes`, f.thisMonthDayPasses > 0 && `${rp(f.thisMonthDayPasses)} from day passes`, f.thisMonthFields > 0 && `${rp(f.thisMonthFields)} from fields`].filter(Boolean).join(" · ")}
             tone={f.changePct === null ? undefined : f.changePct >= 0 ? "good" : "bad"}
           />
           <StatCard label="Last month" value={rp(f.lastMonth)} />

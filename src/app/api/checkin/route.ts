@@ -4,6 +4,7 @@ import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { isTicketToken, parseQrToken, parseTicketToken, verifyQrToken, verifyTicketToken } from "@/lib/qr";
 import { passIsCancelled, passTitle, passWindow } from "@/lib/guestPass";
+import { bookingWhen, bookingWindow } from "@/lib/fieldBooking";
 import { evaluateAndLogCheckin } from "@/lib/checkin";
 
 const checkinSchema = z.object({ token: z.string().min(1) });
@@ -84,7 +85,8 @@ async function handleTicketScan(db: ReturnType<typeof tenantDb>, gym: { id: stri
     where: { id: unverified.passId },
     include: { session: { include: { class: true } }, dayPassPlan: true },
   });
-  if (!pass || pass.gymId !== gymId || !verifyTicketToken(token, pass.ticketSecret)) return reply({ result: "INVALID" });
+  if (!pass) return handleBookingScan(db, gym, staffUserId, token, unverified.passId);
+  if (pass.gymId !== gymId || !verifyTicketToken(token, pass.ticketSecret)) return reply({ result: "INVALID" });
 
   const who = { fullName: pass.fullName, photoUrl: null };
   if (pass.status === "ATTENDED") return reply({ result: "DUPLICATE", message: "Ticket already used", member: who });
@@ -102,4 +104,32 @@ async function handleTicketScan(db: ReturnType<typeof tenantDb>, gym: { id: stri
   });
   if (res.count !== 1) return reply({ result: "DUPLICATE", message: "Ticket already used", member: who });
   return reply({ result: "SUCCESS", message: `${isClass ? "Class ticket" : "Ticket"}: ${passTitle(pass)}`, member: who });
+}
+
+/**
+ * Staff scans a field booking's ticket. Same gates as a guest ticket (right gym, valid signature), then the
+ * booking flips APPROVED to ATTENDED in one compare-and-set. The scan only records that they came: the booking
+ * already holds its time from the moment staff approved it, whether or not anyone scans.
+ */
+async function handleBookingScan(db: ReturnType<typeof tenantDb>, gym: { id: string; timezone: string }, staffUserId: string, token: string, bookingId: string) {
+  const gymId = gym.id;
+  const reply = (body: TicketReply, status = 200) => NextResponse.json(body, { status });
+
+  const booking = await db.fieldBooking.findUnique({ where: { id: bookingId }, include: { field: true } });
+  if (!booking || booking.gymId !== gymId || booking.isBlock || !verifyTicketToken(token, booking.ticketSecret)) return reply({ result: "INVALID" });
+
+  const who = { fullName: booking.fullName, photoUrl: null };
+  if (booking.status === "ATTENDED") return reply({ result: "DUPLICATE", message: "Booking already checked in", member: who });
+  if (booking.status !== "APPROVED") return reply({ result: "INVALID", message: "Booking not approved", member: who });
+
+  const window = bookingWindow(booking);
+  if (window === "EARLY") return reply({ result: "INVALID", message: "Too early for this booking", member: who });
+  if (window === "OVER") return reply({ result: "EXPIRED", message: "This booking is over", member: who });
+
+  const res = await db.fieldBooking.updateMany({
+    where: { id: booking.id, gymId, status: "APPROVED" },
+    data: { status: "ATTENDED", attendedAt: new Date(), scannedById: staffUserId },
+  });
+  if (res.count !== 1) return reply({ result: "DUPLICATE", message: "Booking already checked in", member: who });
+  return reply({ result: "SUCCESS", message: `${booking.field.name}: ${bookingWhen(booking, gym.timezone)}`, member: who });
 }

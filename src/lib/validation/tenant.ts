@@ -309,3 +309,51 @@ export const emailTemplateSchema = z.union([
   z.object({ type: z.string().max(40), reset: z.literal(true) }),
   z.object({ type: z.string().max(40), subject: z.string().max(400), body: z.string().max(8000) }),
 ]);
+
+// ─── Field booking ──────────────────────────────────────────
+
+const clockString = z.string().regex(/^\d{2}:\d{2}$/, "Use a time like 18:30");
+const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date");
+
+/** Owner sets up or edits a bookable field. Times are "HH:MM" in the gym's timezone ("24:00" closes at midnight). */
+export const fieldSchema = z.object({
+  name: z.string().trim().min(2, "Name the field").max(60),
+  sport: z.string().trim().min(2).max(40).default("Badminton"),
+  pricePerHour: z.number().int().min(0).max(100_000_000),
+  opensAt: clockString,
+  closesAt: clockString,
+  stepMinutes: z.union([z.literal(15), z.literal(30), z.literal(60)]).default(30),
+  isActive: z.boolean().optional(),
+});
+export const updateFieldSchema = fieldSchema.partial().refine((v) => Object.keys(v).length > 0, "Nothing to update");
+
+/** Public: someone asks for a stretch of time on a field. Only an approved booking takes the time. */
+export const fieldBookingRequestSchema = z.object({
+  fieldId: z.string().uuid(),
+  date: dateString,
+  start: clockString,
+  end: clockString,
+  fullName: personName("Enter your name"),
+  phone: z.string().trim().min(6, "Enter a valid WhatsApp number").max(30),
+  email: z.string("Enter your email").trim().toLowerCase().email("Enter a valid email").max(120),
+});
+
+/** Staff puts a booking straight on the calendar (a phone or walk-in booking, already paid) or blocks the time. */
+export const manualFieldBookingSchema = z
+  .object({
+    fieldId: z.string().uuid(),
+    date: dateString,
+    start: clockString,
+    end: clockString,
+    isBlock: z.boolean().default(false),
+    fullName: z.string().trim().min(2).max(80).optional(),
+    phone: z.string().trim().min(6).max(30).optional(),
+    note: z.string().trim().max(200).optional(),
+  })
+  .refine((v) => v.isBlock || Boolean(v.fullName), "Enter the name of who booked");
+
+/** Staff acts on a booking. `channel` is how a resent ticket is sent. */
+export const fieldBookingActionSchema = z.object({
+  action: z.enum(["approve", "reject", "cancel", "attend", "noshow", "resend"]),
+  channel: z.enum(["whatsapp", "email"]).optional(),
+});

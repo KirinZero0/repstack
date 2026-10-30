@@ -34,7 +34,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
   const months = lastMonthKeys(12, timezone);
   const since = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
 
-  const [paid, paidClasses, paidDayPasses, pendingAgg, pendingClassAgg, statusGroups, classStatusGroups, recent, recentClasses] = await Promise.all([
+  const [paid, paidClasses, paidDayPasses, paidFields, pendingAgg, pendingClassAgg, statusGroups, classStatusGroups, recent, recentClasses] = await Promise.all([
     db.payment.findMany({
       where: { gymId, status: "PAID", paidAt: { gte: since } },
       include: { plan: { select: { name: true } } },
@@ -48,6 +48,11 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     db.guestPass.findMany({
       where: { gymId, status: { in: ["APPROVED", "ATTENDED"] }, amount: { gt: 0 }, reviewedAt: { gte: since } },
       include: { dayPassPlan: { select: { name: true } }, session: { select: { class: { select: { name: true } } } } },
+    }),
+    // Field bookings count once staff approve them (the moment the money is confirmed); staff blocks are never revenue.
+    db.fieldBooking.findMany({
+      where: { gymId, status: { in: ["APPROVED", "ATTENDED", "NO_SHOW"] }, isBlock: false, amount: { gt: 0 }, reviewedAt: { gte: since } },
+      include: { field: { select: { name: true } } },
     }),
     db.payment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
     db.classPayment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
@@ -67,7 +72,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     }),
   ]);
 
-  type PaidRow = { when: Date; amount: number; item: string; kind: "membership" | "class" | "daypass"; provider: string };
+  type PaidRow = { when: Date; amount: number; item: string; kind: "membership" | "class" | "daypass" | "field"; provider: string };
   const rows: PaidRow[] = [
     ...paid.map((p) => ({ when: p.paidAt ?? p.createdAt, amount: Number(p.amount), item: p.plan.name, kind: "membership" as const, provider: p.provider })),
     ...paidClasses.map((p) => ({
@@ -84,11 +89,13 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       kind: p.session ? ("class" as const) : ("daypass" as const),
       provider: "CASH",
     })),
+    ...paidFields.map((p) => ({ when: p.reviewedAt ?? p.createdAt, amount: Number(p.amount), item: `${p.field.name} (field booking)`, kind: "field" as const, provider: "CASH" })),
   ];
 
   const byMonth = new Map<string, number>(months.map((k) => [k, 0]));
   const byMonthClasses = new Map<string, number>(months.map((k) => [k, 0]));
   const byMonthDayPasses = new Map<string, number>(months.map((k) => [k, 0]));
+  const byMonthFields = new Map<string, number>(months.map((k) => [k, 0]));
   const byPlan = new Map<string, number>();
   const byMethod = new Map<string, number>();
   for (const p of rows) {
@@ -97,6 +104,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       byMonth.set(key, (byMonth.get(key) ?? 0) + p.amount);
       if (p.kind === "class") byMonthClasses.set(key, (byMonthClasses.get(key) ?? 0) + p.amount);
       if (p.kind === "daypass") byMonthDayPasses.set(key, (byMonthDayPasses.get(key) ?? 0) + p.amount);
+      if (p.kind === "field") byMonthFields.set(key, (byMonthFields.get(key) ?? 0) + p.amount);
     }
     if (key === months[months.length - 1]) {
       byPlan.set(p.item, (byPlan.get(p.item) ?? 0) + p.amount);
@@ -109,6 +117,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
   const thisMonth = monthly[monthly.length - 1].value;
   const thisMonthClasses = byMonthClasses.get(months[months.length - 1]) ?? 0;
   const thisMonthDayPasses = byMonthDayPasses.get(months[months.length - 1]) ?? 0;
+  const thisMonthFields = byMonthFields.get(months[months.length - 1]) ?? 0;
   const lastMonth = monthly[monthly.length - 2]?.value ?? 0;
 
   const statusCounts = new Map<string, number>();
@@ -146,6 +155,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     thisMonth,
     thisMonthClasses,
     thisMonthDayPasses,
+    thisMonthFields,
     lastMonth,
     changePct: lastMonth > 0 ? ((thisMonth - lastMonth) / lastMonth) * 100 : null,
     yearTotal: monthly.reduce((s, m) => s + m.value, 0),

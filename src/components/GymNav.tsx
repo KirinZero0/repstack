@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export type GymNavPage = "dashboard" | "members" | "classes" | "checkin-station" | "checkin" | "attendance" | "staff" | "plans" | "finance" | "billing" | "settings";
+export type GymNavPage = "dashboard" | "members" | "classes" | "fields" | "checkin-station" | "checkin" | "attendance" | "staff" | "plans" | "finance" | "billing" | "settings";
 
 interface Props {
   slug: string;
@@ -27,6 +27,7 @@ const ITEMS: Item[] = [
   { page: "members", label: "Members", href: (s) => `/${s}/members`, tone: "var(--plate-blue)" },
   // Staff see the roster and confirm front-desk payments; only the owner gets the set-up controls on the page itself.
   { page: "classes", label: "Classes", href: (s) => `/${s}/classes`, tone: "var(--plate-green)" },
+  { page: "fields", label: "Fields", href: (s) => `/${s}/fields`, tone: "var(--plate-green)" },
   { page: "checkin-station", label: "Check-in poster", href: (s) => `/${s}/checkin-station`, tone: "var(--plate-yellow)" },
   { page: "checkin", label: "Staff scanner", href: (s) => `/${s}/checkin`, tone: "var(--plate-yellow)" },
   { page: "attendance", label: "Attendance", href: (s) => `/${s}/attendance`, tone: "var(--plate-yellow)" },
