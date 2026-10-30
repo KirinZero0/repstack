@@ -478,3 +478,37 @@ test("one gym can't see or act on another gym's bookings or fields", async ({ re
   expect((await v.get(`${baseURL}/api/${b.slug}/fields/${field.id}/availability?date=${DAY}`)).status()).toBe(404);
   expect((await prisma.fieldBooking.findUniqueOrThrow({ where: { id: booking.id } })).status).toBe("PENDING_REVIEW");
 });
+
+test("the fields page has Bookings and Fields tabs for the owner, with add and block on the bookings list", async ({ page, baseURL }) => {
+  const f = await makeGym();
+  const field = await makeField(f, { name: "Court A" });
+  // page.request shares the browser's cookies, so this signs the page in.
+  await login(page.request, baseURL!, f.slug, f.owner);
+
+  // Bookings is the default tab: today's list, with the add and block buttons right on it, and no setup form.
+  await page.goto(`${baseURL}/${f.slug}/fields`);
+  await expect(page.getByTestId("tab-bookings")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create a new field" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Block time" }).click();
+  await expect(page.getByRole("heading", { name: "Block time" })).toBeVisible();
+  await expect(page.getByLabel("Booking name")).toHaveCount(0);
+  await page.getByRole("button", { name: "+ Add booking" }).click();
+  await expect(page.getByRole("heading", { name: "Add a booking" })).toBeVisible();
+  await expect(page.getByLabel("Booking name")).toBeVisible();
+
+  // The Fields tab lists the fields and holds the create form.
+  await page.getByTestId("tab-fields").click();
+  await expect(page).toHaveURL(/tab=fields/);
+  await expect(page.getByRole("heading", { name: "Create a new field" })).toBeVisible();
+  await expect(page.getByTestId("field-row").filter({ hasText: field.name })).toBeVisible();
+  await expect(page.getByTestId("field-day")).toHaveCount(0);
+
+  // Staff only manage bookings: no tabs, and ?tab=fields still shows the bookings list.
+  await page.context().clearCookies();
+  await login(page.request, baseURL!, f.slug, f.staff);
+  await page.goto(`${baseURL}/${f.slug}/fields?tab=fields`);
+  await expect(page.getByTestId("tab-fields")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Create a new field" })).toHaveCount(0);
+  await expect(page.getByTestId("field-day")).toHaveCount(1);
+});

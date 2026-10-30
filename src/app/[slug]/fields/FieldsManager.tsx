@@ -40,6 +40,9 @@ export interface BookingRow {
   hasContact: boolean;
 }
 
+/** The page's two sub tabs: the day's bookings (everyone), and setting fields up (owner only). */
+export type FieldsTab = "bookings" | "fields";
+
 const rp = (n: number) => `Rp ${n.toLocaleString("id-ID")}`;
 const btn = "whitespace-nowrap rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-300 hover:bg-neutral-800 disabled:opacity-50";
 const primary = "whitespace-nowrap rounded-md bg-white px-3 py-1 text-xs font-medium text-neutral-950 hover:bg-neutral-200 disabled:opacity-50";
@@ -93,6 +96,7 @@ function Lane({ field, bookings }: { field: FieldRow; bookings: BookingRow[] }) 
 export default function FieldsManager({
   slug,
   isOwner,
+  tab,
   date,
   today,
   fields,
@@ -101,6 +105,7 @@ export default function FieldsManager({
 }: {
   slug: string;
   isOwner: boolean;
+  tab: FieldsTab;
   date: string;
   today: string;
   fields: FieldRow[];
@@ -111,6 +116,10 @@ export default function FieldsManager({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  // Adding happens right on the day's list: closed until staff pick "Add booking" or "Block time".
+  const [adding, setAdding] = useState<null | "booking" | "block">(null);
+  const current: FieldsTab = isOwner ? tab : "bookings";
+  const activeFields = fields.filter((f) => f.isActive);
 
   async function act(b: BookingRow, action: string, channel?: Channel) {
     if (action === "cancel" && !window.confirm(`Cancel ${b.fullName}'s booking? The time is freed and their ticket stops working.`)) return;
@@ -134,111 +143,155 @@ export default function FieldsManager({
     router.refresh();
   }
 
+  const tabHref = (t: FieldsTab) => (t === "fields" ? `/${slug}/fields?tab=fields` : `/${slug}/fields${date === today ? "" : `?date=${date}`}`);
+  const tabCls = (t: FieldsTab) =>
+    `rounded-md px-4 py-2 text-sm font-medium ${current === t ? "bg-neutral-800 text-white" : "text-neutral-400 hover:text-white"}`;
+
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
+      {isOwner && (
+        <nav className="inline-flex gap-1 rounded-lg border border-neutral-800 bg-neutral-900 p-1" role="tablist" aria-label="Fields sections">
+          <a href={tabHref("bookings")} role="tab" aria-selected={current === "bookings"} className={tabCls("bookings")} data-testid="tab-bookings">
+            Bookings
+            {pending.length > 0 && <span className="ml-2 rounded-full bg-plate-yellow px-1.5 text-xs text-neutral-950">{pending.length}</span>}
+          </a>
+          <a href={tabHref("fields")} role="tab" aria-selected={current === "fields"} className={tabCls("fields")} data-testid="tab-fields">
+            Fields <span className="ml-1 text-xs text-neutral-500">{fields.length}</span>
+          </a>
+        </nav>
+      )}
+
       {error && <p className="rounded-lg border border-red-900 bg-red-950 px-4 py-2 text-sm text-red-300" role="alert">{error}</p>}
       {note && <p className="text-sm text-emerald-400">{note}</p>}
 
-      <section aria-labelledby="requests">
-        <h2 id="requests" className="mb-3 text-lg font-semibold">Booking requests</h2>
-        {pending.length === 0 ? (
-          <p className="text-sm text-neutral-500">No requests waiting.</p>
-        ) : (
-          <ul className="divide-y divide-neutral-800 border-y border-neutral-800">
-            {pending.map((b) => (
-              <li key={b.id} className="flex flex-wrap items-center justify-between gap-3 py-4" data-testid="booking-request" data-status={b.status}>
-                <div>
-                  <p className="font-medium">
-                    {b.fullName} <span className="text-sm text-neutral-500">{b.phone}{b.email ? ` · ${b.email}` : ""}</span>
-                  </p>
-                  <p className="text-sm text-neutral-400">
-                    {b.fieldName} · {b.date} {b.startLabel}–{b.endLabel} · {b.amount > 0 ? rp(b.amount) : "free"}
-                  </p>
-                  {b.amount > 0 && (
-                    <p className="text-sm text-neutral-500">
-                      {b.hasProof ? (
-                        <a href={`/api/${slug}/field-bookings/${b.id}/proof`} target="_blank" rel="noreferrer" className="text-neutral-300 underline underline-offset-2 hover:text-white">
-                          View transfer proof
-                        </a>
-                      ) : (
-                        "No proof attached. Check your bank before approving."
+      {current === "fields" ? (
+        <FieldSetup slug={slug} fields={fields} />
+      ) : (
+        <>
+          {pending.length > 0 && (
+            <section aria-labelledby="requests">
+              <h2 id="requests" className="mb-3 text-lg font-semibold">
+                Booking requests <span className="text-sm font-normal text-neutral-500">{pending.length} waiting</span>
+              </h2>
+              <ul className="divide-y divide-neutral-800 border-y border-neutral-800">
+                {pending.map((b) => (
+                  <li key={b.id} className="flex flex-wrap items-center justify-between gap-3 py-4" data-testid="booking-request" data-status={b.status}>
+                    <div>
+                      <p className="font-medium">
+                        {b.fullName} <span className="text-sm text-neutral-500">{b.phone}{b.email ? ` · ${b.email}` : ""}</span>
+                      </p>
+                      <p className="text-sm text-neutral-400">
+                        {b.fieldName} · {b.date} {b.startLabel}–{b.endLabel} · {b.amount > 0 ? rp(b.amount) : "free"}
+                      </p>
+                      {b.amount > 0 && (
+                        <p className="text-sm text-neutral-500">
+                          {b.hasProof ? (
+                            <a href={`/api/${slug}/field-bookings/${b.id}/proof`} target="_blank" rel="noreferrer" className="text-neutral-300 underline underline-offset-2 hover:text-white">
+                              View transfer proof
+                            </a>
+                          ) : (
+                            "No proof attached. Check your bank before approving."
+                          )}
+                        </p>
                       )}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className={primary} disabled={busy === b.id} onClick={() => act(b, "approve")}>
-                    {b.amount > 0 ? "Payment received, approve" : "Approve"}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button className={primary} disabled={busy === b.id} onClick={() => act(b, "approve")}>
+                        {b.amount > 0 ? "Payment received, approve" : "Approve"}
+                      </button>
+                      <button className={btn} disabled={busy === b.id} onClick={() => act(b, "reject")}>Decline</button>
+                      <button className={`${btn} hover:border-red-800 hover:text-red-400`} disabled={busy === b.id} onClick={() => remove(b)}>Delete</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <section aria-labelledby="day">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 id="day" className="text-lg font-semibold">{date === today ? "Today" : date}</h2>
+                <input type="date" value={date} onChange={(e) => e.target.value && router.push(`/${slug}/fields?date=${e.target.value}`)} className={`${input} w-auto`} aria-label="Day" />
+                {date !== today && (
+                  <a href={`/${slug}/fields`} className="text-sm text-neutral-400 underline underline-offset-2 hover:text-white">Back to today</a>
+                )}
+              </div>
+              {activeFields.length > 0 && (
+                <div className="flex gap-2">
+                  <button className={adding === "booking" ? primary : btn} onClick={() => setAdding(adding === "booking" ? null : "booking")} aria-expanded={adding === "booking"}>
+                    + Add booking
                   </button>
-                  <button className={btn} disabled={busy === b.id} onClick={() => act(b, "reject")}>Decline</button>
-                  <button className={`${btn} hover:border-red-800 hover:text-red-400`} disabled={busy === b.id} onClick={() => remove(b)}>Delete</button>
+                  <button className={adding === "block" ? primary : btn} onClick={() => setAdding(adding === "block" ? null : "block")} aria-expanded={adding === "block"}>
+                    Block time
+                  </button>
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+              )}
+            </div>
 
-      <section aria-labelledby="day">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 id="day" className="text-lg font-semibold">{date === today ? "Today" : date}</h2>
-          <label className="flex items-center gap-2 text-sm text-neutral-400">
-            Day
-            <input type="date" value={date} onChange={(e) => e.target.value && router.push(`/${slug}/fields?date=${e.target.value}`)} className={`${input} w-auto`} aria-label="Day" />
-          </label>
-        </div>
-        {fields.length === 0 ? (
-          <p className="text-sm text-neutral-500">{isOwner ? "Add a field below to start taking bookings." : "No fields yet. Ask the owner to add one."}</p>
-        ) : (
-          <div className="space-y-6">
-            {fields.map((f) => {
-              const list = dayBookings.filter((b) => b.fieldId === f.id);
-              return (
-                <div key={f.id} data-testid="field-day">
-                  <p className="mb-1 text-sm font-medium">
-                    {f.name} <span className="text-neutral-500">{f.opensLabel}–{f.closesLabel}{f.isActive ? "" : " · off"}</span>
-                  </p>
-                  <Lane field={f} bookings={list} />
-                  {list.length > 0 && (
-                    <ul className="mt-2 divide-y divide-neutral-800">
-                      {list.map((b) => (
-                        <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm" data-testid="booking-row" data-status={b.status}>
-                          <span>
-                            {b.startLabel}–{b.endLabel} · {b.isBlock ? `Blocked${b.note ? `: ${b.note}` : ""}` : b.fullName}
-                            {!b.isBlock && <span className="text-neutral-500"> {b.phone}</span>}
-                            {!b.isBlock && b.amount > 0 && <span className="text-neutral-500"> · {rp(b.amount)}</span>}
-                            <span className="ml-2 text-neutral-400">{STATUS_LABEL[b.status]}</span>
-                          </span>
-                          <span className="flex flex-wrap items-center gap-2">
-                            {b.status === "APPROVED" && !b.isBlock && b.window !== "EARLY" && (
-                              <button className={btn} disabled={busy === b.id} onClick={() => act(b, "attend")}>Came</button>
-                            )}
-                            {b.status === "APPROVED" && !b.isBlock && b.window === "OVER" && (
-                              <button className={btn} disabled={busy === b.id} onClick={() => act(b, "noshow")}>No-show</button>
-                            )}
-                            {b.status === "APPROVED" && !b.isBlock && b.window !== "OVER" && b.hasContact && (
-                              <ChannelPicker label="Resend ticket" className={btn} busy={busy === b.id} onPick={(c) => act(b, "resend", c)} />
-                            )}
-                            {b.status === "APPROVED" && !b.isBlock && (
-                              <button className={`${btn} hover:border-red-800 hover:text-red-400`} disabled={busy === b.id} onClick={() => act(b, "cancel")}>Cancel</button>
-                            )}
-                            {b.isBlock && (
-                              <button className={`${btn} hover:border-red-800 hover:text-red-400`} disabled={busy === b.id} onClick={() => remove(b)}>Remove</button>
-                            )}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
+            {adding && <ManualBooking key={adding} slug={slug} date={date} fields={activeFields} mode={adding} onClose={() => setAdding(null)} />}
 
-      {fields.length > 0 && <ManualBooking slug={slug} date={date} fields={fields.filter((f) => f.isActive)} />}
-      {isOwner && <FieldSetup slug={slug} fields={fields} />}
+            {fields.length === 0 ? (
+              <p className="rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-8 text-center text-sm text-neutral-500">
+                {isOwner ? (
+                  <>
+                    No fields yet. <a href={tabHref("fields")} className="text-neutral-300 underline underline-offset-2 hover:text-white">Create your first field</a> to start taking bookings.
+                  </>
+                ) : (
+                  "No fields yet. Ask the owner to add one."
+                )}
+              </p>
+            ) : (
+              <div className="space-y-6">
+                {fields.map((f) => {
+                  const list = dayBookings.filter((b) => b.fieldId === f.id);
+                  return (
+                    <div key={f.id} data-testid="field-day">
+                      <p className="mb-1 text-sm font-medium">
+                        {f.name} <span className="text-neutral-500">{f.opensLabel}–{f.closesLabel}{f.isActive ? "" : " · off"}</span>
+                      </p>
+                      <Lane field={f} bookings={list} />
+                      {list.length === 0 ? (
+                        <p className="mt-2 text-sm text-neutral-600">Nothing booked.</p>
+                      ) : (
+                        <ul className="mt-2 divide-y divide-neutral-800">
+                          {list.map((b) => (
+                            <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm" data-testid="booking-row" data-status={b.status}>
+                              <span>
+                                {b.startLabel}–{b.endLabel} · {b.isBlock ? `Blocked${b.note ? `: ${b.note}` : ""}` : b.fullName}
+                                {!b.isBlock && <span className="text-neutral-500"> {b.phone}</span>}
+                                {!b.isBlock && b.amount > 0 && <span className="text-neutral-500"> · {rp(b.amount)}</span>}
+                                {!b.isBlock && <span className="ml-2 text-neutral-400">{STATUS_LABEL[b.status]}</span>}
+                              </span>
+                              <span className="flex flex-wrap items-center gap-2">
+                                {b.status === "APPROVED" && !b.isBlock && b.window !== "EARLY" && (
+                                  <button className={btn} disabled={busy === b.id} onClick={() => act(b, "attend")}>Came</button>
+                                )}
+                                {b.status === "APPROVED" && !b.isBlock && b.window === "OVER" && (
+                                  <button className={btn} disabled={busy === b.id} onClick={() => act(b, "noshow")}>No-show</button>
+                                )}
+                                {b.status === "APPROVED" && !b.isBlock && b.window !== "OVER" && b.hasContact && (
+                                  <ChannelPicker label="Resend ticket" className={btn} busy={busy === b.id} onPick={(c) => act(b, "resend", c)} />
+                                )}
+                                {b.status === "APPROVED" && !b.isBlock && (
+                                  <button className={`${btn} hover:border-red-800 hover:text-red-400`} disabled={busy === b.id} onClick={() => act(b, "cancel")}>Cancel</button>
+                                )}
+                                {b.isBlock && (
+                                  <button className={`${btn} hover:border-red-800 hover:text-red-400`} disabled={busy === b.id} onClick={() => remove(b)}>Remove</button>
+                                )}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }
@@ -249,13 +302,26 @@ function timeOptions(f: FieldRow, from: number, to: number) {
   return out;
 }
 
-function ManualBooking({ slug, date, fields }: { slug: string; date: string; fields: FieldRow[] }) {
+/** The inline panel under the day's header: a phoned-in or walk-in booking, or a block of closed time. */
+function ManualBooking({
+  slug,
+  date,
+  fields,
+  mode,
+  onClose,
+}: {
+  slug: string;
+  date: string;
+  fields: FieldRow[];
+  mode: "booking" | "block";
+  onClose: () => void;
+}) {
   const router = useRouter();
+  const isBlock = mode === "block";
   const [fieldId, setFieldId] = useState(fields[0]?.id ?? "");
   const [day, setDay] = useState(date);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
-  const [isBlock, setIsBlock] = useState(false);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [noteText, setNoteText] = useState("");
@@ -290,9 +356,18 @@ function ManualBooking({ slug, date, fields }: { slug: string; date: string; fie
   }
 
   return (
-    <section aria-labelledby="manual">
-      <h2 id="manual" className="mb-3 text-lg font-semibold">Add a booking or block time</h2>
-      <p className="mb-3 text-sm text-neutral-500">For someone who phoned or walked in and paid at the counter, or to close a field for maintenance. It takes the time straight away.</p>
+    <section aria-labelledby="manual" className="mb-6 rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h3 id="manual" className="font-semibold">{isBlock ? "Block time" : "Add a booking"}</h3>
+          <p className="text-sm text-neutral-500">
+            {isBlock
+              ? "Close a field for maintenance or an event. No guest, no payment."
+              : "For someone who phoned or walked in and paid at the counter. It takes the time straight away."}
+          </p>
+        </div>
+        <button type="button" onClick={onClose} className="px-1 text-neutral-500 hover:text-neutral-300" aria-label="Close">✕</button>
+      </div>
       <form onSubmit={submit} className="grid gap-3 sm:grid-cols-3">
         <label className="text-sm text-neutral-300">
           <span className="mb-1 block">Field</span>
@@ -320,10 +395,6 @@ function ManualBooking({ slug, date, fields }: { slug: string; date: string; fie
             </select>
           </label>
         </div>
-        <label className="flex items-center gap-2 text-sm text-neutral-300 sm:col-span-3">
-          <input type="checkbox" checked={isBlock} onChange={(e) => setIsBlock(e.target.checked)} className="h-4 w-4" />
-          Block this time instead (maintenance, an event). No guest, no payment.
-        </label>
         {!isBlock && (
           <>
             <label className="text-sm text-neutral-300">
@@ -337,7 +408,7 @@ function ManualBooking({ slug, date, fields }: { slug: string; date: string; fie
           </>
         )}
         <label className="text-sm text-neutral-300">
-          <span className="mb-1 block">Note (optional)</span>
+          <span className="mb-1 block">{isBlock ? "Reason (optional)" : "Note (optional)"}</span>
           <input value={noteText} onChange={(e) => setNoteText(e.target.value)} className={input} maxLength={200} aria-label="Booking note" />
         </label>
         <div className="sm:col-span-3">
@@ -389,43 +460,51 @@ function FieldSetup({ slug, fields }: { slug: string; fields: FieldRow[] }) {
   }
 
   return (
-    <section aria-labelledby="setup">
-      <h2 id="setup" className="mb-3 text-lg font-semibold">Fields</h2>
-      {fields.length > 0 && (
-        <ul className="mb-6 divide-y divide-neutral-800 border-y border-neutral-800">
-          {fields.map((f) => (
-            <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm" data-testid="field-row">
-              <span>
-                <span className="font-medium">{f.name}</span> <span className="text-neutral-500">{f.sport} · {rp(f.pricePerHour)} an hour · {f.opensLabel}–{f.closesLabel} · every {f.stepMinutes} min{f.isActive ? "" : " · off"}</span>
-              </span>
-              <span className="flex gap-2">
-                <button className={btn} onClick={() => {
-                  const v = window.prompt("Price per hour (Rp)", String(f.pricePerHour));
-                  if (v && Number(v) >= 0) patch(f, { pricePerHour: Number(v) });
-                }}>Change price</button>
-                <button className={btn} onClick={() => patch(f, { isActive: !f.isActive })}>{f.isActive ? "Switch off" : "Switch on"}</button>
-                <button className={`${btn} hover:border-red-800 hover:text-red-400`} onClick={() => remove(f)}>Delete</button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-      <form onSubmit={add} className="grid gap-3 sm:grid-cols-3">
-        <label className="text-sm text-neutral-300"><span className="mb-1 block">Name</span><input required minLength={2} maxLength={60} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={input} aria-label="Field name" placeholder="Court 1" /></label>
-        <label className="text-sm text-neutral-300"><span className="mb-1 block">Sport</span><input required value={form.sport} onChange={(e) => setForm({ ...form, sport: e.target.value })} className={input} aria-label="Sport" /></label>
-        <label className="text-sm text-neutral-300"><span className="mb-1 block">Price per hour (Rp)</span><input required type="number" min={0} step={1000} value={form.pricePerHour} onChange={(e) => setForm({ ...form, pricePerHour: e.target.value })} className={input} aria-label="Price per hour" /></label>
-        <label className="text-sm text-neutral-300"><span className="mb-1 block">Opens</span><input required type="time" value={form.opensAt} onChange={(e) => setForm({ ...form, opensAt: e.target.value })} className={input} aria-label="Opens" /></label>
-        <label className="text-sm text-neutral-300"><span className="mb-1 block">Closes (24:00 = midnight)</span><input required value={form.closesAt} onChange={(e) => setForm({ ...form, closesAt: e.target.value })} className={input} aria-label="Closes" placeholder="22:00" /></label>
-        <label className="text-sm text-neutral-300"><span className="mb-1 block">Book in steps of</span>
-          <select value={form.stepMinutes} onChange={(e) => setForm({ ...form, stepMinutes: e.target.value })} className={input} aria-label="Step">
-            <option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option>
-          </select>
-        </label>
-        <div className="sm:col-span-3">
-          <button className={primary} disabled={busy}>{busy ? "Adding…" : "Add field"}</button>
-          {error && <span className="ml-3 text-sm text-red-400" role="alert">{error}</span>}
-        </div>
-      </form>
-    </section>
+    <div className="space-y-8">
+      <section aria-labelledby="setup">
+        <h2 id="setup" className="mb-3 text-lg font-semibold">Your fields</h2>
+        {fields.length === 0 ? (
+          <p className="text-sm text-neutral-500">No fields yet. Create one below.</p>
+        ) : (
+          <ul className="divide-y divide-neutral-800 border-y border-neutral-800">
+            {fields.map((f) => (
+              <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm" data-testid="field-row">
+                <span>
+                  <span className="font-medium">{f.name}</span> <span className="text-neutral-500">{f.sport} · {rp(f.pricePerHour)} an hour · {f.opensLabel}–{f.closesLabel} · every {f.stepMinutes} min{f.isActive ? "" : " · off"}</span>
+                </span>
+                <span className="flex gap-2">
+                  <button className={btn} onClick={() => {
+                    const v = window.prompt("Price per hour (Rp)", String(f.pricePerHour));
+                    if (v && Number(v) >= 0) patch(f, { pricePerHour: Number(v) });
+                  }}>Change price</button>
+                  <button className={btn} onClick={() => patch(f, { isActive: !f.isActive })}>{f.isActive ? "Switch off" : "Switch on"}</button>
+                  <button className={`${btn} hover:border-red-800 hover:text-red-400`} onClick={() => remove(f)}>Delete</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="new-field" className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+        <h2 id="new-field" className="mb-3 text-lg font-semibold">Create a new field</h2>
+        <form onSubmit={add} className="grid gap-3 sm:grid-cols-3">
+          <label className="text-sm text-neutral-300"><span className="mb-1 block">Name</span><input required minLength={2} maxLength={60} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={input} aria-label="Field name" placeholder="Court 1" /></label>
+          <label className="text-sm text-neutral-300"><span className="mb-1 block">Sport</span><input required value={form.sport} onChange={(e) => setForm({ ...form, sport: e.target.value })} className={input} aria-label="Sport" /></label>
+          <label className="text-sm text-neutral-300"><span className="mb-1 block">Price per hour (Rp)</span><input required type="number" min={0} step={1000} value={form.pricePerHour} onChange={(e) => setForm({ ...form, pricePerHour: e.target.value })} className={input} aria-label="Price per hour" /></label>
+          <label className="text-sm text-neutral-300"><span className="mb-1 block">Opens</span><input required type="time" value={form.opensAt} onChange={(e) => setForm({ ...form, opensAt: e.target.value })} className={input} aria-label="Opens" /></label>
+          <label className="text-sm text-neutral-300"><span className="mb-1 block">Closes (24:00 = midnight)</span><input required value={form.closesAt} onChange={(e) => setForm({ ...form, closesAt: e.target.value })} className={input} aria-label="Closes" placeholder="22:00" /></label>
+          <label className="text-sm text-neutral-300"><span className="mb-1 block">Book in steps of</span>
+            <select value={form.stepMinutes} onChange={(e) => setForm({ ...form, stepMinutes: e.target.value })} className={input} aria-label="Step">
+              <option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option>
+            </select>
+          </label>
+          <div className="sm:col-span-3">
+            <button className={primary} disabled={busy}>{busy ? "Adding…" : "Add field"}</button>
+            {error && <span className="ml-3 text-sm text-red-400" role="alert">{error}</span>}
+          </div>
+        </form>
+      </section>
+    </div>
   );
 }
