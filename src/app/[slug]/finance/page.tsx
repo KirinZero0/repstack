@@ -5,6 +5,9 @@ import { BarChart, Card, HBars, StatCard, StatusPill, rp } from "@/components/ch
 import GymNav from "@/components/GymNav";
 import { defaultMonthlyRange, defaultTransactionsRange } from "@/lib/financeExport";
 import FinanceExportCard from "./FinanceExportCard";
+import RefundsCard from "./RefundsCard";
+import { dayKeyInTimezone } from "@/lib/date";
+import { REFUND_CATEGORY_LABEL, REFUND_METHOD_LABEL } from "@/lib/refunds";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +50,7 @@ export default async function FinancePage({ params }: { params: { slug: string }
           <StatCard
             label="Revenue this month"
             value={rp(f.thisMonth)}
-            sub={[change, f.thisMonthClasses > 0 && `${rp(f.thisMonthClasses)} from classes`, f.thisMonthDayPasses > 0 && `${rp(f.thisMonthDayPasses)} from day passes`, f.thisMonthFields > 0 && `${rp(f.thisMonthFields)} from fields`].filter(Boolean).join(" · ")}
+            sub={[change, f.thisMonthClasses > 0 && `${rp(f.thisMonthClasses)} from classes`, f.thisMonthDayPasses > 0 && `${rp(f.thisMonthDayPasses)} from day passes`, f.thisMonthFields > 0 && `${rp(f.thisMonthFields)} from fields`, f.thisMonthRefunds > 0 && `after ${rp(f.thisMonthRefunds)} refunded`].filter(Boolean).join(" · ")}
             tone={f.changePct === null ? undefined : f.changePct >= 0 ? "good" : "bad"}
           />
           <StatCard label="Last month" value={rp(f.lastMonth)} />
@@ -65,7 +68,7 @@ export default async function FinancePage({ params }: { params: { slug: string }
         </div>
 
         <div className="mb-6">
-          <Card title="Revenue — last 12 months (memberships, classes and day passes)">
+          <Card title="Revenue — last 12 months (after refunds)">
             <BarChart data={f.monthly} format={short} />
           </Card>
         </div>
@@ -87,6 +90,26 @@ export default async function FinancePage({ params }: { params: { slug: string }
               ))}
               {f.statusCounts.length === 0 && <p className="text-sm text-neutral-500">No payments yet.</p>}
             </div>
+          </Card>
+        </div>
+
+        <div className="mb-6">
+          <Card title="Refunds">
+            <RefundsCard
+              slug={params.slug}
+              today={dayKeyInTimezone(new Date(), gym.timezone)}
+              refunds={f.refunds.map((r) => ({
+                id: r.id,
+                date: dayKeyInTimezone(r.date, gym.timezone),
+                recipientName: r.recipientName,
+                reason: r.reason,
+                categoryLabel: REFUND_CATEGORY_LABEL[r.category],
+                methodLabel: REFUND_METHOD_LABEL[r.method],
+                amount: r.amount,
+                note: r.note,
+                recordedBy: r.recordedBy,
+              }))}
+            />
           </Card>
         </div>
 

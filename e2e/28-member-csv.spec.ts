@@ -67,6 +67,8 @@ test("the CSV helpers read what Excel writes: BOM, semicolons, quotes, Indonesia
   expect(out.startsWith("﻿")).toBeTruthy();
   expect(out).toContain("'=HYPERLINK(1),=\"081234567890\"");
   expect(out).toContain('"Dewi, ""Sari""",="+62 812-3456"');
+  // A plain negative amount stays a number; anything else starting with "-" is still defused.
+  expect(toCsv([["-50000", "-12.5", "-1+1", "-SUM(A1)"]])).toContain("-50000,-12.5,'-1+1,'-SUM(A1)");
 
   // Header mapping and per-row errors, in Indonesian.
   const sheet = parseMemberSheet(["Nama;No HP;Email;Paket;Berlaku sampai", "Sari;0812345678;sari@x.id;Monthly;31/12/2026", "B;0812;bad;;", "Sari Dua;0812345679;SARI@x.id;;"].join("\n"));

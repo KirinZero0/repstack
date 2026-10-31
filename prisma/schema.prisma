@@ -58,7 +58,7 @@ model Gym {
   isTest             Boolean            @default(false) // a superadmin's test gym: left out of platform revenue and totals, never billed, and sends nothing automatically (send buttons still work)
   settings           Json               @default("{}")
   features           Json               @default("{}") // optional features Liftmora grants this gym (see src/config/features.ts); only a superadmin changes it
-  termsAcceptedAt    DateTime?          // when the owner accepted the terms and privacy policy
+  termsAcceptedAt    DateTime? // when the owner accepted the terms and privacy policy
   bankName           String? // shown on the public join page for manual bank-transfer requests
   bankAccountNumber  String?
   bankAccountHolder  String?
@@ -85,6 +85,7 @@ model Gym {
   fields             Field[]
   fieldBookings      FieldBooking[]
   fieldPayments      FieldBookingPayment[]
+  refunds            Refund[]
   dayPassPlans       DayPassPlan[]
   emailTemplates     EmailTemplate[]
 
@@ -100,7 +101,7 @@ model PlatformPayment {
   provider          String // "xendit" | "midtrans" | "manual" (setup fees settled outside the app)
   kind              String        @default("SUBSCRIPTION") // "SUBSCRIPTION" | "SETUP" — a setup fee is one-time and never moves nextBillingDate
   externalInvoiceId String?       @unique
-  invoiceUrl        String?       // Xendit hosted payment page, so the owner can pay from the billing page
+  invoiceUrl        String? // Xendit hosted payment page, so the owner can pay from the billing page
   amount            Decimal
   status            PaymentStatus @default(PENDING)
   createdAt         DateTime      @default(now())
@@ -148,11 +149,12 @@ model StaffUser {
   checkins              CheckIn[]
   recordedPayments      Payment[]
   recordedClassPayments ClassPayment[]
-  reviewedGuestPasses   GuestPass[] @relation("GuestPassReviewer")
-  scannedGuestPasses    GuestPass[] @relation("GuestPassScanner")
-  reviewedFieldBookings FieldBooking[] @relation("FieldBookingReviewer")
-  scannedFieldBookings  FieldBooking[] @relation("FieldBookingScanner")
+  reviewedGuestPasses   GuestPass[]           @relation("GuestPassReviewer")
+  scannedGuestPasses    GuestPass[]           @relation("GuestPassScanner")
+  reviewedFieldBookings FieldBooking[]        @relation("FieldBookingReviewer")
+  scannedFieldBookings  FieldBooking[]        @relation("FieldBookingScanner")
   fieldPayments         FieldBookingPayment[]
+  recordedRefunds       Refund[]
 
   @@index([gymId])
 }
@@ -199,9 +201,9 @@ model Member {
   qrSecret            String         @default(uuid())
   status              MemberStatus   @default(PENDING_PAYMENT)
   membershipExpiry    DateTime?
-  frozenAt            DateTime?      // set while status is FROZEN; unfreezing pushes the expiry out by the frozen time
+  frozenAt            DateTime? // set while status is FROZEN; unfreezing pushes the expiry out by the frozen time
   termsAcceptedAt     DateTime?
-  anonymizedAt        DateTime?      // personal data erased; the row stays so payment history still adds up
+  anonymizedAt        DateTime? // personal data erased; the row stays so payment history still adds up
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
@@ -225,17 +227,17 @@ enum CheckInResult {
 }
 
 model CheckIn {
-  id          String        @id @default(uuid())
-  gymId       String
-  gym         Gym           @relation(fields: [gymId], references: [id])
-  memberId    String
-  member      Member        @relation(fields: [memberId], references: [id])
-  staffUserId String?
-  staffUser   StaffUser?    @relation(fields: [staffUserId], references: [id])
-  checkedInAt DateTime      @default(now())
-  checkedOutAt DateTime?    // explicit check-out (member or staff); a SUCCESS without one counts as "in the gym" until the occupancy window lapses
-  result      CheckInResult
-  deviceLabel String?
+  id           String        @id @default(uuid())
+  gymId        String
+  gym          Gym           @relation(fields: [gymId], references: [id])
+  memberId     String
+  member       Member        @relation(fields: [memberId], references: [id])
+  staffUserId  String?
+  staffUser    StaffUser?    @relation(fields: [staffUserId], references: [id])
+  checkedInAt  DateTime      @default(now())
+  checkedOutAt DateTime? // explicit check-out (member or staff); a SUCCESS without one counts as "in the gym" until the occupancy window lapses
+  result       CheckInResult
+  deviceLabel  String?
 
   @@index([gymId, checkedInAt])
   @@index([memberId, checkedInAt])
@@ -264,7 +266,7 @@ model Payment {
   plan              MembershipPlan  @relation(fields: [planId], references: [id])
   provider          PaymentProvider
   externalInvoiceId String?         @unique
-  invoiceUrl        String?         // hosted payment page, so an unpaid invoice can be resumed
+  invoiceUrl        String? // hosted payment page, so an unpaid invoice can be resumed
   amount            Decimal
   currency          String          @default("IDR")
   status            PaymentStatus   @default(PENDING)
@@ -319,26 +321,26 @@ model AuditLog {
 /// Hand-made invoices the superadmin issues to gyms (setup, training, packages) and prints or saves as PDF.
 /// Platform-level, not tenant data: no gymId, and the restricted app role is never granted it.
 model Invoice {
-  id          String    @id @default(uuid())
-  number      String    @unique // "INV-2026-0001"
-  gymName     String    @default("") // the gym being billed, typed freely (not tied to a Gym row)
-  billToName  String // the person who pays
-  billToInfo  String    @default("") // address / contact lines, shown under the name
-  currency    String    @default("IDR")
-  items       Json // [{ description, quantity, unitPrice }]
-  subtotal    Decimal   @default(0) // sum of the line items, before any discount
+  id             String    @id @default(uuid())
+  number         String    @unique // "INV-2026-0001"
+  gymName        String    @default("") // the gym being billed, typed freely (not tied to a Gym row)
+  billToName     String // the person who pays
+  billToInfo     String    @default("") // address / contact lines, shown under the name
+  currency       String    @default("IDR")
+  items          Json // [{ description, quantity, unitPrice }]
+  subtotal       Decimal   @default(0) // sum of the line items, before any discount
   discountType   String? // "PERCENT" | "AMOUNT" | null (no discount)
-  discountValue  Decimal @default(0) // the percentage, or the rupiah amount, as typed
-  discountLabel  String  @default("") // optional wording for the invoice, e.g. "Early bird"
-  discountAmount Decimal @default(0) // rupiah actually taken off the subtotal
-  total       Decimal // what is payable: subtotal minus discountAmount
-  notes       String    @default("")
-  status      String    @default("UNPAID") // "UNPAID" | "PAID" | "VOID"
-  issueDate   DateTime
-  dueDate     DateTime?
-  paidAt      DateTime?
-  createdById String
-  createdAt   DateTime  @default(now())
+  discountValue  Decimal   @default(0) // the percentage, or the rupiah amount, as typed
+  discountLabel  String    @default("") // optional wording for the invoice, e.g. "Early bird"
+  discountAmount Decimal   @default(0) // rupiah actually taken off the subtotal
+  total          Decimal // what is payable: subtotal minus discountAmount
+  notes          String    @default("")
+  status         String    @default("UNPAID") // "UNPAID" | "PAID" | "VOID"
+  issueDate      DateTime
+  dueDate        DateTime?
+  paidAt         DateTime?
+  createdById    String
+  createdAt      DateTime  @default(now())
 
   @@index([createdAt])
 }
@@ -390,9 +392,9 @@ model GymSignup {
 // once gym staff approves it. Unapproved rows expire after 24h.
 
 model MemberSignup {
-  id                  String       @id @default(uuid())
+  id                  String         @id @default(uuid())
   gymId               String
-  gym                 Gym          @relation(fields: [gymId], references: [id])
+  gym                 Gym            @relation(fields: [gymId], references: [id])
   planId              String
   plan                MembershipPlan @relation(fields: [planId], references: [id])
   fullName            String
@@ -400,16 +402,16 @@ model MemberSignup {
   phoneWhatsapp       String // AES-256-GCM encrypted, like Member.phoneWhatsapp
   phoneWhatsappLookup String
   passwordHash        String? // null for a RENEWAL: the member already has an account
-  kind                String       @default("JOIN") // "JOIN" (new member) | "RENEWAL" (existing member, memberId set from the start)
+  kind                String         @default("JOIN") // "JOIN" (new member) | "RENEWAL" (existing member, memberId set from the start)
   amount              Decimal // snapshot of the plan price when the request was made
-  status              SignupStatus @default(PENDING_REVIEW)
+  status              SignupStatus   @default(PENDING_REVIEW)
   proofImageUrl       String? // Vercel Blob URL (private access), a screenshot of the transfer
-  externalInvoiceId   String?      @unique
+  externalInvoiceId   String?        @unique
   invoiceUrl          String?
   memberId            String?
   ipHash              String? // keyed hash of the requester's IP, for throttling only
   termsAcceptedAt     DateTime?
-  createdAt           DateTime     @default(now())
+  createdAt           DateTime       @default(now())
   completedAt         DateTime?
 
   @@index([gymId, createdAt])
@@ -473,20 +475,20 @@ enum ClassRegistrationStatus {
 }
 
 model ClassRegistration {
-  id        String                  @id @default(uuid())
-  gymId     String
-  gym       Gym                     @relation(fields: [gymId], references: [id])
-  sessionId String
-  session   ClassSession            @relation(fields: [sessionId], references: [id])
-  memberId  String
-  member    Member                  @relation(fields: [memberId], references: [id])
-  status    ClassRegistrationStatus @default(PENDING_PAYMENT)
-  attendance     String?   // "ATTENDED" | "NO_SHOW", marked by staff from the roster once the session has started; null = not marked
-  attendanceAt   DateTime?
+  id               String                  @id @default(uuid())
+  gymId            String
+  gym              Gym                     @relation(fields: [gymId], references: [id])
+  sessionId        String
+  session          ClassSession            @relation(fields: [sessionId], references: [id])
+  memberId         String
+  member           Member                  @relation(fields: [memberId], references: [id])
+  status           ClassRegistrationStatus @default(PENDING_PAYMENT)
+  attendance       String? // "ATTENDED" | "NO_SHOW", marked by staff from the roster once the session has started; null = not marked
+  attendanceAt     DateTime?
   proofImageUrl    String? // member's bank-transfer screenshot (private blob) for staff to check before "Record payment"
   proofSubmittedAt DateTime?
-  reminderSentAt DateTime? // set by the class-reminders cron before the message goes out, so it's sent at most once
-  createdAt DateTime                @default(now())
+  reminderSentAt   DateTime? // set by the class-reminders cron before the message goes out, so it's sent at most once
+  createdAt        DateTime                @default(now())
 
   payment ClassPayment?
 
@@ -536,15 +538,15 @@ enum GuestPassStatus {
 // of sessionId. Exactly one of sessionId / dayPassPlanId is set on a pass. Valid on visitDate, a
 // calendar day in the gym's timezone.
 model DayPassPlan {
-  id          String   @id @default(uuid())
-  gymId       String
-  gym         Gym      @relation(fields: [gymId], references: [id])
-  name        String
-  price       Decimal
-  currency    String   @default("IDR")
-  isActive    Boolean  @default(true)
-  validityDays Int?    @default(30) // how many days a ticket stays usable after staff approve it; null = never expires
-  createdAt   DateTime @default(now())
+  id           String   @id @default(uuid())
+  gymId        String
+  gym          Gym      @relation(fields: [gymId], references: [id])
+  name         String
+  price        Decimal
+  currency     String   @default("IDR")
+  isActive     Boolean  @default(true)
+  validityDays Int?     @default(30) // how many days a ticket stays usable after staff approve it; null = never expires
+  createdAt    DateTime @default(now())
 
   guestPasses GuestPass[]
 
@@ -627,34 +629,34 @@ enum FieldBookingStatus {
 }
 
 model FieldBooking {
-  id                  String             @id @default(uuid())
+  id                  String                @id @default(uuid())
   gymId               String
-  gym                 Gym                @relation(fields: [gymId], references: [id])
+  gym                 Gym                   @relation(fields: [gymId], references: [id])
   fieldId             String
-  field               Field              @relation(fields: [fieldId], references: [id])
+  field               Field                 @relation(fields: [fieldId], references: [id])
   startsAt            DateTime // UTC
   endsAt              DateTime
   fullName            String
   phoneWhatsapp       String // encrypted
   phoneWhatsappLookup String // HMAC blind index
   email               String? // encrypted
-  status              FieldBookingStatus @default(PENDING_REVIEW)
+  status              FieldBookingStatus    @default(PENDING_REVIEW)
   pax                 Int? // how many people, on a PER_PAX field; staff can change it, which changes the amount
   rate                Decimal? // the per-person hourly price when it was booked, so editing the people uses that price, not today's
   amount              Decimal // what this booking costs now (price x people x time). What has been paid is the sum of its payments below
-  isBlock             Boolean            @default(false) // staff blocking the time (maintenance, a tournament): never revenue, never ticketed
+  isBlock             Boolean               @default(false) // staff blocking the time (maintenance, a tournament): never revenue, never ticketed
   note                String?
   proofImageUrl       String? // optional bank-transfer screenshot (private blob)
   proofSubmittedAt    DateTime?
-  ticketSecret        String             @default(uuid()) // signs the ticket QR; rotating it voids the ticket
+  ticketSecret        String                @default(uuid()) // signs the ticket QR; rotating it voids the ticket
   ipHash              String?
   reviewedById        String?
-  reviewedBy          StaffUser?         @relation("FieldBookingReviewer", fields: [reviewedById], references: [id])
+  reviewedBy          StaffUser?            @relation("FieldBookingReviewer", fields: [reviewedById], references: [id])
   reviewedAt          DateTime?
   attendedAt          DateTime?
   scannedById         String?
-  scannedBy           StaffUser?         @relation("FieldBookingScanner", fields: [scannedById], references: [id])
-  createdAt           DateTime           @default(now())
+  scannedBy           StaffUser?            @relation("FieldBookingScanner", fields: [scannedById], references: [id])
+  createdAt           DateTime              @default(now())
   payments            FieldBookingPayment[]
 
   @@index([gymId, startsAt])
@@ -671,17 +673,17 @@ enum FieldPaymentKind {
 /// Every movement of money on a field booking, each with its own date. Revenue is the sum of these (for bookings
 /// that are still held), so extra money collected later counts in the month it came in, and a refund subtracts.
 model FieldBookingPayment {
-  id           String             @id @default(uuid())
+  id           String           @id @default(uuid())
   gymId        String
-  gym          Gym                @relation(fields: [gymId], references: [id])
+  gym          Gym              @relation(fields: [gymId], references: [id])
   bookingId    String
-  booking      FieldBooking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking      FieldBooking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   amount       Decimal // negative for a refund
   kind         FieldPaymentKind
   note         String?
   recordedById String?
-  recordedBy   StaffUser?         @relation(fields: [recordedById], references: [id])
-  createdAt    DateTime           @default(now())
+  recordedBy   StaffUser?       @relation(fields: [recordedById], references: [id])
+  createdAt    DateTime         @default(now())
 
   @@index([gymId, createdAt])
   @@index([bookingId])
@@ -720,13 +722,13 @@ model LoginAttempt {
 // template is what tells one gym's email from another's. (gymId, type) is unique, with one platform
 // row per type enforced by a partial index in the migration, since NULLs never collide in a plain one.
 model EmailTemplate {
-  id        String   @id @default(uuid())
+  id        String      @id @default(uuid())
   gymId     String?
-  gym       Gym?     @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  gym       Gym?        @relation(fields: [gymId], references: [id], onDelete: Cascade)
   type      MessageType
   subject   String
   body      String
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime    @updatedAt
 
   @@unique([gymId, type])
   @@index([type])
@@ -760,4 +762,39 @@ enum MessageType {
   gym_suspended
   staff_invite
   staff_password_reset
+}
+
+// ─── Refunds ────────────────────────────────────────────────
+// Money the gym gave back, recorded by the owner. Finance subtracts it on its own date.
+
+enum RefundCategory {
+  MEMBERSHIP
+  CLASS
+  DAY_PASS
+  FIELD
+  OTHER
+}
+
+enum RefundMethod {
+  CASH
+  TRANSFER
+}
+
+model Refund {
+  id            String         @id @default(uuid())
+  gymId         String
+  gym           Gym            @relation(fields: [gymId], references: [id])
+  amount        Decimal // what was given back, as a positive number; finance subtracts it
+  currency      String         @default("IDR")
+  recipientName String
+  reason        String
+  category      RefundCategory
+  method        RefundMethod
+  refundedAt    DateTime // the day the money went back (chosen by the owner), which finance counts it on
+  note          String?
+  recordedById  String?
+  recordedBy    StaffUser?     @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime       @default(now())
+
+  @@index([gymId, refundedAt])
 }

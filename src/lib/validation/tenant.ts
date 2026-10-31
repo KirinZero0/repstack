@@ -102,6 +102,17 @@ export const renewalRequestSchema = z.object({ planId: z.string().uuid() });
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 
 /** Query string of the owner's finance CSV export. Dates are days in the gym's timezone, inclusive. */
+/** The owner records money the gym gave back. `date` is the day it went back, in the gym's timezone. */
+export const refundSchema = z.object({
+  amount: z.number().int("Enter a whole Rupiah amount").positive("Enter how much was refunded").max(1_000_000_000),
+  recipientName: z.string().trim().min(2, "Enter who received the refund").max(80),
+  reason: z.string().trim().min(3, "Say why it was refunded").max(200),
+  category: z.enum(["MEMBERSHIP", "CLASS", "DAY_PASS", "FIELD", "OTHER"]),
+  method: z.enum(["CASH", "TRANSFER"]),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the date of the refund"),
+  note: z.string().trim().max(300).optional(),
+});
+
 export const financeExportQuerySchema = z
   .object({
     report: z.enum(["transactions", "monthly"]).default("transactions"),

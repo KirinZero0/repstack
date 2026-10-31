@@ -9,7 +9,7 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 
-const TENANT_TABLES = ["Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup", "GymClass", "ClassSession", "ClassRegistration", "ClassPayment", "GuestPass", "DayPassPlan", "EmailTemplate", "Field", "FieldBooking", "FieldBookingPayment"];
+const TENANT_TABLES = ["Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup", "GymClass", "ClassSession", "ClassRegistration", "ClassPayment", "GuestPass", "DayPassPlan", "EmailTemplate", "Field", "FieldBooking", "FieldBookingPayment", "Refund"];
 const NOT_GRANTED = ["Superadmin", "AuditLog", "GymSignup", "MagicLink", "PasswordReset", "AppConfig", "Invoice"];
 
 let failures = 0;

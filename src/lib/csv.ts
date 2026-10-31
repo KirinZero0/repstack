@@ -26,7 +26,8 @@ function escapeCell(cell: CsvCell, delimiter: string): string {
   }
   let v = cell;
   // A spreadsheet treats a leading =, +, -, @ (or a stray tab/CR) as a formula. A member name is never one.
-  if (/^[=+\-@\t\r]/.test(v)) v = `'${v}`;
+  // A plain negative number (a refund amount) can't be a formula, and must stay a number so the column sums.
+  if (/^[=+\-@\t\r]/.test(v) && !/^-\d+(\.\d+)?$/.test(v)) v = `'${v}`;
   if (v.includes('"') || v.includes(delimiter) || /[\r\n]/.test(v)) {
     v = `"${v.replace(/"/g, '""')}"`;
   }

@@ -28,13 +28,14 @@ function monthlyEquivalent(price: number, interval: string) {
 
 /**
  * The owner's money picture: membership payments and class payments together, since both are
- * revenue. Breakdowns are per item ("Monthly" plan, "Yoga class") and per method.
+ * revenue. Breakdowns are per item ("Monthly" plan, "Yoga class") and per method. Refunds the owner
+ * recorded are subtracted from the totals on the day they went back, and listed on their own.
  */
 export async function getGymFinance(db: TenantDb, gymId: string, timezone: string) {
   const months = lastMonthKeys(12, timezone);
   const since = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
 
-  const [paid, paidClasses, paidDayPasses, paidFields, pendingAgg, pendingClassAgg, statusGroups, classStatusGroups, recent, recentClasses] = await Promise.all([
+  const [paid, paidClasses, paidDayPasses, paidFields, refunds, pendingAgg, pendingClassAgg, statusGroups, classStatusGroups, recent, recentClasses] = await Promise.all([
     db.payment.findMany({
       where: { gymId, status: "PAID", paidAt: { gte: since } },
       include: { plan: { select: { name: true } } },
@@ -55,6 +56,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       where: { gymId, createdAt: { gte: since }, booking: { status: { in: ["APPROVED", "ATTENDED", "NO_SHOW"] }, isBlock: false } },
       include: { booking: { select: { field: { select: { name: true } } } } },
     }),
+    db.refund.findMany({ where: { gymId, refundedAt: { gte: since } }, orderBy: { refundedAt: "desc" }, include: { recordedBy: { select: { name: true } } } }),
     db.payment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
     db.classPayment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
     db.payment.groupBy({ by: ["status"], where: { gymId }, _count: true }),
@@ -73,7 +75,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     }),
   ]);
 
-  type PaidRow = { when: Date; amount: number; item: string; kind: "membership" | "class" | "daypass" | "field"; provider: string };
+  type PaidRow = { when: Date; amount: number; item: string; kind: "membership" | "class" | "daypass" | "field" | "refund"; provider: string };
   const rows: PaidRow[] = [
     ...paid.map((p) => ({ when: p.paidAt ?? p.createdAt, amount: Number(p.amount), item: p.plan.name, kind: "membership" as const, provider: p.provider })),
     ...paidClasses.map((p) => ({
@@ -91,12 +93,15 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       provider: "CASH",
     })),
     ...paidFields.map((p) => ({ when: p.createdAt, amount: Number(p.amount), item: `${p.booking.field.name} (field booking)`, kind: "field" as const, provider: "CASH" })),
+    // Negative, so every total below is net of what was given back.
+    ...refunds.map((r) => ({ when: r.refundedAt, amount: -Number(r.amount), item: "Refunds", kind: "refund" as const, provider: "CASH" })),
   ];
 
   const byMonth = new Map<string, number>(months.map((k) => [k, 0]));
   const byMonthClasses = new Map<string, number>(months.map((k) => [k, 0]));
   const byMonthDayPasses = new Map<string, number>(months.map((k) => [k, 0]));
   const byMonthFields = new Map<string, number>(months.map((k) => [k, 0]));
+  const byMonthRefunds = new Map<string, number>(months.map((k) => [k, 0]));
   const byPlan = new Map<string, number>();
   const byMethod = new Map<string, number>();
   for (const p of rows) {
@@ -106,8 +111,10 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       if (p.kind === "class") byMonthClasses.set(key, (byMonthClasses.get(key) ?? 0) + p.amount);
       if (p.kind === "daypass") byMonthDayPasses.set(key, (byMonthDayPasses.get(key) ?? 0) + p.amount);
       if (p.kind === "field") byMonthFields.set(key, (byMonthFields.get(key) ?? 0) + p.amount);
+      if (p.kind === "refund") byMonthRefunds.set(key, (byMonthRefunds.get(key) ?? 0) - p.amount);
     }
-    if (key === months[months.length - 1]) {
+    // The breakdowns show what came in; refunds are shown on their own rather than as negative bars.
+    if (key === months[months.length - 1] && p.kind !== "refund") {
       byPlan.set(p.item, (byPlan.get(p.item) ?? 0) + p.amount);
       const method = p.provider === "CASH" ? "Recorded manually" : "Online payment";
       byMethod.set(method, (byMethod.get(method) ?? 0) + p.amount);
@@ -119,6 +126,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
   const thisMonthClasses = byMonthClasses.get(months[months.length - 1]) ?? 0;
   const thisMonthDayPasses = byMonthDayPasses.get(months[months.length - 1]) ?? 0;
   const thisMonthFields = byMonthFields.get(months[months.length - 1]) ?? 0;
+  const thisMonthRefunds = byMonthRefunds.get(months[months.length - 1]) ?? 0;
   const lastMonth = monthly[monthly.length - 2]?.value ?? 0;
 
   const statusCounts = new Map<string, number>();
@@ -157,6 +165,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     thisMonthClasses,
     thisMonthDayPasses,
     thisMonthFields,
+    thisMonthRefunds,
     lastMonth,
     changePct: lastMonth > 0 ? ((thisMonth - lastMonth) / lastMonth) * 100 : null,
     yearTotal: monthly.reduce((s, m) => s + m.value, 0),
@@ -166,6 +175,17 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     byMethod: Array.from(byMethod.entries()).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value),
     statusCounts: Array.from(statusCounts.entries()).map(([status, count]) => ({ status, count })),
     recent: recentAll,
+    refunds: refunds.slice(0, 20).map((r) => ({
+      id: r.id,
+      date: r.refundedAt,
+      recipientName: r.recipientName,
+      reason: r.reason,
+      category: r.category,
+      method: r.method,
+      amount: Number(r.amount),
+      note: r.note,
+      recordedBy: r.recordedBy?.name ?? null,
+    })),
   };
 }
 

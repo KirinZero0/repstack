@@ -66,7 +66,7 @@ export default function FinanceExportCard({ slug, monthStart, today, yearStart }
         >
           Download monthly summary
         </DownloadButton>
-        <span className="text-xs text-neutral-500">Last 12 months, one row per month: membership and class revenue, cash vs online, voided entries.</span>
+        <span className="text-xs text-neutral-500">Last 12 months, one row per month: revenue by type, refunds, cash vs online, voided entries.</span>
       </div>
     </div>
   );

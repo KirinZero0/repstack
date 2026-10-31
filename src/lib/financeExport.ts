@@ -3,6 +3,7 @@ import type { TenantDb } from "./prisma";
 import { dayKeyInTimezone, zonedTimeToUtc } from "./date";
 import { monthKey, monthLabel } from "./stats";
 import type { CsvCell } from "./csv";
+import { REFUND_CATEGORY_LABEL, REFUND_METHOD_LABEL } from "./refunds";
 
 export interface DateRange {
   /** YYYY-MM-DD, inclusive, in the gym's timezone. */
@@ -53,7 +54,7 @@ export const TRANSACTION_COLUMNS = [
 
 interface Txn {
   when: Date;
-  type: "Membership" | "Class" | "Day pass" | "Field";
+  type: "Membership" | "Class" | "Day pass" | "Field" | "Refund";
   member: string;
   item: string;
   amount: number;
@@ -82,7 +83,7 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
         ],
       };
 
-  const [memberships, classes, dayPasses, fieldBookings] = await Promise.all([
+  const [memberships, classes, dayPasses, fieldBookings, refunds] = await Promise.all([
     db.payment.findMany({
       where: { gymId, ...inRange },
       include: { member: { select: { fullName: true } }, plan: { select: { name: true } }, recordedBy: { select: { name: true } } },
@@ -106,6 +107,8 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
       where: { gymId, createdAt: { gte: start, lte: end }, booking: { status: { in: ["APPROVED", "ATTENDED", "NO_SHOW"] }, isBlock: false } },
       include: { booking: { include: { field: { select: { name: true } } } }, recordedBy: { select: { name: true } } },
     }),
+    // Refunds the owner recorded: money out, on the day it went back.
+    db.refund.findMany({ where: { gymId, refundedAt: { gte: start, lte: end } }, include: { recordedBy: { select: { name: true } } } }),
   ]);
 
   const rows: Txn[] = [
@@ -167,6 +170,20 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
       invoiceId: "",
       id: p.id,
     })),
+    ...refunds.map((r) => ({
+      when: r.refundedAt,
+      type: "Refund" as const,
+      member: r.recipientName,
+      item: REFUND_CATEGORY_LABEL[r.category],
+      amount: -Number(r.amount),
+      currency: r.currency,
+      status: "REFUNDED",
+      method: REFUND_METHOD_LABEL[r.method],
+      recordedBy: r.recordedBy?.name ?? "",
+      note: [r.reason, r.note].filter(Boolean).join(" · "),
+      invoiceId: "",
+      id: r.id,
+    })),
   ];
   return rows.sort((a, b) => a.when.getTime() - b.when.getTime());
 }
@@ -192,7 +209,7 @@ export async function transactionsReport(db: TenantDb, gymId: string, range: Dat
   ];
 }
 
-export const MONTHLY_COLUMNS = ["Month", "Membership revenue", "Class revenue", "Day pass revenue", "Field revenue", "Total revenue", "Paid payments", "Cash / transfer", "Online", "Voided"] as const;
+export const MONTHLY_COLUMNS = ["Month", "Membership revenue", "Class revenue", "Day pass revenue", "Field revenue", "Refunds", "Total revenue", "Paid payments", "Cash / transfer", "Online", "Voided"] as const;
 
 /** Month keys (YYYY-MM) from the month of `from` to the month of `to`, inclusive. */
 function monthsIn(range: DateRange): string[] {
@@ -210,16 +227,23 @@ function monthsIn(range: DateRange): string[] {
   return keys;
 }
 
-/** One row per month: what came in, split by membership vs class and by how it was paid. Paid money only, plus a count of voided entries. */
+/**
+ * One row per month: what came in, split by membership vs class and by how it was paid. Paid money only, plus a count
+ * of voided entries. Refunds the owner recorded are their own (negative) column, and Total revenue is net of them.
+ */
 export async function monthlyReport(db: TenantDb, gymId: string, range: DateRange, timezone: string): Promise<CsvCell[][]> {
   const rows = await loadTransactions(db, gymId, range, timezone, false);
-  type Bucket = { membership: number; classes: number; dayPasses: number; fields: number; count: number; cash: number; online: number; voided: number };
-  const buckets = new Map<string, Bucket>(monthsIn(range).map((k) => [k, { membership: 0, classes: 0, dayPasses: 0, fields: 0, count: 0, cash: 0, online: 0, voided: 0 }]));
+  type Bucket = { membership: number; classes: number; dayPasses: number; fields: number; refunds: number; count: number; cash: number; online: number; voided: number };
+  const buckets = new Map<string, Bucket>(monthsIn(range).map((k) => [k, { membership: 0, classes: 0, dayPasses: 0, fields: 0, refunds: 0, count: 0, cash: 0, online: 0, voided: 0 }]));
   for (const r of rows) {
     const b = buckets.get(monthKey(r.when, timezone));
     if (!b) continue;
     if (r.status === "VOIDED") {
       b.voided++;
+      continue;
+    }
+    if (r.type === "Refund") {
+      b.refunds += r.amount;
       continue;
     }
     if (r.status !== "PAID") continue;
@@ -239,7 +263,8 @@ export async function monthlyReport(db: TenantDb, gymId: string, range: DateRang
       String(b.classes),
       String(b.dayPasses),
       String(b.fields),
-      String(b.membership + b.classes + b.dayPasses + b.fields),
+      String(b.refunds),
+      String(b.membership + b.classes + b.dayPasses + b.fields + b.refunds),
       String(b.count),
       String(b.cash),
       String(b.online),

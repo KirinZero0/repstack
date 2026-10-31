@@ -182,16 +182,24 @@ test("the monthly summary has one row per month with revenue split by type and m
     status, amount: 30000, reviewedAt: now, attendedAt: status === "ATTENDED" ? now : null,
   });
   await prisma.guestPass.createMany({ data: [dp("ATTENDED", 1), dp("APPROVED", 2), { ...dp("APPROVED", 3), status: "PENDING_REVIEW" as const, reviewedAt: null }] });
+  // A refund the owner recorded this month comes off the total, in its own column.
+  await prisma.refund.create({ data: { gymId: f.gym.id, amount: 50000, recipientName: "Rina", reason: "No-show goodwill", category: "DAY_PASS", method: "CASH", refundedAt: now } });
 
   await login(request, baseURL!, f.slug, f.owner);
   const { rows, disposition } = await fetchCsv(request, baseURL!, f.slug, `?report=monthly&from=${prevKey}-01&to=${dayKeyInTimezone(now, TZ)}`);
   expect(disposition).toContain(`finance-monthly-${f.slug}-`);
-  expect(rows[0]).toEqual(["Month", "Membership revenue", "Class revenue", "Day pass revenue", "Field revenue", "Total revenue", "Paid payments", "Cash / transfer", "Online", "Voided"]);
+  expect(rows[0]).toEqual(["Month", "Membership revenue", "Class revenue", "Day pass revenue", "Field revenue", "Refunds", "Total revenue", "Paid payments", "Cash / transfer", "Online", "Voided"]);
   expect(rows).toHaveLength(3);
   // Previous month: one cash payment, one voided entry.
-  expect(rows[1].slice(1)).toEqual(["300000", "0", "0", "0", "300000", "1", "300000", "0", "1"]);
-  // This month: cash + online membership and an online class; the pending invoice isn't revenue.
-  expect(rows[2].slice(1)).toEqual(["450000", "40000", "60000", "0", "550000", "5", "260000", "290000", "0"]);
+  expect(rows[1].slice(1)).toEqual(["300000", "0", "0", "0", "0", "300000", "1", "300000", "0", "1"]);
+  // This month: cash + online membership and an online class, less the refund; the pending invoice isn't revenue.
+  expect(rows[2].slice(1)).toEqual(["450000", "40000", "60000", "0", "-50000", "500000", "5", "260000", "290000", "0"]);
+
+  // The transactions export lists the refund as a negative line.
+  const tx = await fetchCsv(request, baseURL!, f.slug, `?report=transactions&from=${dayKeyInTimezone(now, TZ)}&to=${dayKeyInTimezone(now, TZ)}`);
+  const refundRow = tx.rows.find((r) => r[1] === "Refund");
+  expect(refundRow?.slice(1, 8)).toEqual(["Refund", "Rina", "Day pass", "-50000", "IDR", "REFUNDED", "Cash"]);
+  expect(refundRow?.[9]).toBe("No-show goodwill");
   expect(rows[2][0]).toMatch(/^[A-Z][a-z]{2} \d{4}$/);
 
   // The default monthly range is twelve months, all present even when empty.
@@ -218,4 +226,48 @@ test("the Finance page offers the exports to the owner with this month pre-fille
   
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download monthly summary" }).click()]);
   expect(download.suggestedFilename()).toMatch(new RegExp(`^finance-monthly-${f.slug}-.*\\.csv$`));
+});
+
+test("the owner records a refund on the Finance page, revenue drops by it, and staff can't record one", async ({ page, request, baseURL }) => {
+  const f = await makeGym();
+  const now = new Date();
+  await prisma.payment.create({ data: { gymId: f.gym.id, memberId: f.member.id, planId: f.plan.id, provider: "CASH", amount: 300000, status: "PAID", paidAt: now } });
+  await staffLoginUI(page, baseURL!, f.slug, f.owner.email, f.owner.password);
+  await page.waitForURL(`${baseURL}/${f.slug}/dashboard`);
+  await page.goto(`${baseURL}/${f.slug}/finance`);
+
+  await page.getByRole("button", { name: "Record a refund" }).click();
+  await page.getByLabel("Refund amount").fill("75000");
+  await page.getByLabel("Refunded to").fill("Budi Santoso");
+  await page.getByLabel("Refund reason").fill("No-show, refunded as goodwill");
+  await page.getByLabel("Refund for").selectOption("FIELD");
+  await page.getByLabel("Refund method").selectOption("TRANSFER");
+  await page.getByRole("button", { name: "Record refund" }).click();
+  await expect(page.getByTestId("refund-row").filter({ hasText: "Budi Santoso" })).toContainText("75.000");
+
+  const saved = await prisma.refund.findFirstOrThrow({ where: { gymId: f.gym.id } });
+  expect(Number(saved.amount)).toBe(75000);
+  expect(saved.category).toBe("FIELD");
+  expect(saved.method).toBe("TRANSFER");
+  // Revenue this month is net of it.
+  await expect(page.getByText("Rp 225.000").first()).toBeVisible();
+
+  // A future date and a bad amount are refused; removing it puts revenue back.
+  const post = (data: object) => page.request.post(`${baseURL}/api/${f.slug}/refunds`, { data: { amount: 1000, recipientName: "X Y", reason: "Test", category: "OTHER", method: "CASH", date: dayKeyInTimezone(now, TZ), ...data } });
+  expect((await post({ date: dayKeyInTimezone(new Date(Date.now() + 3 * 24 * 3600 * 1000), TZ) })).status()).toBe(400);
+  expect((await post({ amount: -5 })).status()).toBe(400);
+  page.once("dialog", (d) => d.accept());
+  await page.getByTestId("refund-row").filter({ hasText: "Budi Santoso" }).getByRole("button", { name: "Remove" }).click();
+  await expect(page.getByTestId("refund-row")).toHaveCount(0);
+  expect(await prisma.refund.count({ where: { gymId: f.gym.id } })).toBe(0);
+
+  // Staff can't record or remove refunds, and another gym's owner can't remove this gym's.
+  const keep = await prisma.refund.create({ data: { gymId: f.gym.id, amount: 1000, recipientName: "Keep", reason: "Stays", category: "OTHER", method: "CASH", refundedAt: now } });
+  await login(request, baseURL!, f.slug, f.staff);
+  expect((await request.post(`${baseURL}/api/${f.slug}/refunds`, { data: { amount: 1000, recipientName: "X Y", reason: "Test", category: "OTHER", method: "CASH", date: dayKeyInTimezone(now, TZ) } })).status()).toBe(403);
+  expect((await request.delete(`${baseURL}/api/${f.slug}/refunds/${keep.id}`)).status()).toBe(403);
+  const other = await makeGym();
+  await login(request, baseURL!, other.slug, other.owner);
+  expect((await request.delete(`${baseURL}/api/${other.slug}/refunds/${keep.id}`)).status()).toBe(404);
+  expect(await prisma.refund.count({ where: { id: keep.id } })).toBe(1);
 });
