@@ -228,7 +228,7 @@ test("the Finance page offers the exports to the owner with this month pre-fille
   expect(download.suggestedFilename()).toMatch(new RegExp(`^finance-monthly-${f.slug}-.*\\.csv$`));
 });
 
-test("the owner records a refund on the Finance page, revenue drops by it, and staff can't record one", async ({ page, request, baseURL }) => {
+test("the owner records a refund on the Finance page, revenue drops by it, voiding keeps the record, and staff can't do either", async ({ page, request, baseURL }) => {
   const f = await makeGym();
   const now = new Date();
   await prisma.payment.create({ data: { gymId: f.gym.id, memberId: f.member.id, planId: f.plan.id, provider: "CASH", amount: 300000, status: "PAID", paidAt: now } });
@@ -252,22 +252,33 @@ test("the owner records a refund on the Finance page, revenue drops by it, and s
   // Revenue this month is net of it.
   await expect(page.getByText("Rp 225.000").first()).toBeVisible();
 
-  // A future date and a bad amount are refused; removing it puts revenue back.
+  // A future date and a bad amount are refused; voiding it puts revenue back but keeps the record.
   const post = (data: object) => page.request.post(`${baseURL}/api/${f.slug}/refunds`, { data: { amount: 1000, recipientName: "X Y", reason: "Test", category: "OTHER", method: "CASH", date: dayKeyInTimezone(now, TZ), ...data } });
   expect((await post({ date: dayKeyInTimezone(new Date(Date.now() + 3 * 24 * 3600 * 1000), TZ) })).status()).toBe(400);
   expect((await post({ amount: -5 })).status()).toBe(400);
   page.once("dialog", (d) => d.accept());
-  await page.getByTestId("refund-row").filter({ hasText: "Budi Santoso" }).getByRole("button", { name: "Remove" }).click();
-  await expect(page.getByTestId("refund-row")).toHaveCount(0);
-  expect(await prisma.refund.count({ where: { gymId: f.gym.id } })).toBe(0);
+  await page.getByTestId("refund-row").filter({ hasText: "Budi Santoso" }).getByRole("button", { name: "Void" }).click();
+  await expect(page.getByTestId("refund-row").filter({ hasText: "Budi Santoso" })).toHaveAttribute("data-voided", "true");
+  await expect(page.getByTestId("refund-row").filter({ hasText: "Budi Santoso" })).toContainText("Voided");
+  const voided = await prisma.refund.findUniqueOrThrow({ where: { id: saved.id } });
+  expect(voided.voidedAt).not.toBeNull();
+  expect(voided.voidedById).toBe(f.ownerRow.id);
+  await expect(page.getByText("Rp 300.000").first()).toBeVisible();
+  // Voiding twice is refused; the paid-only export leaves it out, the full one lists it as VOIDED.
+  expect((await page.request.post(`${baseURL}/api/${f.slug}/refunds/${saved.id}`)).status()).toBe(409);
+  const day = dayKeyInTimezone(now, TZ);
+  const paidOnly = await fetchCsv(page.request, baseURL!, f.slug, `?report=transactions&from=${day}&to=${day}`);
+  expect(paidOnly.rows.some((r) => r[1] === "Refund")).toBeFalsy();
+  const all = await fetchCsv(page.request, baseURL!, f.slug, `?report=transactions&from=${day}&to=${day}&status=all`);
+  expect(all.rows.find((r) => r[1] === "Refund")?.[6]).toBe("VOIDED");
 
   // Staff can't record or remove refunds, and another gym's owner can't remove this gym's.
   const keep = await prisma.refund.create({ data: { gymId: f.gym.id, amount: 1000, recipientName: "Keep", reason: "Stays", category: "OTHER", method: "CASH", refundedAt: now } });
   await login(request, baseURL!, f.slug, f.staff);
   expect((await request.post(`${baseURL}/api/${f.slug}/refunds`, { data: { amount: 1000, recipientName: "X Y", reason: "Test", category: "OTHER", method: "CASH", date: dayKeyInTimezone(now, TZ) } })).status()).toBe(403);
-  expect((await request.delete(`${baseURL}/api/${f.slug}/refunds/${keep.id}`)).status()).toBe(403);
+  expect((await request.post(`${baseURL}/api/${f.slug}/refunds/${keep.id}`)).status()).toBe(403);
   const other = await makeGym();
   await login(request, baseURL!, other.slug, other.owner);
-  expect((await request.delete(`${baseURL}/api/${other.slug}/refunds/${keep.id}`)).status()).toBe(404);
-  expect(await prisma.refund.count({ where: { id: keep.id } })).toBe(1);
+  expect((await request.post(`${baseURL}/api/${other.slug}/refunds/${keep.id}`)).status()).toBe(404);
+  expect((await prisma.refund.findUniqueOrThrow({ where: { id: keep.id } })).voidedAt).toBeNull();
 });

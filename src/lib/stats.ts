@@ -56,7 +56,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       where: { gymId, createdAt: { gte: since }, booking: { status: { in: ["APPROVED", "ATTENDED", "NO_SHOW"] }, isBlock: false } },
       include: { booking: { select: { field: { select: { name: true } } } } },
     }),
-    db.refund.findMany({ where: { gymId, refundedAt: { gte: since } }, orderBy: { refundedAt: "desc" }, include: { recordedBy: { select: { name: true } } } }),
+    db.refund.findMany({ where: { gymId, refundedAt: { gte: since } }, orderBy: { refundedAt: "desc" }, include: { recordedBy: { select: { name: true } }, voidedBy: { select: { name: true } } } }),
     db.payment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
     db.classPayment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
     db.payment.groupBy({ by: ["status"], where: { gymId }, _count: true }),
@@ -94,7 +94,8 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     })),
     ...paidFields.map((p) => ({ when: p.createdAt, amount: Number(p.amount), item: `${p.booking.field.name} (field booking)`, kind: "field" as const, provider: "CASH" })),
     // Negative, so every total below is net of what was given back.
-    ...refunds.map((r) => ({ when: r.refundedAt, amount: -Number(r.amount), item: "Refunds", kind: "refund" as const, provider: "CASH" })),
+    // A voided refund stays listed below but no longer comes off revenue.
+    ...refunds.filter((r) => !r.voidedAt).map((r) => ({ when: r.refundedAt, amount: -Number(r.amount), item: "Refunds", kind: "refund" as const, provider: "CASH" })),
   ];
 
   const byMonth = new Map<string, number>(months.map((k) => [k, 0]));
@@ -185,6 +186,8 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       amount: Number(r.amount),
       note: r.note,
       recordedBy: r.recordedBy?.name ?? null,
+      voidedAt: r.voidedAt,
+      voidedBy: r.voidedBy?.name ?? null,
     })),
   };
 }

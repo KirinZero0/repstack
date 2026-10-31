@@ -14,6 +14,8 @@ export interface RefundRow {
   amount: number;
   note: string | null;
   recordedBy: string | null;
+  /** Set when the owner voided it: it stays listed but no longer comes off revenue. */
+  voided: { on: string; by: string | null } | null;
 }
 
 const rp = (n: number) => `Rp ${n.toLocaleString("id-ID")}`;
@@ -21,7 +23,7 @@ const btn = "whitespace-nowrap rounded-md border border-neutral-700 px-3 py-1 te
 const primary = "whitespace-nowrap rounded-md bg-white px-3 py-1.5 text-sm font-medium text-neutral-950 hover:bg-neutral-200 disabled:opacity-50";
 const input = "w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm text-white outline-none focus:border-neutral-500";
 
-/** The owner records money given back; Finance subtracts it on that day. Recent refunds are listed with a remove. */
+/** The owner records money given back; Finance subtracts it on that day. Recent refunds are listed, and one recorded by mistake can be voided. */
 export default function RefundsCard({ slug, today, refunds }: { slug: string; today: string; refunds: RefundRow[] }) {
   const router = useRouter();
   const empty = { amount: "", recipientName: "", reason: "", category: "OTHER", method: "CASH", date: today, note: "" };
@@ -51,10 +53,12 @@ export default function RefundsCard({ slug, today, refunds }: { slug: string; to
     router.refresh();
   }
 
-  async function remove(r: RefundRow) {
-    if (!window.confirm(`Remove the ${rp(r.amount)} refund to ${r.recipientName}? Finance stops subtracting it.`)) return;
-    const res = await fetch(`/api/${slug}/refunds/${r.id}`, { method: "DELETE" });
-    if (!res.ok) return setError("Couldn't remove it.");
+  async function voidRefund(r: RefundRow) {
+    if (!window.confirm(`Void the ${rp(r.amount)} refund to ${r.recipientName}? It stays on record but no longer comes off revenue. This can't be undone.`)) return;
+    setError(null);
+    const res = await fetch(`/api/${slug}/refunds/${r.id}`, { method: "POST" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return setError(typeof body.error === "string" ? body.error : "Couldn't void it.");
     router.refresh();
   }
 
@@ -134,17 +138,22 @@ export default function RefundsCard({ slug, today, refunds }: { slug: string; to
             </thead>
             <tbody>
               {refunds.map((r) => (
-                <tr key={r.id} className="border-t border-neutral-800 align-top" data-testid="refund-row">
+                <tr key={r.id} className={`border-t border-neutral-800 align-top ${r.voided ? "opacity-60" : ""}`} data-testid="refund-row" data-voided={r.voided ? "true" : "false"}>
                   <td className="py-2 text-neutral-400">{r.date}</td>
-                  <td className="py-2">{r.recipientName}</td>
+                  <td className={`py-2 ${r.voided ? "line-through" : ""}`}>{r.recipientName}</td>
                   <td className="py-2 text-neutral-400">{r.categoryLabel} · {r.methodLabel}</td>
                   <td className="py-2 text-neutral-400">
                     {r.reason}
                     {r.note && <span className="block text-xs text-neutral-500">{r.note}</span>}
+                    {r.voided && <span className="block text-xs text-amber-400">Voided {r.voided.on}{r.voided.by ? ` by ${r.voided.by}` : ""}</span>}
                   </td>
-                  <td className="py-2 text-red-400">−{rp(r.amount)}</td>
+                  <td className={`py-2 ${r.voided ? "text-neutral-500 line-through" : "text-red-400"}`}>−{rp(r.amount)}</td>
                   <td className="py-2 text-right">
-                    <button className={`${btn} hover:border-red-800 hover:text-red-400`} onClick={() => remove(r)}>Remove</button>
+                    {r.voided ? (
+                      <span className="text-xs font-semibold uppercase tracking-wide text-amber-400">Voided</span>
+                    ) : (
+                      <button className={`${btn} hover:border-red-800 hover:text-red-400`} onClick={() => voidRefund(r)}>Void</button>
+                    )}
                   </td>
                 </tr>
               ))}

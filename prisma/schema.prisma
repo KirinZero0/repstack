@@ -154,7 +154,8 @@ model StaffUser {
   reviewedFieldBookings FieldBooking[]        @relation("FieldBookingReviewer")
   scannedFieldBookings  FieldBooking[]        @relation("FieldBookingScanner")
   fieldPayments         FieldBookingPayment[]
-  recordedRefunds       Refund[]
+  recordedRefunds       Refund[]              @relation("RefundRecorder")
+  voidedRefunds         Refund[]              @relation("RefundVoider")
 
   @@index([gymId])
 }
@@ -793,7 +794,10 @@ model Refund {
   refundedAt    DateTime // the day the money went back (chosen by the owner), which finance counts it on
   note          String?
   recordedById  String?
-  recordedBy    StaffUser?     @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  recordedBy    StaffUser?     @relation("RefundRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  voidedAt      DateTime? // set when the owner voids a refund recorded by mistake; it stays on record but no longer counts
+  voidedById    String?
+  voidedBy      StaffUser?     @relation("RefundVoider", fields: [voidedById], references: [id], onDelete: SetNull)
   createdAt     DateTime       @default(now())
 
   @@index([gymId, refundedAt])

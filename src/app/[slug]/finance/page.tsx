@@ -108,6 +108,7 @@ export default async function FinancePage({ params }: { params: { slug: string }
                 amount: r.amount,
                 note: r.note,
                 recordedBy: r.recordedBy,
+                voided: r.voidedAt ? { on: dayKeyInTimezone(r.voidedAt, gym.timezone), by: r.voidedBy } : null,
               }))}
             />
           </Card>

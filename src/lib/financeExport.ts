@@ -107,8 +107,8 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
       where: { gymId, createdAt: { gte: start, lte: end }, booking: { status: { in: ["APPROVED", "ATTENDED", "NO_SHOW"] }, isBlock: false } },
       include: { booking: { include: { field: { select: { name: true } } } }, recordedBy: { select: { name: true } } },
     }),
-    // Refunds the owner recorded: money out, on the day it went back.
-    db.refund.findMany({ where: { gymId, refundedAt: { gte: start, lte: end } }, include: { recordedBy: { select: { name: true } } } }),
+    // Refunds the owner recorded: money out, on the day it went back. A voided one is only listed when asking for everything.
+    db.refund.findMany({ where: { gymId, refundedAt: { gte: start, lte: end }, ...(onlyPaid ? { voidedAt: null } : {}) }, include: { recordedBy: { select: { name: true } } } }),
   ]);
 
   const rows: Txn[] = [
@@ -177,7 +177,7 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
       item: REFUND_CATEGORY_LABEL[r.category],
       amount: -Number(r.amount),
       currency: r.currency,
-      status: "REFUNDED",
+      status: r.voidedAt ? "VOIDED" : "REFUNDED",
       method: REFUND_METHOD_LABEL[r.method],
       recordedBy: r.recordedBy?.name ?? "",
       note: [r.reason, r.note].filter(Boolean).join(" · "),
