@@ -4,6 +4,7 @@ import { decrypt } from "./crypto";
 import { notifyGuest, type Channel, type NotifyResult } from "./notify";
 import { ticketTokenFor, ticketUrl } from "./guestPass";
 import { bookingWhen, type FieldRules } from "./fieldBooking";
+import type { TenantDb } from "./prisma";
 
 /** Statuses in which a booking holds its time on the field (the database rule uses the same three). */
 export const HOLDING: ("APPROVED" | "ATTENDED" | "NO_SHOW")[] = ["APPROVED", "ATTENDED", "NO_SHOW"];
@@ -13,6 +14,18 @@ export const MAX_BOOKING_REQUESTS_PER_GYM_HOUR = 80;
 
 export function fieldRules(f: { opensAt: number; closesAt: number; stepMinutes: number; pricePerHour: Prisma.Decimal | number }): FieldRules {
   return { opensAt: f.opensAt, closesAt: f.closesAt, stepMinutes: f.stepMinutes, pricePerHour: Number(f.pricePerHour) };
+}
+
+/** What has been paid on each booking so far: the sum of its payment entries (refunds count as negative). */
+export async function paidByBooking(db: TenantDb, bookingIds: string[]): Promise<Map<string, number>> {
+  if (bookingIds.length === 0) return new Map();
+  const sums = await db.fieldBookingPayment.groupBy({ by: ["bookingId"], where: { bookingId: { in: bookingIds } }, _sum: { amount: true } });
+  return new Map(sums.map((s) => [s.bookingId, Number(s._sum.amount ?? 0)]));
+}
+
+/** Positive: the guest still owes this much. Negative: they have overpaid and are owed it back. Zero: settled. */
+export function balance(amount: number, paid: number): number {
+  return amount - paid;
 }
 
 /** True for Postgres' "no two held bookings may overlap" refusal (exclusion violation, SQLSTATE 23P01). */
@@ -31,8 +44,11 @@ type BookingForMessage = {
   endsAt: Date;
   ticketSecret: string;
   amount: Prisma.Decimal | number;
+  pax: number | null;
   field: { name: string };
 };
+
+const peopleNote = (pax: number | null) => (pax ? ` for ${pax} ${pax === 1 ? "person" : "people"}` : "");
 
 const contact = (b: BookingForMessage) => ({ name: b.fullName, phone: decrypt(b.phoneWhatsapp), email: b.email ? decrypt(b.email) : null });
 
@@ -50,7 +66,7 @@ export async function sendBookingReceived(id: string): Promise<void> {
       ...contact(b),
       trigger: "auto",
       type: "field_booking_received",
-      message: `Hi ${b.fullName}, we got your request for ${b.field.name} at ${b.gym.name} on ${bookingWhen(b, b.gym.timezone)}${price}. We'll confirm it once ${Number(b.amount) > 0 ? "the payment is checked" : "staff have looked at it"}. The time is only yours once we do.`,
+      message: `Hi ${b.fullName}, we got your request for ${b.field.name}${peopleNote(b.pax)} at ${b.gym.name} on ${bookingWhen(b, b.gym.timezone)}${price}. We'll confirm it once ${Number(b.amount) > 0 ? "the payment is checked" : "staff have looked at it"}. The time is only yours once we do.`,
     });
   } catch (err) {
     console.error("Booking received message failed", err);
@@ -66,7 +82,7 @@ export async function sendBookingApproved(id: string, channel?: Channel): Promis
       ...contact(b),
       channel,
       type: "field_booking_approved",
-      message: `Hi ${b.fullName}, your booking is confirmed: ${b.field.name} at ${b.gym.name} on ${bookingWhen(b, b.gym.timezone)}. Show this QR ticket at the front desk: ${ticketUrl(ticketTokenFor(b))}`,
+      message: `Hi ${b.fullName}, your booking is confirmed: ${b.field.name}${peopleNote(b.pax)} at ${b.gym.name} on ${bookingWhen(b, b.gym.timezone)}. Show this QR ticket at the front desk: ${ticketUrl(ticketTokenFor(b))}`,
     });
   } catch (err) {
     console.error("Booking approved message failed", err);

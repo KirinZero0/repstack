@@ -7,7 +7,7 @@ import { proofFileError } from "@/lib/transferProof";
 import { fieldBookingRequestSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
 import { hashIp } from "@/lib/memberSignup";
-import { bookingInstants, bookingPrice, parseClock, timeProblem } from "@/lib/fieldBooking";
+import { bookingAmount, bookingInstants, parseClock, timeProblem } from "@/lib/fieldBooking";
 import { fieldRules, HOLDING, MAX_BOOKING_REQUESTS_PER_GYM_HOUR, MAX_BOOKING_REQUESTS_PER_IP_HOUR, sendBookingReceived } from "@/lib/fieldBookings";
 
 function clientIp(req: NextRequest): string {
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const v = form.get(k);
       return typeof v === "string" && v !== "" ? v : undefined;
     };
-    raw = { fieldId: text("fieldId"), date: text("date"), start: text("start"), end: text("end"), fullName: text("fullName"), phone: text("phone"), email: text("email") };
+    raw = { fieldId: text("fieldId"), date: text("date"), start: text("start"), end: text("end"), pax: text("pax") === undefined ? undefined : Number(text("pax")), fullName: text("fullName"), phone: text("phone"), email: text("email") };
     const f = form.get("proof");
     const bad = proofFileError(f);
     if (bad) return bad;
@@ -66,6 +66,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const field = await prisma.field.findUnique({ where: { id: d.fieldId } });
   if (!field || field.gymId !== gym.id || !field.isActive) return NextResponse.json({ error: "That field isn't available. Pick another." }, { status: 400 });
 
+  // A per-person field needs to know how many people; a per-field one ignores it.
+  const perPax = field.pricingType === "PER_PAX";
+  if (perPax && d.pax === undefined) return NextResponse.json({ error: "Enter how many people." }, { status: 400 });
+  if (perPax && field.maxPax !== null && d.pax! > field.maxPax) {
+    return NextResponse.json({ error: `This field takes up to ${field.maxPax} people. Ask at the front desk for a bigger group.` }, { status: 400 });
+  }
+  const pax = perPax ? d.pax! : null;
+
   const startMin = parseClock(d.start);
   const endMin = parseClock(d.end);
   if (startMin === null || endMin === null) return NextResponse.json({ error: "Pick a start and an end time." }, { status: 400 });
@@ -87,7 +95,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   });
   if (open) return NextResponse.json({ error: "You already asked for this time. The gym will contact you once it's reviewed." }, { status: 409 });
 
-  const amount = bookingPrice(rules.pricePerHour, endMin - startMin);
+  const amount = bookingAmount(field.pricingType, rules.pricePerHour, pax, endMin - startMin);
   // Proof is optional and only means something when there is something to pay; a storage hiccup must not block the request.
   let proofImageUrl: string | undefined;
   if (proof && amount > 0) {
@@ -108,6 +116,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       phoneWhatsapp: encrypt(d.phone),
       phoneWhatsappLookup: lookup,
       email: encrypt(d.email),
+      pax,
+      rate: rules.pricePerHour,
       amount,
       ipHash,
       proofImageUrl,

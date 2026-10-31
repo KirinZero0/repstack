@@ -3,7 +3,8 @@ import { requireTenantSession, SessionError } from "@/lib/session";
 import { featureOff, gymHasFeature } from "@/lib/features";
 import { manualFieldBookingSchema } from "@/lib/validation/tenant";
 import { encrypt, hmacLookup, normalizePhone } from "@/lib/crypto";
-import { bookingInstants, bookingPrice, parseClock, timeProblem } from "@/lib/fieldBooking";
+import { bookingAmount, bookingInstants, parseClock, timeProblem } from "@/lib/fieldBooking";
+import { tenantTransaction } from "@/lib/prisma";
 import { fieldRules, HOLDING, isOverlapError } from "@/lib/fieldBookings";
 
 /**
@@ -32,6 +33,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const field = await db.field.findUnique({ where: { id: d.fieldId } });
   if (!field || field.gymId !== gym.id) return NextResponse.json({ error: "Field not found" }, { status: 404 });
 
+  const perPax = field.pricingType === "PER_PAX";
+  if (perPax && !d.isBlock && d.pax === undefined) return NextResponse.json({ error: "Enter how many people." }, { status: 400 });
+  const pax = perPax && !d.isBlock ? d.pax! : null;
+
   const startMin = parseClock(d.start);
   const endMin = parseClock(d.end);
   if (startMin === null || endMin === null) return NextResponse.json({ error: "Pick a start and an end time." }, { status: 400 });
@@ -49,7 +54,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const phone = d.phone ? normalizePhone(d.phone) : "";
   try {
-    const created = await db.fieldBooking.create({
+    const amount = d.isBlock ? 0 : bookingAmount(field.pricingType, rules.pricePerHour, pax, endMin - startMin);
+    // Paid at the counter, so the booking and its payment entry are written together.
+    const created = await tenantTransaction(gym.id, async (tx) => {
+      const row = await tx.fieldBooking.create({
       data: {
         gymId: gym.id,
         fieldId: field.id,
@@ -59,12 +67,17 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         phoneWhatsapp: encrypt(d.phone ?? ""),
         phoneWhatsappLookup: hmacLookup(phone || "none"),
         status: "APPROVED",
-        amount: d.isBlock ? 0 : bookingPrice(rules.pricePerHour, endMin - startMin),
+        pax,
+        rate: d.isBlock ? null : rules.pricePerHour,
+        amount,
         isBlock: d.isBlock,
         note: d.note || null,
         reviewedAt: new Date(),
         reviewedById: session.staffUserId,
       },
+      });
+      if (amount > 0) await tx.fieldBookingPayment.create({ data: { gymId: gym.id, bookingId: row.id, amount, kind: "PAYMENT", recordedById: session.staffUserId } });
+      return row;
     });
     return NextResponse.json({ ok: true, id: created.id }, { status: 201 });
   } catch (err) {

@@ -49,10 +49,11 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       where: { gymId, status: { in: ["APPROVED", "ATTENDED"] }, amount: { gt: 0 }, reviewedAt: { gte: since } },
       include: { dayPassPlan: { select: { name: true } }, session: { select: { class: { select: { name: true } } } } },
     }),
-    // Field bookings count once staff approve them (the moment the money is confirmed); staff blocks are never revenue.
-    db.fieldBooking.findMany({
-      where: { gymId, status: { in: ["APPROVED", "ATTENDED", "NO_SHOW"] }, isBlock: false, amount: { gt: 0 }, reviewedAt: { gte: since } },
-      include: { field: { select: { name: true } } },
+    // Field money is every payment entry on a booking that is still held (approval, extra collected later, refunds
+    // as negatives), each counted on its own date. Staff blocks and cancelled bookings are never revenue.
+    db.fieldBookingPayment.findMany({
+      where: { gymId, createdAt: { gte: since }, booking: { status: { in: ["APPROVED", "ATTENDED", "NO_SHOW"] }, isBlock: false } },
+      include: { booking: { select: { field: { select: { name: true } } } } },
     }),
     db.payment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
     db.classPayment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
@@ -89,7 +90,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       kind: p.session ? ("class" as const) : ("daypass" as const),
       provider: "CASH",
     })),
-    ...paidFields.map((p) => ({ when: p.reviewedAt ?? p.createdAt, amount: Number(p.amount), item: `${p.field.name} (field booking)`, kind: "field" as const, provider: "CASH" })),
+    ...paidFields.map((p) => ({ when: p.createdAt, amount: Number(p.amount), item: `${p.booking.field.name} (field booking)`, kind: "field" as const, provider: "CASH" })),
   ];
 
   const byMonth = new Map<string, number>(months.map((k) => [k, 0]));

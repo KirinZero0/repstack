@@ -457,3 +457,28 @@ staff approve, but the thing being booked is a stretch of time on one field, so 
 - **Deploy**: `npm run db:migrate` (adds `Gym.features`), then **grant Field booking to each gym that should have it**
   from its page in the superadmin panel; nobody has it until you do.
 - Tests: `e2e/45-gym-features.spec.ts` (and `e2e/44` now grants the feature to its test gyms).
+
+## 16. Per-person field pricing, editable headcount, and field payment entries
+
+- **Per-person fields**: a field is priced either **per field** (one hourly price for the whole court, as before) or **per
+  person** (a price per person per hour), with an optional "most people per booking" (public requests only; staff can
+  go over it). The booker on the public page says how many people, and the price is rate x people x time, pro rata
+  (10 people at Rp 15.000 for 1,5 hours is Rp 225.000). A booking still holds the whole field for its time; only the
+  price depends on people. A per-field court ignores the headcount.
+- **Editable headcount**: staff press **Edit people** on a pending, approved or attended booking. The amount is recalculated
+  from the rate the booking was made at (so changing the field's price later doesn't touch existing bookings), and the
+  screen shows the balance: **owes Rp X** when more people came, **refund due Rp X** when fewer, **paid** when settled.
+  Changing the people moves no money by itself.
+- **Collect / Refund**: **Collect Rp X** records the extra money (any staff; the whole balance, or less via the API);
+  **Refund Rp X** records money given back (owner only). The scan message also says "12 people, owes Rp 30.000" so
+  the desk collects at the door.
+- **Payment entries** (`FieldBookingPayment`, migration `field_pax_pricing`): every movement of money is its own dated row:
+  `PAYMENT` when staff approve (or add a booking at the counter), `COLLECTION` for extra collected later, `REFUND`
+  as a negative. Finance and the transactions CSV now sum these entries (for bookings still held), so extra money
+  counts in the month it was collected and a refund subtracts; the extra shows as "Extra collected", a refund as
+  "Refund". Bookings already approved before this migration get one `PAYMENT` entry each, dated at their approval.
+  Cancelling a booking that took money stays the owner's and removes all its entries from revenue; a booking
+  that took any payment is cancelled, never deleted.
+- **Messages** say "for N people" on a per-person booking.
+- **Deploy**: `npm run db:migrate`, then `npm run db:rls` (the new table needs its policy).
+- Tests: `e2e/46-field-pax.spec.ts`.

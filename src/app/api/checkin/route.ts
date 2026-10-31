@@ -131,5 +131,10 @@ async function handleBookingScan(db: ReturnType<typeof tenantDb>, gym: { id: str
     data: { status: "ATTENDED", attendedAt: new Date(), scannedById: staffUserId },
   });
   if (res.count !== 1) return reply({ result: "DUPLICATE", message: "Booking already checked in", member: who });
-  return reply({ result: "SUCCESS", message: `${booking.field.name}: ${bookingWhen(booking, gym.timezone)}`, member: who });
+  // Tell the desk about the people and any balance, so extra money is collected at the door.
+  const paid = Number((await db.fieldBookingPayment.aggregate({ where: { bookingId: booking.id }, _sum: { amount: true } }))._sum.amount ?? 0);
+  const owing = Number(booking.amount) - paid;
+  const people = booking.pax ? ` · ${booking.pax} ${booking.pax === 1 ? "person" : "people"}` : "";
+  const money = owing > 0 ? ` · owes Rp ${owing.toLocaleString("id-ID")}` : owing < 0 ? ` · refund Rp ${(-owing).toLocaleString("id-ID")}` : "";
+  return reply({ result: "SUCCESS", message: `${booking.field.name}: ${bookingWhen(booking, gym.timezone)}${people}${money}`, member: who });
 }

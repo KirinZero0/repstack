@@ -100,10 +100,11 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
       where: { gymId, status: { in: ["APPROVED", "ATTENDED"] }, amount: { gt: 0 }, reviewedAt: { gte: start, lte: end } },
       include: { dayPassPlan: { select: { name: true } }, session: { include: { class: { select: { name: true } } } }, reviewedBy: { select: { name: true } } },
     }),
-    // Field bookings count once staff approve them (confirm the payment); staff blocks and cancelled ones aren't revenue.
-    db.fieldBooking.findMany({
-      where: { gymId, status: { in: ["APPROVED", "ATTENDED", "NO_SHOW"] }, isBlock: false, amount: { gt: 0 }, reviewedAt: { gte: start, lte: end } },
-      include: { field: { select: { name: true } }, reviewedBy: { select: { name: true } } },
+    // Field money is each payment entry (approval, extra collected later, refunds as negatives) on a booking that is
+    // still held, on its own date. Staff blocks and cancelled bookings aren't revenue.
+    db.fieldBookingPayment.findMany({
+      where: { gymId, createdAt: { gte: start, lte: end }, booking: { status: { in: ["APPROVED", "ATTENDED", "NO_SHOW"] }, isBlock: false } },
+      include: { booking: { include: { field: { select: { name: true } } } }, recordedBy: { select: { name: true } } },
     }),
   ]);
 
@@ -153,16 +154,16 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
       id: p.id,
     })),
     ...fieldBookings.map((p) => ({
-      when: p.reviewedAt ?? p.createdAt,
+      when: p.createdAt,
       type: "Field" as const,
-      member: `${p.fullName} (guest)`,
-      item: `${p.field.name} (${dayKeyInTimezone(p.startsAt, timezone)})`,
+      member: `${p.booking.fullName} (guest)`,
+      item: `${p.booking.field.name} (${dayKeyInTimezone(p.booking.startsAt, timezone)})`,
       amount: Number(p.amount),
       currency: "IDR",
       status: "PAID",
       method: METHOD.CASH,
-      recordedBy: p.reviewedBy?.name ?? "",
-      note: p.note ?? "",
+      recordedBy: p.recordedBy?.name ?? "",
+      note: p.kind === "COLLECTION" ? "Extra collected" : p.kind === "REFUND" ? "Refund" : p.note ?? "",
       invoiceId: "",
       id: p.id,
     })),

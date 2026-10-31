@@ -46,6 +46,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
       ...(d.name !== undefined ? { name: d.name } : {}),
       ...(d.sport !== undefined ? { sport: d.sport } : {}),
       ...(d.pricePerHour !== undefined ? { pricePerHour: d.pricePerHour } : {}),
+      // Changing how a field is priced only affects new bookings; existing ones keep the rate they were made at.
+      ...(d.pricingType !== undefined ? { pricingType: d.pricingType } : {}),
+      ...(d.maxPax !== undefined ? { maxPax: d.maxPax } : {}),
       ...(d.isActive !== undefined ? { isActive: d.isActive } : {}),
       opensAt,
       closesAt,

@@ -49,6 +49,8 @@ export default async function BookPage({ params }: { params: { slug: string } })
                   name: f.name,
                   sport: f.sport,
                   pricePerHour: Number(f.pricePerHour),
+                  pricingType: f.pricingType,
+                  maxPax: f.maxPax,
                   opensAt: f.opensAt,
                   closesAt: f.closesAt,
                   stepMinutes: f.stepMinutes,

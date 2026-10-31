@@ -319,7 +319,11 @@ const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date");
 export const fieldSchema = z.object({
   name: z.string().trim().min(2, "Name the field").max(60),
   sport: z.string().trim().min(2).max(40).default("Badminton"),
+  /** A price for the whole field an hour, or for each person an hour on a per-person field. */
   pricePerHour: z.number().int().min(0).max(100_000_000),
+  pricingType: z.enum(["PER_FIELD", "PER_PAX"]).default("PER_FIELD"),
+  /** Per-person fields: the most people one public request can ask for. Empty = no limit. */
+  maxPax: z.number().int().min(1).max(200).nullable().optional(),
   opensAt: clockString,
   closesAt: clockString,
   stepMinutes: z.union([z.literal(15), z.literal(30), z.literal(60)]).default(30),
@@ -333,6 +337,8 @@ export const fieldBookingRequestSchema = z.object({
   date: dateString,
   start: clockString,
   end: clockString,
+  /** How many people, for a per-person field. */
+  pax: z.number("Enter how many people").int("Enter how many people").min(1, "Enter how many people").max(200).optional(),
   fullName: personName("Enter your name"),
   phone: z.string().trim().min(6, "Enter a valid WhatsApp number").max(30),
   email: z.string("Enter your email").trim().toLowerCase().email("Enter a valid email").max(120),
@@ -346,6 +352,7 @@ export const manualFieldBookingSchema = z
     start: clockString,
     end: clockString,
     isBlock: z.boolean().default(false),
+    pax: z.number().int().min(1).max(200).optional(),
     fullName: z.string().trim().min(2).max(80).optional(),
     phone: z.string().trim().min(6).max(30).optional(),
     note: z.string().trim().max(200).optional(),
@@ -354,6 +361,10 @@ export const manualFieldBookingSchema = z
 
 /** Staff acts on a booking. `channel` is how a resent ticket is sent. */
 export const fieldBookingActionSchema = z.object({
-  action: z.enum(["approve", "reject", "cancel", "attend", "noshow", "resend"]),
+  action: z.enum(["approve", "reject", "cancel", "attend", "noshow", "resend", "edit_pax", "collect", "refund"]),
   channel: z.enum(["whatsapp", "email"]).optional(),
+  /** edit_pax: the new number of people. */
+  pax: z.number().int().min(1).max(200).optional(),
+  /** collect / refund: how much, if not the whole balance. */
+  amount: z.number().int().min(1).max(100_000_000).optional(),
 });

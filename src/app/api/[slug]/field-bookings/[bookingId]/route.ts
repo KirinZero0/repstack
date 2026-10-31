@@ -4,8 +4,9 @@ import { waitUntil } from "@vercel/functions";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { deleteBlob } from "@/lib/blob";
 import { fieldBookingActionSchema } from "@/lib/validation/tenant";
-import { bookingWindow } from "@/lib/fieldBooking";
-import { HOLDING, isOverlapError, sendBookingApproved, sendBookingCancelled, sendBookingRejected } from "@/lib/fieldBookings";
+import { bookingAmount, bookingMinutes, bookingWindow } from "@/lib/fieldBooking";
+import { tenantTransaction } from "@/lib/prisma";
+import { HOLDING, balance, isOverlapError, paidByBooking, sendBookingApproved, sendBookingCancelled, sendBookingRejected } from "@/lib/fieldBookings";
 import { channelProblem } from "@/lib/notify";
 import { featureOff, gymHasFeature } from "@/lib/features";
 
@@ -32,14 +33,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const parsed = fieldBookingActionSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-  const { action, channel } = parsed.data;
+  const { action, channel, pax, amount: asked } = parsed.data;
 
   // Tenant isolation: the booking must belong to the session's gym.
   const booking = await db.fieldBooking.findUnique({ where: { id: params.bookingId } });
   if (!booking || booking.gymId !== gym.id) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
   const now = new Date();
   const window = bookingWindow(booking, now);
-  const paid = Number(booking.amount) > 0;
+  const paidSoFar = (await paidByBooking(db, [booking.id])).get(booking.id) ?? 0;
+  const paid = paidSoFar > 0;
 
   if (action === "approve") {
     // Taking new bookings needs the feature; managing ones already made (cancel, attend, resend) always works.
@@ -52,11 +54,19 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     });
     if (clash) return NextResponse.json({ error: TAKEN }, { status: 409 });
     try {
-      const res = await db.fieldBooking.updateMany({
-        where: { id: booking.id, gymId: gym.id, status: "PENDING_REVIEW" },
-        data: { status: "APPROVED", reviewedAt: now, reviewedById: session.staffUserId },
+      // Approving is staff confirming the money arrived, so the booking and its payment entry are written together.
+      const done = await tenantTransaction(gym.id, async (tx) => {
+        const res = await tx.fieldBooking.updateMany({
+          where: { id: booking.id, gymId: gym.id, status: "PENDING_REVIEW" },
+          data: { status: "APPROVED", reviewedAt: now, reviewedById: session.staffUserId },
+        });
+        if (res.count !== 1) return false;
+        if (Number(booking.amount) > 0) {
+          await tx.fieldBookingPayment.create({ data: { gymId: gym.id, bookingId: booking.id, amount: booking.amount, kind: "PAYMENT", recordedById: session.staffUserId } });
+        }
+        return true;
       });
-      if (res.count !== 1) return NextResponse.json({ error: "This request was already reviewed." }, { status: 409 });
+      if (!done) return NextResponse.json({ error: "This request was already reviewed." }, { status: 409 });
     } catch (err) {
       // Two approvals at the same instant: the database lets exactly one through.
       if (isOverlapError(err)) return NextResponse.json({ error: TAKEN }, { status: 409 });
@@ -112,6 +122,38 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ ok: true });
   }
 
+  if (action === "edit_pax") {
+    if (!["PENDING_REVIEW", "APPROVED", "ATTENDED"].includes(booking.status)) return NextResponse.json({ error: "The number of people can't be changed on this booking." }, { status: 409 });
+    if (booking.pax === null || booking.rate === null) return NextResponse.json({ error: "This booking isn't priced per person." }, { status: 409 });
+    if (pax === undefined) return NextResponse.json({ error: "Enter how many people." }, { status: 400 });
+    const newAmount = bookingAmount("PER_PAX", Number(booking.rate), pax, bookingMinutes(booking));
+    const res = await db.fieldBooking.updateMany({
+      where: { id: booking.id, gymId: gym.id, status: { in: ["PENDING_REVIEW", "APPROVED", "ATTENDED"] } },
+      data: { pax, amount: newAmount },
+    });
+    if (res.count !== 1) return NextResponse.json({ error: "This booking was already changed." }, { status: 409 });
+    return NextResponse.json({ ok: true, amount: newAmount, paid: paidSoFar, balance: balance(newAmount, paidSoFar) });
+  }
+
+  if (action === "collect" || action === "refund") {
+    if (!["APPROVED", "ATTENDED", "NO_SHOW"].includes(booking.status)) return NextResponse.json({ error: "Only an approved booking has a balance." }, { status: 409 });
+    const owing = balance(Number(booking.amount), paidSoFar);
+    if (action === "collect") {
+      if (owing <= 0) return NextResponse.json({ error: "Nothing is owed on this booking." }, { status: 409 });
+      const take = asked ?? owing;
+      if (take > owing) return NextResponse.json({ error: `Only Rp ${owing.toLocaleString("id-ID")} is owed.` }, { status: 400 });
+      await db.fieldBookingPayment.create({ data: { gymId: gym.id, bookingId: booking.id, amount: take, kind: "COLLECTION", recordedById: session.staffUserId } });
+      return NextResponse.json({ ok: true, balance: owing - take });
+    }
+    // Giving money back is a money action, like cancelling a paid booking: owner only.
+    if (session.role !== "OWNER") return NextResponse.json({ error: "Only the owner can record a refund." }, { status: 403 });
+    if (owing >= 0) return NextResponse.json({ error: "Nothing is owed back on this booking." }, { status: 409 });
+    const give = asked ?? -owing;
+    if (give > -owing) return NextResponse.json({ error: `Only Rp ${(-owing).toLocaleString("id-ID")} is owed back.` }, { status: 400 });
+    await db.fieldBookingPayment.create({ data: { gymId: gym.id, bookingId: booking.id, amount: -give, kind: "REFUND", recordedById: session.staffUserId } });
+    return NextResponse.json({ ok: true, balance: owing + give });
+  }
+
   // resend
   if (booking.status !== "APPROVED" || booking.isBlock) return NextResponse.json({ error: "Only an approved, unused ticket can be sent again." }, { status: 409 });
   if (window === "OVER") return NextResponse.json({ error: "This booking is over, so the ticket can't be used." }, { status: 409 });
@@ -139,9 +181,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: { slug: st
   }
   const booking = await db.fieldBooking.findUnique({ where: { id: params.bookingId } });
   if (!booking || booking.gymId !== gym.id) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
-  const moneyTaken = Number(booking.amount) > 0 && ["APPROVED", "ATTENDED", "NO_SHOW"].includes(booking.status);
-  if (moneyTaken && !booking.isBlock) return NextResponse.json({ error: "A paid booking can't be deleted. Cancel it instead." }, { status: 409 });
-  if (booking.status === "CANCELLED" && Number(booking.amount) > 0) return NextResponse.json({ error: "A cancelled paid booking stays on record." }, { status: 409 });
+  const paidSoFar = (await paidByBooking(db, [booking.id])).get(booking.id) ?? 0;
+  const entries = await db.fieldBookingPayment.count({ where: { bookingId: booking.id } });
+  // Anything that took money, even if it was later refunded, is part of the books: cancel it instead of deleting it.
+  if (!booking.isBlock && (paidSoFar > 0 || entries > 0)) return NextResponse.json({ error: "A booking that took payment can't be deleted. Cancel it instead." }, { status: 409 });
 
   await db.fieldBooking.delete({ where: { id: booking.id } });
   if (booking.proofImageUrl) await deleteBlob(booking.proofImageUrl).catch(() => {});

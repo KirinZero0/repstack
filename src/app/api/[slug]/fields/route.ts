@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (problem) return NextResponse.json({ error: problem }, { status: 400 });
 
   const field = await db.field.create({
-    data: { gymId: gym.id, name: d.name, sport: d.sport, pricePerHour: d.pricePerHour, opensAt, closesAt, stepMinutes: d.stepMinutes, isActive: d.isActive ?? true },
+    data: { gymId: gym.id, name: d.name, sport: d.sport, pricePerHour: d.pricePerHour, pricingType: d.pricingType, maxPax: d.pricingType === "PER_PAX" ? d.maxPax ?? null : null, opensAt, closesAt, stepMinutes: d.stepMinutes, isActive: d.isActive ?? true },
   });
   return NextResponse.json({ id: field.id }, { status: 201 });
 }

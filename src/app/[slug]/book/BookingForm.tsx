@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import TransferPayment, { type BankInfo, rupiah } from "@/components/TransferPayment";
-import { MAX_BOOKING_MINUTES, bookingPrice, clock, type MinuteRange } from "@/lib/fieldBooking";
+import { MAX_BOOKING_MINUTES, bookingAmount, clock, type FieldPricingType, type MinuteRange } from "@/lib/fieldBooking";
 
 export interface FieldOption {
   id: string;
   name: string;
   sport: string;
   pricePerHour: number;
+  pricingType: FieldPricingType;
+  maxPax: number | null;
   opensAt: number;
   closesAt: number;
   stepMinutes: number;
@@ -36,6 +38,7 @@ export default function BookingForm({ slug, fields, bank, today, last }: { slug:
   const [loading, setLoading] = useState(false);
   const [start, setStart] = useState<number | null>(null);
   const [end, setEnd] = useState<number | null>(null);
+  const [pax, setPax] = useState("2");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -79,7 +82,9 @@ export default function BookingForm({ slug, fields, bank, today, last }: { slug:
     return out;
   }, [avail, start, field.stepMinutes]);
 
-  const price = start !== null && end !== null ? bookingPrice(field.pricePerHour, end - start) : 0;
+  const perPax = field.pricingType === "PER_PAX";
+  const people = Number(pax);
+  const price = start !== null && end !== null ? bookingAmount(field.pricingType, field.pricePerHour, perPax ? (Number.isInteger(people) && people > 0 ? people : 0) : null, end - start) : 0;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -92,6 +97,7 @@ export default function BookingForm({ slug, fields, bank, today, last }: { slug:
       fd.set("date", date);
       fd.set("start", clock(start));
       fd.set("end", clock(end));
+      if (perPax) fd.set("pax", pax);
       fd.set("fullName", fullName);
       fd.set("phone", phone);
       fd.set("email", email.trim());
@@ -136,8 +142,16 @@ export default function BookingForm({ slug, fields, bank, today, last }: { slug:
         </label>
       </div>
       <p className="-mt-3 text-sm text-neutral-500">
-        Open {clock(field.opensAt)} to {clock(field.closesAt)} · {rupiah(field.pricePerHour)} an hour
+        Open {clock(field.opensAt)} to {clock(field.closesAt)} · {rupiah(field.pricePerHour)} {perPax ? "per person an hour" : "an hour"}
       </p>
+
+      {perPax && (
+        <label className="block text-sm text-neutral-300">
+          <span className="mb-1 block">How many people{field.maxPax ? ` (up to ${field.maxPax})` : ""}</span>
+          <input type="number" min={1} max={field.maxPax ?? 200} required value={pax} onChange={(e) => setPax(e.target.value)} className={input} aria-label="How many people" />
+          <span className="mt-1 block text-neutral-500">The price depends on this. If more people come, you pay the difference at the front desk.</span>
+        </label>
+      )}
 
       {avail && (avail.busy.length > 0) && (
         <p className="text-sm text-neutral-500" data-testid="booked-times">
@@ -187,7 +201,7 @@ export default function BookingForm({ slug, fields, bank, today, last }: { slug:
       )}
       {start !== null && end !== null && (
         <p className="text-sm text-neutral-300" data-testid="booking-price">
-          {clock(start)} to {clock(end)} · {length(end - start)} · {price > 0 ? rupiah(price) : "Free"}
+          {clock(start)} to {clock(end)} · {length(end - start)}{perPax ? ` · ${people || 0} ${people === 1 ? "person" : "people"}` : ""} · {price > 0 ? rupiah(price) : "Free"}
         </p>
       )}
 

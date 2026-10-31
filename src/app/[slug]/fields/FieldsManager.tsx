@@ -10,6 +10,8 @@ export interface FieldRow {
   name: string;
   sport: string;
   pricePerHour: number;
+  pricingType: "PER_FIELD" | "PER_PAX";
+  maxPax: number | null;
   opensAt: number;
   closesAt: number;
   stepMinutes: number;
@@ -32,6 +34,10 @@ export interface BookingRow {
   startLabel: string;
   endLabel: string;
   amount: number;
+  /** How many people, on a per-person field. */
+  pax: number | null;
+  /** What has been paid so far (refunds taken off). */
+  paid: number;
   status: "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "CANCELLED" | "ATTENDED" | "NO_SHOW";
   isBlock: boolean;
   note: string | null;
@@ -65,6 +71,15 @@ async function call(url: string, method: string, body?: unknown): Promise<{ erro
   const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   return { error: res.ok ? null : typeof data.error === "string" ? data.error : "Something went wrong.", data };
+}
+
+/** What a booking has paid against what it costs now: settled, owes, or owed back. */
+function Balance({ b }: { b: BookingRow }) {
+  if (b.status === "PENDING_REVIEW" || b.amount === 0) return null;
+  const owing = b.amount - b.paid;
+  if (owing > 0) return <span className="ml-2 text-amber-400" data-testid="owes">owes {rp(owing)}</span>;
+  if (owing < 0) return <span className="ml-2 text-sky-400" data-testid="refund-due">refund due {rp(-owing)}</span>;
+  return <span className="ml-2 text-emerald-400">paid</span>;
 }
 
 function Lane({ field, bookings }: { field: FieldRow; bookings: BookingRow[] }) {
@@ -124,6 +139,37 @@ export default function FieldsManager({
     router.refresh();
   }
 
+  /** Change how many people a booking is for; the price follows, and the screen shows what's now owed. */
+  async function editPax(b: BookingRow) {
+    const v = window.prompt(`How many people for ${b.fullName}? (now ${b.pax})`, String(b.pax ?? ""));
+    if (v === null) return;
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 1) return setError("Enter a whole number of people.");
+    setBusy(b.id);
+    setError(null);
+    setNote(null);
+    const { error: err, data } = await call(`/api/${slug}/field-bookings/${b.id}`, "POST", { action: "edit_pax", pax: n });
+    setBusy(null);
+    if (err) return setError(err);
+    const bal = Number(data.balance ?? 0);
+    setNote(`Now ${n} ${n === 1 ? "person" : "people"}, ${rp(Number(data.amount))}.${bal > 0 ? ` ${rp(bal)} is owed.` : bal < 0 ? ` ${rp(-bal)} is owed back.` : ""}`);
+    router.refresh();
+  }
+
+  /** Record the extra money collected for the difference, or money handed back. */
+  async function settle(b: BookingRow, action: "collect" | "refund") {
+    const sum = Math.abs(b.amount - b.paid);
+    if (!window.confirm(action === "collect" ? `Collect ${rp(sum)} from ${b.fullName}?` : `Refund ${rp(sum)} to ${b.fullName}?`)) return;
+    setBusy(b.id);
+    setError(null);
+    setNote(null);
+    const { error: err } = await call(`/api/${slug}/field-bookings/${b.id}`, "POST", { action });
+    setBusy(null);
+    if (err) return setError(err);
+    setNote(action === "collect" ? `Recorded ${rp(sum)} collected.` : `Recorded ${rp(sum)} refunded.`);
+    router.refresh();
+  }
+
   async function remove(b: BookingRow) {
     if (!window.confirm(b.isBlock ? "Remove this block?" : `Delete ${b.fullName}'s booking?`)) return;
     setBusy(b.id);
@@ -152,7 +198,7 @@ export default function FieldsManager({
                     {b.fullName} <span className="text-sm text-neutral-500">{b.phone}{b.email ? ` · ${b.email}` : ""}</span>
                   </p>
                   <p className="text-sm text-neutral-400">
-                    {b.fieldName} · {b.date} {b.startLabel}–{b.endLabel} · {b.amount > 0 ? rp(b.amount) : "free"}
+                    {b.fieldName} · {b.date} {b.startLabel}–{b.endLabel}{b.pax ? ` · ${b.pax} ${b.pax === 1 ? "person" : "people"}` : ""} · {b.amount > 0 ? rp(b.amount) : "free"}
                   </p>
                   {b.amount > 0 && (
                     <p className="text-sm text-neutral-500">
@@ -167,6 +213,7 @@ export default function FieldsManager({
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {b.pax !== null && <button className={btn} disabled={busy === b.id} onClick={() => editPax(b)}>Edit people</button>}
                   <button className={primary} disabled={busy === b.id} onClick={() => act(b, "approve")}>
                     {b.amount > 0 ? "Payment received, approve" : "Approve"}
                   </button>
@@ -206,10 +253,21 @@ export default function FieldsManager({
                           <span>
                             {b.startLabel}–{b.endLabel} · {b.isBlock ? `Blocked${b.note ? `: ${b.note}` : ""}` : b.fullName}
                             {!b.isBlock && <span className="text-neutral-500"> {b.phone}</span>}
+                            {!b.isBlock && b.pax !== null && <span className="text-neutral-500"> · {b.pax} {b.pax === 1 ? "person" : "people"}</span>}
                             {!b.isBlock && b.amount > 0 && <span className="text-neutral-500"> · {rp(b.amount)}</span>}
+                            {!b.isBlock && <Balance b={b} />}
                             <span className="ml-2 text-neutral-400">{STATUS_LABEL[b.status]}</span>
                           </span>
                           <span className="flex flex-wrap items-center gap-2">
+                            {b.pax !== null && (b.status === "APPROVED" || b.status === "ATTENDED") && (
+                              <button className={btn} disabled={busy === b.id} onClick={() => editPax(b)}>Edit people</button>
+                            )}
+                            {!b.isBlock && b.amount - b.paid > 0 && b.status !== "PENDING_REVIEW" && (
+                              <button className={primary} disabled={busy === b.id} onClick={() => settle(b, "collect")}>Collect {rp(b.amount - b.paid)}</button>
+                            )}
+                            {!b.isBlock && b.amount - b.paid < 0 && isOwner && (
+                              <button className={btn} disabled={busy === b.id} onClick={() => settle(b, "refund")}>Refund {rp(b.paid - b.amount)}</button>
+                            )}
                             {b.status === "APPROVED" && !b.isBlock && b.window !== "EARLY" && (
                               <button className={btn} disabled={busy === b.id} onClick={() => act(b, "attend")}>Came</button>
                             )}
@@ -256,6 +314,7 @@ function ManualBooking({ slug, date, fields }: { slug: string; date: string; fie
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [isBlock, setIsBlock] = useState(false);
+  const [pax, setPax] = useState("2");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [noteText, setNoteText] = useState("");
@@ -276,6 +335,7 @@ function ManualBooking({ slug, date, fields }: { slug: string; date: string; fie
       start,
       end,
       isBlock,
+      pax: field?.pricingType === "PER_PAX" && !isBlock ? Number(pax) : undefined,
       fullName: fullName || undefined,
       phone: phone || undefined,
       note: noteText || undefined,
@@ -324,6 +384,12 @@ function ManualBooking({ slug, date, fields }: { slug: string; date: string; fie
           <input type="checkbox" checked={isBlock} onChange={(e) => setIsBlock(e.target.checked)} className="h-4 w-4" />
           Block this time instead (maintenance, an event). No guest, no payment.
         </label>
+        {!isBlock && field.pricingType === "PER_PAX" && (
+          <label className="text-sm text-neutral-300">
+            <span className="mb-1 block">How many people</span>
+            <input type="number" min={1} value={pax} onChange={(e) => setPax(e.target.value)} className={input} aria-label="Booking people" />
+          </label>
+        )}
         {!isBlock && (
           <>
             <label className="text-sm text-neutral-300">
@@ -353,7 +419,7 @@ function ManualBooking({ slug, date, fields }: { slug: string; date: string; fie
 function FieldSetup({ slug, fields }: { slug: string; fields: FieldRow[] }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", sport: "Badminton", pricePerHour: "50000", opensAt: "08:00", closesAt: "22:00", stepMinutes: "30" });
+  const [form, setForm] = useState({ name: "", sport: "Badminton", pricePerHour: "50000", pricingType: "PER_FIELD", maxPax: "", opensAt: "08:00", closesAt: "22:00", stepMinutes: "30" });
   const [busy, setBusy] = useState(false);
 
   async function add(e: React.FormEvent) {
@@ -364,6 +430,8 @@ function FieldSetup({ slug, fields }: { slug: string; fields: FieldRow[] }) {
       name: form.name,
       sport: form.sport,
       pricePerHour: Number(form.pricePerHour),
+      pricingType: form.pricingType,
+      maxPax: form.pricingType === "PER_PAX" && form.maxPax ? Number(form.maxPax) : null,
       opensAt: form.opensAt,
       closesAt: form.closesAt,
       stepMinutes: Number(form.stepMinutes),
@@ -396,7 +464,7 @@ function FieldSetup({ slug, fields }: { slug: string; fields: FieldRow[] }) {
           {fields.map((f) => (
             <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm" data-testid="field-row">
               <span>
-                <span className="font-medium">{f.name}</span> <span className="text-neutral-500">{f.sport} · {rp(f.pricePerHour)} an hour · {f.opensLabel}–{f.closesLabel} · every {f.stepMinutes} min{f.isActive ? "" : " · off"}</span>
+                <span className="font-medium">{f.name}</span> <span className="text-neutral-500">{f.sport} · {rp(f.pricePerHour)} {f.pricingType === "PER_PAX" ? `per person an hour${f.maxPax ? ` (up to ${f.maxPax})` : ""}` : "an hour"} · {f.opensLabel}–{f.closesLabel} · every {f.stepMinutes} min{f.isActive ? "" : " · off"}</span>
               </span>
               <span className="flex gap-2">
                 <button className={btn} onClick={() => {
@@ -413,7 +481,16 @@ function FieldSetup({ slug, fields }: { slug: string; fields: FieldRow[] }) {
       <form onSubmit={add} className="grid gap-3 sm:grid-cols-3">
         <label className="text-sm text-neutral-300"><span className="mb-1 block">Name</span><input required minLength={2} maxLength={60} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={input} aria-label="Field name" placeholder="Court 1" /></label>
         <label className="text-sm text-neutral-300"><span className="mb-1 block">Sport</span><input required value={form.sport} onChange={(e) => setForm({ ...form, sport: e.target.value })} className={input} aria-label="Sport" /></label>
-        <label className="text-sm text-neutral-300"><span className="mb-1 block">Price per hour (Rp)</span><input required type="number" min={0} step={1000} value={form.pricePerHour} onChange={(e) => setForm({ ...form, pricePerHour: e.target.value })} className={input} aria-label="Price per hour" /></label>
+        <label className="text-sm text-neutral-300"><span className="mb-1 block">Priced</span>
+          <select value={form.pricingType} onChange={(e) => setForm({ ...form, pricingType: e.target.value })} className={input} aria-label="Pricing">
+            <option value="PER_FIELD">Per field (one price for the whole field)</option>
+            <option value="PER_PAX">Per person (price depends on how many play)</option>
+          </select>
+        </label>
+        <label className="text-sm text-neutral-300"><span className="mb-1 block">{form.pricingType === "PER_PAX" ? "Price per person an hour (Rp)" : "Price per hour (Rp)"}</span><input required type="number" min={0} step={1000} value={form.pricePerHour} onChange={(e) => setForm({ ...form, pricePerHour: e.target.value })} className={input} aria-label="Price per hour" /></label>
+        {form.pricingType === "PER_PAX" && (
+          <label className="text-sm text-neutral-300"><span className="mb-1 block">Most people per booking (optional)</span><input type="number" min={1} max={200} value={form.maxPax} onChange={(e) => setForm({ ...form, maxPax: e.target.value })} className={input} aria-label="Most people" placeholder="No limit" /></label>
+        )}
         <label className="text-sm text-neutral-300"><span className="mb-1 block">Opens</span><input required type="time" value={form.opensAt} onChange={(e) => setForm({ ...form, opensAt: e.target.value })} className={input} aria-label="Opens" /></label>
         <label className="text-sm text-neutral-300"><span className="mb-1 block">Closes (24:00 = midnight)</span><input required value={form.closesAt} onChange={(e) => setForm({ ...form, closesAt: e.target.value })} className={input} aria-label="Closes" placeholder="22:00" /></label>
         <label className="text-sm text-neutral-300"><span className="mb-1 block">Book in steps of</span>

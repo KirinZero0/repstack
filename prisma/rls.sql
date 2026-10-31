@@ -15,7 +15,7 @@ GRANT USAGE ON SCHEMA public TO {{ROLE}};
 -- manual join/bank-transfer requests staff review on /[slug]/members and act on via approve/reject.
 -- GymClass, ClassSession, ClassRegistration and ClassPayment are the classes feature (/[slug]/classes, /my/classes).
 -- GuestPass holds non-member class ticket requests (/[slug]/classes/guests); the public request form writes it with the owner client.
-GRANT SELECT, INSERT, UPDATE, DELETE ON "Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup", "GymClass", "ClassSession", "ClassRegistration", "ClassPayment", "GuestPass", "DayPassPlan", "EmailTemplate", "Field", "FieldBooking" TO {{ROLE}};
+GRANT SELECT, INSERT, UPDATE, DELETE ON "Gym", "StaffUser", "MembershipPlan", "Member", "CheckIn", "Payment", "NotificationLog", "WhatsappSenderConfig", "PlatformPayment", "MemberSignup", "GymClass", "ClassSession", "ClassRegistration", "ClassPayment", "GuestPass", "DayPassPlan", "EmailTemplate", "Field", "FieldBooking", "FieldBookingPayment" TO {{ROLE}};
 -- EmailTemplate: a gym sees and edits only its own rows. The platform defaults (no gymId) are invisible to this role;
 -- sending and the settings page read them with the owner client.
 -- The plan catalog is not tenant data; gyms read their own plan's limits.
@@ -97,3 +97,7 @@ CREATE POLICY tenant_isolation ON "Field" USING ("gymId" = current_setting('app.
 ALTER TABLE "FieldBooking" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON "FieldBooking";
 CREATE POLICY tenant_isolation ON "FieldBooking" USING ("gymId" = current_setting('app.current_gym_id', true)) WITH CHECK ("gymId" = current_setting('app.current_gym_id', true));
+
+ALTER TABLE "FieldBookingPayment" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "FieldBookingPayment";
+CREATE POLICY tenant_isolation ON "FieldBookingPayment" USING ("gymId" = current_setting('app.current_gym_id', true)) WITH CHECK ("gymId" = current_setting('app.current_gym_id', true));

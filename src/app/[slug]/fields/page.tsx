@@ -4,6 +4,7 @@ import { decrypt, maskEmail, maskPhone } from "@/lib/crypto";
 import { dayKeyInTimezone } from "@/lib/date";
 import { bookingInstants, bookingWindow, clock, isDateKey } from "@/lib/fieldBooking";
 import GymNav from "@/components/GymNav";
+import { paidByBooking } from "@/lib/fieldBookings";
 import { gymHasFeature } from "@/lib/features";
 import FieldsManager, { type BookingRow, type FieldRow } from "./FieldsManager";
 
@@ -52,6 +53,7 @@ export default async function FieldsPage({ params, searchParams }: { params: { s
       take: 100,
     }),
   ]);
+  const paidMap = await paidByBooking(db, [...dayBookings, ...pending].map((b) => b.id));
   const fieldName = new Map(fields.map((f) => [f.id, f.name]));
   const minutesOfDay = (d: Date) => Math.round((d.getTime() - dayStart.getTime()) / 60000);
 
@@ -68,6 +70,8 @@ export default async function FieldsPage({ params, searchParams }: { params: { s
     startLabel: new Intl.DateTimeFormat("en-GB", { timeZone: gym.timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(b.startsAt),
     endLabel: new Intl.DateTimeFormat("en-GB", { timeZone: gym.timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(b.endsAt),
     amount: Number(b.amount),
+    pax: b.pax,
+    paid: paidMap.get(b.id) ?? 0,
     status: b.status,
     isBlock: b.isBlock,
     note: b.note,
@@ -81,6 +85,8 @@ export default async function FieldsPage({ params, searchParams }: { params: { s
     name: f.name,
     sport: f.sport,
     pricePerHour: Number(f.pricePerHour),
+    pricingType: f.pricingType,
+    maxPax: f.maxPax,
     opensAt: f.opensAt,
     closesAt: f.closesAt,
     stepMinutes: f.stepMinutes,

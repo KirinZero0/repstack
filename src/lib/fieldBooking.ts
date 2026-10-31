@@ -55,6 +55,25 @@ export function bookingInstants(dateKey: string, startMin: number, endMin: numbe
   return { startsAt: at(startMin), endsAt: at(endMin) };
 }
 
+export type FieldPricingType = "PER_FIELD" | "PER_PAX";
+
+/** Most people a single booking can be for. */
+export const MAX_PAX = 200;
+
+/**
+ * What a booking costs: on a per-field price, the hourly price pro rata; on a per-person price, that rate times how
+ * many people, pro rata. Whole rupiah.
+ */
+export function bookingAmount(pricing: FieldPricingType, rate: number, pax: number | null, minutes: number): number {
+  const people = pricing === "PER_PAX" ? (pax ?? 1) : 1;
+  return Math.round((rate * people * minutes) / 60);
+}
+
+/** The minutes a booking covers. */
+export function bookingMinutes(b: { startsAt: Date; endsAt: Date }): number {
+  return Math.round((b.endsAt.getTime() - b.startsAt.getTime()) / 60000);
+}
+
 /** Price for a stretch of time: the hourly price pro rata, in whole rupiah. */
 export function bookingPrice(pricePerHour: number, minutes: number): number {
   return Math.round((pricePerHour * minutes) / 60);

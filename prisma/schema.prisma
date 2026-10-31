@@ -83,6 +83,7 @@ model Gym {
   guestPasses        GuestPass[]
   fields             Field[]
   fieldBookings      FieldBooking[]
+  fieldPayments      FieldBookingPayment[]
   dayPassPlans       DayPassPlan[]
   emailTemplates     EmailTemplate[]
 
@@ -150,6 +151,7 @@ model StaffUser {
   scannedGuestPasses    GuestPass[] @relation("GuestPassScanner")
   reviewedFieldBookings FieldBooking[] @relation("FieldBookingReviewer")
   scannedFieldBookings  FieldBooking[] @relation("FieldBookingScanner")
+  fieldPayments         FieldBookingPayment[]
 
   @@index([gymId])
 }
@@ -594,7 +596,9 @@ model Field {
   gym          Gym            @relation(fields: [gymId], references: [id])
   name         String
   sport        String         @default("Badminton")
-  pricePerHour Decimal
+  pricePerHour Decimal // PER_FIELD: for the whole field; PER_PAX: for each person
+  pricingType  FieldPricing   @default(PER_FIELD)
+  maxPax       Int? // PER_PAX: most people one public request may ask for (staff can go over it); null = no limit
   currency     String         @default("IDR")
   opensAt      Int            @default(480) // minutes after midnight, gym timezone (08:00)
   closesAt     Int            @default(1320) // 22:00; 1440 = midnight
@@ -604,6 +608,11 @@ model Field {
   bookings     FieldBooking[]
 
   @@index([gymId])
+}
+
+enum FieldPricing {
+  PER_FIELD // one price an hour for the whole field
+  PER_PAX // a price an hour for each person; the booking says how many
 }
 
 enum FieldBookingStatus {
@@ -628,7 +637,9 @@ model FieldBooking {
   phoneWhatsappLookup String // HMAC blind index
   email               String? // encrypted
   status              FieldBookingStatus @default(PENDING_REVIEW)
-  amount              Decimal // the price for this stretch of time; revenue once approved (staff confirm the money arrived)
+  pax                 Int? // how many people, on a PER_PAX field; staff can change it, which changes the amount
+  rate                Decimal? // the per-person hourly price when it was booked, so editing the people uses that price, not today's
+  amount              Decimal // what this booking costs now (price x people x time). What has been paid is the sum of its payments below
   isBlock             Boolean            @default(false) // staff blocking the time (maintenance, a tournament): never revenue, never ticketed
   note                String?
   proofImageUrl       String? // optional bank-transfer screenshot (private blob)
@@ -642,10 +653,36 @@ model FieldBooking {
   scannedById         String?
   scannedBy           StaffUser?         @relation("FieldBookingScanner", fields: [scannedById], references: [id])
   createdAt           DateTime           @default(now())
+  payments            FieldBookingPayment[]
 
   @@index([gymId, startsAt])
   @@index([fieldId, startsAt])
   @@index([ipHash, createdAt])
+}
+
+enum FieldPaymentKind {
+  PAYMENT // the money confirmed when staff approved the booking
+  COLLECTION // extra money collected later, e.g. more people came than were booked
+  REFUND // money given back, e.g. fewer people came; the amount is negative
+}
+
+/// Every movement of money on a field booking, each with its own date. Revenue is the sum of these (for bookings
+/// that are still held), so extra money collected later counts in the month it came in, and a refund subtracts.
+model FieldBookingPayment {
+  id           String             @id @default(uuid())
+  gymId        String
+  gym          Gym                @relation(fields: [gymId], references: [id])
+  bookingId    String
+  booking      FieldBooking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amount       Decimal // negative for a refund
+  kind         FieldPaymentKind
+  note         String?
+  recordedById String?
+  recordedBy   StaffUser?         @relation(fields: [recordedById], references: [id])
+  createdAt    DateTime           @default(now())
+
+  @@index([gymId, createdAt])
+  @@index([bookingId])
 }
 
 // ─── Password reset / staff invite ──────────────────────────
