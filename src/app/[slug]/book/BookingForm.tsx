@@ -11,6 +11,7 @@ export interface FieldOption {
   pricePerHour: number;
   pricingType: FieldPricingType;
   maxPax: number | null;
+  minPax: number | null;
   opensAt: number;
   closesAt: number;
   stepMinutes: number;
@@ -147,8 +148,8 @@ export default function BookingForm({ slug, fields, bank, today, last }: { slug:
 
       {perPax && (
         <label className="block text-sm text-neutral-300">
-          <span className="mb-1 block">How many people{field.maxPax ? ` (up to ${field.maxPax})` : ""}</span>
-          <input type="number" min={1} max={field.maxPax ?? 200} required value={pax} onChange={(e) => setPax(e.target.value)} className={input} aria-label="How many people" />
+          <span className="mb-1 block">How many people{field.minPax && field.maxPax ? ` (${field.minPax} to ${field.maxPax})` : field.maxPax ? ` (up to ${field.maxPax})` : field.minPax ? ` (at least ${field.minPax})` : ""}</span>
+          <input type="number" min={field.minPax ?? 1} max={field.maxPax ?? 200} required value={pax} onChange={(e) => setPax(e.target.value)} className={input} aria-label="How many people" />
           <span className="mt-1 block text-neutral-500">The price depends on this. If more people come, you pay the difference at the front desk.</span>
         </label>
       )}

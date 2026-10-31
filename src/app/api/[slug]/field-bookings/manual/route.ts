@@ -35,6 +35,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const perPax = field.pricingType === "PER_PAX";
   if (perPax && !d.isBlock && d.pax === undefined) return NextResponse.json({ error: "Enter how many people." }, { status: 400 });
+  if (perPax && !d.isBlock && field.minPax !== null && d.pax! < field.minPax) {
+    return NextResponse.json({ error: `This field is booked for at least ${field.minPax} people.` }, { status: 400 });
+  }
   const pax = perPax && !d.isBlock ? d.pax! : null;
 
   const startMin = parseClock(d.start);

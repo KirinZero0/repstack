@@ -600,6 +600,7 @@ model Field {
   pricePerHour Decimal // PER_FIELD: for the whole field; PER_PAX: for each person
   pricingType  FieldPricing   @default(PER_FIELD)
   maxPax       Int? // PER_PAX: most people one public request may ask for (staff can go over it); null = no limit
+  minPax       Int? // PER_PAX: fewest people a booking can be for, however it is made or edited; null = no minimum
   currency     String         @default("IDR")
   opensAt      Int            @default(480) // minutes after midnight, gym timezone (08:00)
   closesAt     Int            @default(1320) // 22:00; 1440 = midnight

@@ -12,6 +12,7 @@ export interface FieldRow {
   pricePerHour: number;
   pricingType: "PER_FIELD" | "PER_PAX";
   maxPax: number | null;
+  minPax: number | null;
   opensAt: number;
   closesAt: number;
   stepMinutes: number;
@@ -458,7 +459,7 @@ function ManualBooking({
         {!isBlock && field.pricingType === "PER_PAX" && (
           <label className="text-sm text-neutral-300">
             <span className="mb-1 block">How many people</span>
-            <input type="number" min={1} value={pax} onChange={(e) => setPax(e.target.value)} className={input} aria-label="Booking people" />
+            <input type="number" min={field.minPax ?? 1} value={pax} onChange={(e) => setPax(e.target.value)} className={input} aria-label="Booking people" />
           </label>
         )}
         {!isBlock && (
@@ -490,7 +491,7 @@ function ManualBooking({
 function FieldSetup({ slug, fields }: { slug: string; fields: FieldRow[] }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", sport: "Badminton", pricePerHour: "50000", pricingType: "PER_FIELD", maxPax: "", opensAt: "08:00", closesAt: "22:00", stepMinutes: "30" });
+  const [form, setForm] = useState({ name: "", sport: "Badminton", pricePerHour: "50000", pricingType: "PER_FIELD", minPax: "", maxPax: "", opensAt: "08:00", closesAt: "22:00", stepMinutes: "30" });
   const [busy, setBusy] = useState(false);
 
   async function add(e: React.FormEvent) {
@@ -502,6 +503,7 @@ function FieldSetup({ slug, fields }: { slug: string; fields: FieldRow[] }) {
       sport: form.sport,
       pricePerHour: Number(form.pricePerHour),
       pricingType: form.pricingType,
+      minPax: form.pricingType === "PER_PAX" && form.minPax ? Number(form.minPax) : null,
       maxPax: form.pricingType === "PER_PAX" && form.maxPax ? Number(form.maxPax) : null,
       opensAt: form.opensAt,
       closesAt: form.closesAt,
@@ -538,7 +540,7 @@ function FieldSetup({ slug, fields }: { slug: string; fields: FieldRow[] }) {
             {fields.map((f) => (
               <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm" data-testid="field-row">
                 <span>
-                  <span className="font-medium">{f.name}</span> <span className="text-neutral-500">{f.sport} · {rp(f.pricePerHour)} {f.pricingType === "PER_PAX" ? `per person an hour${f.maxPax ? ` (up to ${f.maxPax})` : ""}` : "an hour"} · {f.opensLabel}–{f.closesLabel} · every {f.stepMinutes} min{f.isActive ? "" : " · off"}</span>
+                  <span className="font-medium">{f.name}</span> <span className="text-neutral-500">{f.sport} · {rp(f.pricePerHour)} {f.pricingType === "PER_PAX" ? `per person an hour${f.minPax && f.maxPax ? ` (${f.minPax} to ${f.maxPax} people)` : f.maxPax ? ` (up to ${f.maxPax})` : f.minPax ? ` (at least ${f.minPax})` : ""}` : "an hour"} · {f.opensLabel}–{f.closesLabel} · every {f.stepMinutes} min{f.isActive ? "" : " · off"}</span>
                 </span>
                 <span className="flex gap-2">
                   <button className={btn} onClick={() => {
@@ -566,6 +568,9 @@ function FieldSetup({ slug, fields }: { slug: string; fields: FieldRow[] }) {
             </select>
           </label>
           <label className="text-sm text-neutral-300"><span className="mb-1 block">{form.pricingType === "PER_PAX" ? "Price per person an hour (Rp)" : "Price per hour (Rp)"}</span><input required type="number" min={0} step={1000} value={form.pricePerHour} onChange={(e) => setForm({ ...form, pricePerHour: e.target.value })} className={input} aria-label="Price per hour" /></label>
+          {form.pricingType === "PER_PAX" && (
+            <label className="text-sm text-neutral-300"><span className="mb-1 block">Fewest people per booking (optional)</span><input type="number" min={1} max={200} value={form.minPax} onChange={(e) => setForm({ ...form, minPax: e.target.value })} className={input} aria-label="Fewest people" placeholder="No minimum" /></label>
+          )}
           {form.pricingType === "PER_PAX" && (
             <label className="text-sm text-neutral-300"><span className="mb-1 block">Most people per booking (optional)</span><input type="number" min={1} max={200} value={form.maxPax} onChange={(e) => setForm({ ...form, maxPax: e.target.value })} className={input} aria-label="Most people" placeholder="No limit" /></label>
           )}

@@ -36,6 +36,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   const opensAt = d.opensAt !== undefined ? parseClock(d.opensAt) : field.opensAt;
   const closesAt = d.closesAt !== undefined ? parseClock(d.closesAt) : field.closesAt;
   if (opensAt === null || closesAt === null) return NextResponse.json({ error: "Use times like 08:00." }, { status: 400 });
+  const lowest = d.minPax !== undefined ? d.minPax : field.minPax;
+  const highest = d.maxPax !== undefined ? d.maxPax : field.maxPax;
+  if (lowest && highest && lowest > highest) return NextResponse.json({ error: "The fewest people can't be more than the most." }, { status: 400 });
   const step = d.stepMinutes ?? field.stepMinutes;
   const problem = hoursProblem(opensAt, closesAt, step);
   if (problem) return NextResponse.json({ error: problem }, { status: 400 });
@@ -49,6 +52,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
       // Changing how a field is priced only affects new bookings; existing ones keep the rate they were made at.
       ...(d.pricingType !== undefined ? { pricingType: d.pricingType } : {}),
       ...(d.maxPax !== undefined ? { maxPax: d.maxPax } : {}),
+      ...(d.minPax !== undefined ? { minPax: d.minPax } : {}),
       ...(d.isActive !== undefined ? { isActive: d.isActive } : {}),
       opensAt,
       closesAt,

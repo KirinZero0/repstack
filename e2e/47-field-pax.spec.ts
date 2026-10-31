@@ -276,3 +276,58 @@ test("the public form asks for people on a per-person field and shows the price;
   const b = await prisma.fieldBooking.findFirstOrThrow({ where: { gymId: f.gym.id } });
   expect(await ledger(b.id)).toEqual(["PAYMENT:150000", "COLLECTION:75000"]);
 });
+
+test("a per-person field can require a minimum number of people, everywhere a booking is made or changed", async ({ baseURL, playwright }) => {
+  const f = await makeGym();
+  const owner = await as(playwright, baseURL!, f, "owner");
+  const staff = await as(playwright, baseURL!, f, "staff");
+  const body = { name: "Open Play", sport: "Badminton", pricePerHour: 15000, pricingType: "PER_PAX", opensAt: "00:00", closesAt: "24:00", stepMinutes: 30 };
+
+  // Set up with a minimum and a maximum; the minimum can't be more than the maximum, and a per-field price ignores it.
+  expect((await owner.post(`${baseURL}/api/${f.slug}/fields`, { data: { ...body, minPax: 8, maxPax: 4 } })).status()).toBe(400);
+  const made = await owner.post(`${baseURL}/api/${f.slug}/fields`, { data: { ...body, minPax: 4, maxPax: 20 } });
+  expect(made.status()).toBe(201);
+  const field = await prisma.field.findUniqueOrThrow({ where: { id: (await made.json()).id } });
+  expect([field.minPax, field.maxPax]).toEqual([4, 20]);
+  const flat = await owner.post(`${baseURL}/api/${f.slug}/fields`, { data: { ...body, name: "Court A", pricingType: "PER_FIELD", minPax: 4 } });
+  expect((await prisma.field.findUniqueOrThrow({ where: { id: (await flat.json()).id } })).minPax).toBeNull();
+  // Editing the field: the same rule against what is already there.
+  expect((await owner.patch(`${baseURL}/api/${f.slug}/fields/${field.id}`, { data: { minPax: 30 } })).status()).toBe(400);
+  expect((await owner.patch(`${baseURL}/api/${f.slug}/fields/${field.id}`, { data: { minPax: 6 } })).ok()).toBeTruthy();
+  expect((await prisma.field.findUniqueOrThrow({ where: { id: field.id } })).minPax).toBe(6);
+  expect((await owner.patch(`${baseURL}/api/${f.slug}/fields/${field.id}`, { data: { minPax: 4 } })).ok()).toBeTruthy();
+
+  // Editing one thing changes only that thing: the pricing type, limits, sport and step are all kept.
+  await prisma.field.update({ where: { id: field.id }, data: { sport: "Futsal", stepMinutes: 60, opensAt: 0, closesAt: 1440 } });
+  for (const change of [{ isActive: false }, { isActive: true }, { pricePerHour: 18000 }, { name: "Open Play 1" }]) {
+    expect((await owner.patch(`${baseURL}/api/${f.slug}/fields/${field.id}`, { data: change })).ok()).toBeTruthy();
+  }
+  const kept = await prisma.field.findUniqueOrThrow({ where: { id: field.id } });
+  expect([kept.pricingType, kept.minPax, kept.maxPax, kept.sport, kept.stepMinutes, Number(kept.pricePerHour), kept.name, kept.isActive]).toEqual(["PER_PAX", 4, 20, "Futsal", 60, 18000, "Open Play 1", true]);
+  await prisma.field.update({ where: { id: field.id }, data: { sport: "Badminton", stepMinutes: 30, pricePerHour: 15000, name: "Open Play" } });
+
+  const v = await visitor(playwright);
+  // The public form: below the minimum is refused with a clear message, the minimum itself is fine.
+  const low = await book(v, baseURL!, f.slug, field.id, { pax: 3 });
+  expect(low.status()).toBe(400);
+  expect((await low.json()).error).toContain("at least 4");
+  expect((await book(v, baseURL!, f.slug, field.id, { pax: 4 })).status()).toBe(201);
+  const b = await latest(field.id);
+  expect(Number(b.amount)).toBe(90000); // 4 people x Rp 15.000 x 1,5 hours
+
+  // Staff-made bookings and edits can't go below it either, so the booking stays billed for the minimum.
+  const today = dayKeyInTimezone(new Date(), TZ);
+  const manual = (pax: number) => staff.post(`${baseURL}/api/${f.slug}/field-bookings/manual`, { data: { fieldId: field.id, date: today, start: "01:00", end: "02:00", fullName: "Walk In", phone: phoneN(), pax } });
+  expect((await manual(2)).status()).toBe(400);
+  expect((await manual(4)).status()).toBe(201);
+  await act(staff, baseURL!, f.slug, b.id, { action: "approve" });
+  const down = await act(staff, baseURL!, f.slug, b.id, { action: "edit_pax", pax: 2 });
+  expect(down.status()).toBe(400);
+  expect((await down.json()).error).toContain("stays billed for 4");
+  expect((await prisma.fieldBooking.findUniqueOrThrow({ where: { id: b.id } })).pax).toBe(4);
+  expect((await act(staff, baseURL!, f.slug, b.id, { action: "edit_pax", pax: 5 })).ok()).toBeTruthy();
+
+  // The booking page tells people the range.
+  const page = await (await v.get(`${baseURL}/${f.slug}/book`)).text();
+  expect(page).toContain("Open Play");
+});

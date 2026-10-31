@@ -126,6 +126,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     if (!["PENDING_REVIEW", "APPROVED", "ATTENDED"].includes(booking.status)) return NextResponse.json({ error: "The number of people can't be changed on this booking." }, { status: 409 });
     if (booking.pax === null || booking.rate === null) return NextResponse.json({ error: "This booking isn't priced per person." }, { status: 409 });
     if (pax === undefined) return NextResponse.json({ error: "Enter how many people." }, { status: 400 });
+    // The field's minimum holds on edits too: a booking can't be brought below it, so it is still billed for the minimum.
+    const minimum = (await db.field.findUnique({ where: { id: booking.fieldId }, select: { minPax: true } }))?.minPax ?? null;
+    if (minimum !== null && pax < minimum) return NextResponse.json({ error: `This field is booked for at least ${minimum} people, so it stays billed for ${minimum}.` }, { status: 400 });
     const newAmount = bookingAmount("PER_PAX", Number(booking.rate), pax, bookingMinutes(booking));
     const res = await db.fieldBooking.updateMany({
       where: { id: booking.id, gymId: gym.id, status: { in: ["PENDING_REVIEW", "APPROVED", "ATTENDED"] } },

@@ -316,20 +316,33 @@ const clockString = z.string().regex(/^\d{2}:\d{2}$/, "Use a time like 18:30");
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date");
 
 /** Owner sets up or edits a bookable field. Times are "HH:MM" in the gym's timezone ("24:00" closes at midnight). */
-export const fieldSchema = z.object({
+const fieldShape = {
   name: z.string().trim().min(2, "Name the field").max(60),
-  sport: z.string().trim().min(2).max(40).default("Badminton"),
+  sport: z.string().trim().min(2).max(40),
   /** A price for the whole field an hour, or for each person an hour on a per-person field. */
   pricePerHour: z.number().int().min(0).max(100_000_000),
-  pricingType: z.enum(["PER_FIELD", "PER_PAX"]).default("PER_FIELD"),
+  pricingType: z.enum(["PER_FIELD", "PER_PAX"]),
   /** Per-person fields: the most people one public request can ask for. Empty = no limit. */
   maxPax: z.number().int().min(1).max(200).nullable().optional(),
+  /** Per-person fields: the fewest people a booking can be for. Empty = no minimum. */
+  minPax: z.number().int().min(1).max(200).nullable().optional(),
   opensAt: clockString,
   closesAt: clockString,
-  stepMinutes: z.union([z.literal(15), z.literal(30), z.literal(60)]).default(30),
+  stepMinutes: z.union([z.literal(15), z.literal(30), z.literal(60)]),
   isActive: z.boolean().optional(),
+};
+/** Creating: what isn't given gets its usual default. */
+export const fieldSchema = z.object({
+  ...fieldShape,
+  sport: fieldShape.sport.default("Badminton"),
+  pricingType: fieldShape.pricingType.default("PER_FIELD"),
+  stepMinutes: fieldShape.stepMinutes.default(30),
 });
-export const updateFieldSchema = fieldSchema.partial().refine((v) => Object.keys(v).length > 0, "Nothing to update");
+/**
+ * Editing: only what is sent changes. This is built from the shape without defaults on purpose: with them,
+ * "Switch off" would also have reset the sport, step and pricing type to their defaults.
+ */
+export const updateFieldSchema = z.object(fieldShape).partial().refine((v) => Object.keys(v).length > 0, "Nothing to update");
 
 /** Public: someone asks for a stretch of time on a field. Only an approved booking takes the time. */
 export const fieldBookingRequestSchema = z.object({

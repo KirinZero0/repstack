@@ -72,6 +72,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (perPax && field.maxPax !== null && d.pax! > field.maxPax) {
     return NextResponse.json({ error: `This field takes up to ${field.maxPax} people. Ask at the front desk for a bigger group.` }, { status: 400 });
   }
+  if (perPax && field.minPax !== null && d.pax! < field.minPax) {
+    return NextResponse.json({ error: `This field is booked for at least ${field.minPax} people.` }, { status: 400 });
+  }
   const pax = perPax ? d.pax! : null;
 
   const startMin = parseClock(d.start);

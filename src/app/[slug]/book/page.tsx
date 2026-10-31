@@ -51,6 +51,7 @@ export default async function BookPage({ params }: { params: { slug: string } })
                   pricePerHour: Number(f.pricePerHour),
                   pricingType: f.pricingType,
                   maxPax: f.maxPax,
+                  minPax: f.minPax,
                   opensAt: f.opensAt,
                   closesAt: f.closesAt,
                   stepMinutes: f.stepMinutes,

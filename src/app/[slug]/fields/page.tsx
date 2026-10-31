@@ -87,6 +87,7 @@ export default async function FieldsPage({ params, searchParams }: { params: { s
     pricePerHour: Number(f.pricePerHour),
     pricingType: f.pricingType,
     maxPax: f.maxPax,
+    minPax: f.minPax,
     opensAt: f.opensAt,
     closesAt: f.closesAt,
     stepMinutes: f.stepMinutes,

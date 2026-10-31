@@ -482,3 +482,13 @@ staff approve, but the thing being booked is a stretch of time on one field, so 
 - **Messages** say "for N people" on a per-person booking.
 - **Deploy**: `npm run db:migrate`, then `npm run db:rls` (the new table needs its policy).
 - Tests: `e2e/47-field-pax.spec.ts`.
+
+### 16a. Minimum people, and a fix to editing a field
+
+- **Minimum people** (`Field.minPax`, migration `field_min_pax`): a per-person field can require a minimum number of people per
+  booking (shown as "4 to 20 people"). It holds everywhere: the public form, a staff-made booking and a headcount edit all
+  refuse fewer, so a field with a minimum of 4 always bills for at least 4. The minimum can't exceed the maximum. A per-field
+  price ignores it.
+- **Fix**: editing a field (Change price, Switch off, rename) used to reset its pricing type, sport and step to their defaults,
+  because the edit schema inherited the create form's defaults. It is now built without defaults, like the plan, class and
+  day-pass edit schemas, so only what is sent changes. Tests: `e2e/47-field-pax.spec.ts`.
