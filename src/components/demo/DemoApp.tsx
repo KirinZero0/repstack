@@ -5,32 +5,46 @@ import BrandMark from "../BrandMark";
 import { BarChart, Card, HBars, StatCard, StatusPill, rp } from "../charts";
 import Tour, { type TourStep } from "./Tour";
 import {
+  CLASSES,
+  FIELDS,
+  GUEST_REQUESTS,
+  IN_GYM_NOW,
   INITIAL_MEMBERS,
   INITIAL_PLANS,
   INITIAL_REQUESTS,
   RECENT_PAYMENTS,
+  REFUNDS,
   REVENUE_BY_PLAN,
   REVENUE_MONTHS,
+  ROSTER,
+  STAFF,
+  type DemoGuest,
   type DemoMember,
   type DemoPlan,
   type DemoRequest,
 } from "./data";
 
 // "requests" is a sub-page of Members (reached from its banner), so it has no tab in the nav.
-type Tab = "dashboard" | "members" | "requests" | "plans" | "finance" | "poster";
+type Tab = "dashboard" | "members" | "requests" | "plans" | "classes" | "guests" | "fields" | "desk" | "staff" | "finance" | "poster" | "member";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "members", label: "Members" },
   { id: "plans", label: "Plans" },
+  { id: "classes", label: "Classes" },
+  { id: "guests", label: "Guests" },
+  { id: "fields", label: "Fields" },
+  { id: "desk", label: "Front desk" },
+  { id: "staff", label: "Staff" },
   { id: "finance", label: "Finance" },
   { id: "poster", label: "Check-in poster" },
+  { id: "member", label: "Member app" },
 ];
 
 const STEPS: TourStep[] = [
   {
     title: "Welcome to your gym",
-    body: "You're the owner of Demo Gym. This 2-minute tour shows how you'd run memberships, check-ins and billing. Everything here is sample data, and nothing is saved.",
+    body: "You're the owner of Demo Gym. This short tour shows how you'd run memberships, check-ins, classes, guests, court bookings and the money. Everything here is sample data, and nothing is saved.",
     tab: "dashboard",
   },
   {
@@ -180,14 +194,84 @@ const STEPS: TourStep[] = [
     tab: "poster",
   },
   {
+    title: "Run classes too",
+    body: "Set up a class once and schedule the weeks. Members book a spot from their phone, a full class stops taking bookings, and everyone booked gets a reminder the evening before.",
+    target: "class-list",
+    tab: "classes",
+  },
+  {
+    title: "Rosters and no-shows",
+    body: "Each session has its roster. Tick who came, and no-shows are kept on record. Paid classes show up in your finance like any other payment.",
+    target: "roster",
+    tab: "classes",
+  },
+  {
+    title: "Day passes for visitors",
+    body: "People who aren't members can ask for a day pass or a spot in a class from your public page, and attach their transfer receipt. Nothing is issued until you've checked the money.",
+    target: "guest-card",
+    tab: "guests",
+  },
+  {
+    title: "Approve, and the ticket goes out",
+    body: "Kevin's transfer is in your bank. Approve his day pass.",
+    target: "guest-approve",
+    action: "Click Payment received, approve",
+    advanceOnClick: true,
+    tab: "guests",
+  },
+  {
+    title: "A one-time QR ticket",
+    body: "Kevin gets his ticket by WhatsApp and email. Staff scan it once at the door, it works for as many days as the pass allows, and if he loses it you can send it again.",
+    target: "guest-ticket",
+    tab: "guests",
+  },
+  {
+    title: "Courts and pitches by the hour",
+    body: "Rent out badminton courts or a futsal pitch? People pick a time on your booking page and you approve it. Approved bookings fill the day's timeline and can never overlap. Charge per field or per person.",
+    target: "field-timeline",
+    tab: "fields",
+  },
+  {
+    title: "Phone bookings and closed time",
+    body: "Someone rang to book, or a court needs repairs? Add the booking, or block the time, straight from the day's list.",
+    target: "field-actions",
+    tab: "fields",
+  },
+  {
+    title: "The front desk",
+    body: "See who's in the gym right now. Day-pass visitors show up here too, so you always know how full it is.",
+    target: "in-gym",
+    tab: "desk",
+  },
+  {
+    title: "Forgot their phone? Check them in by hand",
+    body: "Budi left his phone at home. One click checks him in, with the same rules as a scan: an expired or frozen member is turned away.",
+    target: "desk-checkin",
+    action: "Click Check in next to Budi",
+    advanceOnClick: true,
+    tab: "desk",
+  },
+  {
+    title: "Owner and staff logins",
+    body: "Give your front-desk team their own logins. Staff run the day; only owners see finance, refunds and billing. Every payment is recorded under whoever took it.",
+    target: "staff",
+    tab: "staff",
+  },
+  {
     title: "Know where the money is",
-    body: "Revenue by month and by plan, plus invoices that are still unpaid. It's all in one place, no spreadsheet needed.",
+    body: "Revenue by month and by plan, invoices still unpaid, refunds you gave back, and a CSV export for your accountant. Only the owner sees this page.",
     target: "finance",
     tab: "finance",
   },
   {
-    title: "That's the owner side",
-    body: "Members log in to see their check-in QR and book classes. Ready to run your own gym on Liftmora?",
+    title: "What your members see",
+    body: "Members get their own page on their phone, installable like an app: their status and dates, the check-in QR, classes they booked, renewal by bank transfer, and their visits.",
+    target: "member-phone",
+    tab: "member",
+  },
+  {
+    title: "That's Liftmora",
+    body: "Members, check-ins, classes, guests, court bookings and the money, in one place. Ready to run your own gym on Liftmora?",
     tab: "dashboard",
     final: true,
   },
@@ -243,6 +327,10 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
   const [query, setQuery] = useState("");
   const [requests, setRequests] = useState<DemoRequest[]>(INITIAL_REQUESTS);
   const [approvedName, setApprovedName] = useState<string | null>(null);
+  const [guests, setGuests] = useState<DemoGuest[]>(GUEST_REQUESTS);
+  const [ticketFor, setTicketFor] = useState<DemoGuest | null>(null);
+  const [inGym, setInGym] = useState(IN_GYM_NOW);
+  const [deskNote, setDeskNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   const onTab = useCallback((t: string) => {
     setTab(t as Tab);
@@ -266,6 +354,23 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
       ...ms,
     ]);
     setApprovedName(r.name);
+  }
+
+  function approveGuest(g: DemoGuest) {
+    setGuests((gs) => gs.filter((x) => x.id !== g.id));
+    setTicketFor(g);
+  }
+
+  /** The front desk checks a member in by hand, with the same rule a scan uses: only an active membership gets in. */
+  function deskCheckIn(m: DemoMember) {
+    if (m.status !== "ACTIVE") {
+      setDeskNote({ ok: false, text: `${m.name} can't check in: membership ${m.status === "FROZEN" ? "is frozen" : "has expired"}.` });
+      return;
+    }
+    const now = new Date();
+    const since = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    setInGym((xs) => (xs.some((x) => x.name === m.name) ? xs : [...xs, { name: m.name, since }]));
+    setDeskNote({ ok: true, text: `${m.name} is checked in.` });
   }
 
   function rejectRequest(r: DemoRequest) {
@@ -321,6 +426,10 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
     setQuery("");
     setRequests(INITIAL_REQUESTS);
     setApprovedName(null);
+    setGuests(GUEST_REQUESTS);
+    setTicketFor(null);
+    setInGym(IN_GYM_NOW);
+    setDeskNote(null);
     setTourKey((k) => k + 1);
     setTourOn(true);
   }
@@ -729,6 +838,15 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
                 <BarChart data={REVENUE_MONTHS} format={(n) => `${(n / 1_000_000).toFixed(1)}M`} />
               </Card>
             </div>
+            <div className="mb-6">
+              <Card title="Export for your accountant">
+                <div className="flex flex-wrap items-center gap-3">
+                  <button className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-neutral-950 hover:bg-neutral-200">Download transactions</button>
+                  <button className="rounded-lg border border-neutral-700 px-4 py-2 text-sm hover:bg-neutral-800">Download monthly summary</button>
+                  <span className="text-xs text-neutral-500">CSV files for Excel or Google Sheets: every payment and refund, or one row per month.</span>
+                </div>
+              </Card>
+            </div>
             <div className="grid gap-6 lg:grid-cols-2">
               <Card title="This month by plan">
                 <HBars data={REVENUE_BY_PLAN} format={rp} />
@@ -747,6 +865,279 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
                   ))}
                 </ul>
               </Card>
+            </div>
+            <div className="mt-6">
+              <Card title="Refunds">
+                <p className="mb-3 text-sm text-neutral-400">Money you gave back comes off revenue on the day it went back. One recorded by mistake is voided, never silently deleted.</p>
+                <ul className="space-y-2 text-sm">
+                  {REFUNDS.map((r) => (
+                    <li key={r.to + r.date} className="flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        {r.date} · {r.to} <span className="text-neutral-500">· {r.forWhat} · {r.reason}</span>
+                      </span>
+                      <span className="text-red-400">−{rp(r.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {tab === "classes" && (
+          <div>
+            <h1 className="mb-6 text-2xl font-semibold">Classes</h1>
+            <div data-tour="class-list" className="mb-6 overflow-x-auto rounded-xl border border-neutral-800">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <thead className="bg-neutral-900 text-neutral-400">
+                  <tr>
+                    <th className="px-4 py-3 font-normal">Class</th>
+                    <th className="px-4 py-3 font-normal">Next session</th>
+                    <th className="px-4 py-3 font-normal">Spots</th>
+                    <th className="px-4 py-3 font-normal">Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {CLASSES.map((c) => (
+                    <tr key={c.id} className="border-t border-neutral-800">
+                      <td className="px-4 py-3 font-medium">
+                        {c.name} <span className="text-neutral-500">· {c.coach}</span>
+                      </td>
+                      <td className="px-4 py-3 text-neutral-300">{c.when}</td>
+                      <td className="px-4 py-3">
+                        {c.booked >= c.capacity ? <span className="text-amber-400">Full ({c.capacity})</span> : <span>{c.booked} / {c.capacity}</span>}
+                      </td>
+                      <td className="px-4 py-3 text-neutral-300">{c.price > 0 ? rp(c.price) : "Included"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div data-tour="roster" className="rounded-xl border border-neutral-800 bg-neutral-900 p-5">
+              <p className="mb-3 font-medium">Morning Yoga · Sat 31 Oct · roster</p>
+              <ul className="divide-y divide-neutral-800 text-sm">
+                {ROSTER.map((r) => (
+                  <li key={r.name} className="flex items-center justify-between py-2">
+                    <span>{r.name}</span>
+                    <span className={r.status === "Came" ? "text-emerald-400" : r.status === "No-show" ? "text-red-400" : "text-neutral-400"}>{r.status}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {tab === "guests" && (
+          <div>
+            <h1 className="mb-2 text-2xl font-semibold">Guest tickets</h1>
+            <p className="mb-6 text-sm text-neutral-400">Day passes and class spots requested by people who aren&apos;t members.</p>
+            {ticketFor && (
+              <div data-tour="guest-ticket" className="mb-6 flex flex-wrap items-center gap-6 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
+                <div className="rounded-xl bg-[#ffffff] p-3">
+                  <div className="scale-[0.55] origin-top-left" style={{ width: 124, height: 124 }}>
+                    <FakeQr />
+                  </div>
+                </div>
+                <div className="max-w-sm text-sm">
+                  <p className="mb-2 text-emerald-400">Approved. {ticketFor.name}&apos;s ticket is on its way by WhatsApp and email.</p>
+                  <div className="rounded-2xl rounded-tl-sm bg-[#d9fdd3] p-3 leading-relaxed text-[#111b21] shadow">
+                    Hi {ticketFor.name.split(" ")[0]}, you&apos;re approved for {ticketFor.item} at Demo Gym, valid for 30 days. Show this one-time QR ticket at the front desk:{" "}
+                    <span className="text-[#027eb5] underline">ticket/7Hq…</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            {guests.length === 0 ? (
+              <p className="rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-8 text-center text-neutral-500">No requests waiting.</p>
+            ) : (
+              <ul className="divide-y divide-neutral-800 border-y border-neutral-800">
+                {guests.map((g, i) => (
+                  <li key={g.id} data-tour={i === 0 ? "guest-card" : undefined} className="flex flex-wrap items-center justify-between gap-3 py-4">
+                    <div>
+                      <p className="font-medium">
+                        {g.name} <span className="text-sm text-neutral-500">{g.phone}</span>
+                      </p>
+                      <p className="text-sm text-neutral-400">
+                        {g.item} · {rp(g.amount)}
+                      </p>
+                      <p className="text-sm text-neutral-500">{g.hasProof ? <span className="underline underline-offset-2">View transfer proof</span> : "No proof attached. Check your bank before approving."}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        data-tour={i === 0 ? "guest-approve" : undefined}
+                        onClick={() => approveGuest(g)}
+                        className="whitespace-nowrap rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-[#ffffff] hover:bg-emerald-500"
+                      >
+                        Payment received, approve
+                      </button>
+                      <button onClick={() => setGuests((gs) => gs.filter((x) => x.id !== g.id))} className="whitespace-nowrap rounded-md border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800">
+                        Decline
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {tab === "fields" && (
+          <div>
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <h1 className="text-2xl font-semibold">Fields · Today</h1>
+              <div data-tour="field-actions" className="flex gap-2">
+                <button className="rounded-md border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-800">+ Add booking</button>
+                <button className="rounded-md border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-800">Block time</button>
+              </div>
+            </div>
+            <div data-tour="field-timeline" className="space-y-6">
+              {FIELDS.map((f) => {
+                const span = f.closes - f.opens;
+                const clock = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+                return (
+                  <div key={f.id}>
+                    <p className="mb-1 text-sm font-medium">
+                      {f.name} <span className="text-neutral-500">{f.sport} · {rp(f.perHour)}/hr · {clock(f.opens)}–{clock(f.closes)}</span>
+                    </p>
+                    <div className="relative h-9 rounded-md border border-neutral-800 bg-neutral-900">
+                      {f.bookings.map((b) => (
+                        <div
+                          key={b.name + b.start}
+                          title={`${clock(b.start)}–${clock(b.end)} ${b.name}`}
+                          className={`absolute top-1 bottom-1 overflow-hidden rounded px-1.5 text-[11px] leading-7 ${
+                            b.status === "Blocked" ? "bg-neutral-600 text-white" : b.status === "Came" ? "bg-emerald-500 text-neutral-950" : "bg-plate-yellow text-neutral-950"
+                          }`}
+                          style={{ left: `${((b.start - f.opens) / span) * 100}%`, width: `${((b.end - b.start) / span) * 100}%` }}
+                        >
+                          {b.status === "Blocked" ? "Blocked" : b.name}
+                        </div>
+                      ))}
+                    </div>
+                    <ul className="mt-2 text-sm text-neutral-400">
+                      {f.bookings.map((b) => (
+                        <li key={b.name + b.start}>
+                          {clock(b.start)}–{clock(b.end)} · {b.status === "Blocked" ? `Blocked: ${b.name}` : b.name}
+                          {b.status !== "Blocked" && <span className="text-neutral-500"> · {b.status}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {tab === "desk" && (
+          <div>
+            <h1 className="mb-6 text-2xl font-semibold">Front desk</h1>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div data-tour="in-gym" className="rounded-xl border border-neutral-800 bg-neutral-900 p-5">
+                <p className="mb-3 font-medium">
+                  In the gym now <span className="text-sm text-neutral-500">· {inGym.length}</span>
+                </p>
+                <ul className="divide-y divide-neutral-800 text-sm">
+                  {inGym.map((x) => (
+                    <li key={x.name} className="flex justify-between py-2">
+                      <span>{x.name}</span>
+                      <span className="text-neutral-500">since {x.since}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-5">
+                <p className="mb-1 font-medium">Check a member in by hand</p>
+                <p className="mb-3 text-sm text-neutral-500">For a member who forgot their phone. Same rules as a scan.</p>
+                {deskNote && <p className={`mb-3 text-sm ${deskNote.ok ? "text-emerald-400" : "text-red-400"}`}>{deskNote.text}</p>}
+                <ul className="divide-y divide-neutral-800 text-sm">
+                  {members
+                    .filter((m) => ["Budi Santoso", "Rina Putri", "Andi Wijaya"].includes(m.name))
+                    .map((m) => (
+                      <li key={m.name} className="flex items-center justify-between py-2">
+                        <span>
+                          {m.name} <StatusPill status={m.status} />
+                        </span>
+                        <button
+                          data-tour={m.name === "Budi Santoso" ? "desk-checkin" : undefined}
+                          onClick={() => deskCheckIn(m)}
+                          className="whitespace-nowrap rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-300 hover:bg-neutral-800"
+                        >
+                          Check in
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+                <p className="mt-4 border-t border-neutral-800 pt-3 text-sm text-neutral-400">
+                  Walk-in buying a day pass at the counter? <span className="text-white">Sell day pass</span> records the payment and checks them in, in one step.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "staff" && (
+          <div>
+            <h1 className="mb-6 text-2xl font-semibold">Staff</h1>
+            <div data-tour="staff" className="overflow-x-auto rounded-xl border border-neutral-800">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <thead className="bg-neutral-900 text-neutral-400">
+                  <tr>
+                    <th className="px-4 py-3 font-normal">Name</th>
+                    <th className="px-4 py-3 font-normal">Role</th>
+                    <th className="px-4 py-3 font-normal">Can do</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {STAFF.map((x) => (
+                    <tr key={x.email} className="border-t border-neutral-800">
+                      <td className="px-4 py-3">
+                        <span className="font-medium">{x.name}</span>
+                        <span className="block text-xs text-neutral-500">{x.email}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={x.role === "Owner" ? "text-plate-yellow" : "text-neutral-300"}>{x.role}</span>
+                      </td>
+                      <td className="px-4 py-3 text-neutral-400">{x.can}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs text-neutral-500">New staff get an email to set their own password. Remove someone and their login stops working at once; what they recorded stays.</p>
+          </div>
+        )}
+
+        {tab === "member" && (
+          <div className="flex flex-col items-center">
+            <h1 className="mb-6 text-2xl font-semibold">What a member sees</h1>
+            <div data-tour="member-phone" className="w-[300px] rounded-[2.2rem] border-4 border-neutral-700 bg-neutral-950 p-4 shadow-2xl">
+              <div className="mx-auto mb-4 h-1.5 w-16 rounded-full bg-neutral-700" />
+              <p className="text-xs text-neutral-500">Demo Gym</p>
+              <p className="mb-3 text-lg font-semibold">Hi, Sari</p>
+              <div className="mb-3 rounded-xl border border-emerald-800 bg-emerald-950 px-3 py-2 text-sm">
+                <span className="font-medium text-emerald-400">Active</span>
+                <span className="block text-xs text-neutral-300">Annual · until 28 May 2027</span>
+              </div>
+              <div className="mb-3 flex justify-center rounded-xl bg-[#ffffff] p-2">
+                <div className="origin-top scale-[0.7]" style={{ width: 224, height: 157 }}>
+                  <FakeQr />
+                </div>
+              </div>
+              <p className="mb-3 text-center text-xs text-neutral-500">Show at the door, or scan the poster</p>
+              <div className="mb-2 rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm">
+                <span className="text-xs text-neutral-500">Booked</span>
+                <span className="block">Morning Yoga · Sat 07:00</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-2">
+                  <span className="text-xs text-neutral-500">This month</span>
+                  <span className="block font-semibold">14 visits</span>
+                </div>
+                <div className="rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-2">
+                  <span className="text-xs text-neutral-500">Renew</span>
+                  <span className="block font-semibold">By transfer</span>
+                </div>
+              </div>
             </div>
           </div>
         )}

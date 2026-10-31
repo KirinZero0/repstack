@@ -71,3 +71,101 @@ export const RECENT_PAYMENTS = [
   { member: "Lala Kusuma", plan: "Monthly", amount: 250000, status: "PENDING", date: "15 Sep" },
   { member: "Sari Dewi", plan: "Annual", amount: 2500000, status: "PAID", date: "12 Sep" },
 ];
+
+export interface DemoClass {
+  id: string;
+  name: string;
+  coach: string;
+  when: string;
+  capacity: number;
+  booked: number;
+  price: number;
+}
+
+export const CLASSES: DemoClass[] = [
+  { id: "c1", name: "Morning Yoga", coach: "Dewi", when: "Sat 31 Oct · 07:00", capacity: 12, booked: 9, price: 0 },
+  { id: "c2", name: "HIIT Circuit", coach: "Arif", when: "Mon 2 Nov · 18:30", capacity: 16, booked: 16, price: 0 },
+  { id: "c3", name: "Boxing Basics", coach: "Yudi", when: "Wed 4 Nov · 19:00", capacity: 10, booked: 4, price: 50000 },
+];
+
+export const ROSTER: { name: string; status: "Came" | "No-show" | "Booked" }[] = [
+  { name: "Sari Dewi", status: "Came" },
+  { name: "Maya Lestari", status: "Came" },
+  { name: "Budi Santoso", status: "No-show" },
+  { name: "Dimas Pratama", status: "Came" },
+  { name: "Tari Wulandari (guest)", status: "Booked" },
+];
+
+export interface DemoGuest {
+  id: string;
+  name: string;
+  phone: string;
+  item: string;
+  amount: number;
+  hasProof: boolean;
+}
+
+export const GUEST_REQUESTS: DemoGuest[] = [
+  { id: "g1", name: "Kevin Hartono", phone: "0813 5555 0144", item: "Day pass (Daily)", amount: 35000, hasProof: true },
+  { id: "g2", name: "Tari Wulandari", phone: "0813 5555 0167", item: "Boxing Basics class", amount: 50000, hasProof: false },
+];
+
+export interface DemoFieldBooking {
+  start: number;
+  end: number;
+  name: string;
+  status: "Booked" | "Came" | "Blocked";
+}
+
+export const FIELDS: { id: string; name: string; sport: string; opens: number; closes: number; perHour: number; bookings: DemoFieldBooking[] }[] = [
+  {
+    id: "f1",
+    name: "Court 1",
+    sport: "Badminton",
+    opens: 8 * 60,
+    closes: 22 * 60,
+    perHour: 60000,
+    bookings: [
+      { start: 9 * 60, end: 11 * 60, name: "Budi Santoso", status: "Came" },
+      { start: 16 * 60, end: 18 * 60, name: "Dewi Lestari", status: "Booked" },
+      { start: 19 * 60, end: 21 * 60, name: "Team Garuda", status: "Booked" },
+    ],
+  },
+  {
+    id: "f2",
+    name: "Court 2",
+    sport: "Badminton",
+    opens: 8 * 60,
+    closes: 22 * 60,
+    perHour: 60000,
+    bookings: [
+      { start: 12 * 60, end: 14 * 60, name: "Net repair", status: "Blocked" },
+      { start: 18 * 60, end: 19 * 60 + 30, name: "Rizki Pratama", status: "Booked" },
+    ],
+  },
+  {
+    id: "f3",
+    name: "Futsal pitch",
+    sport: "Futsal · per person",
+    opens: 8 * 60,
+    closes: 23 * 60,
+    perHour: 25000,
+    bookings: [{ start: 20 * 60, end: 22 * 60, name: "Kantor FC (10 people)", status: "Booked" }],
+  },
+];
+
+export const IN_GYM_NOW = [
+  { name: "Sari Dewi", since: "07:42" },
+  { name: "Dimas Pratama", since: "08:05" },
+  { name: "Lina Marlina (day pass)", since: "08:20" },
+];
+
+export const STAFF = [
+  { name: "Ayu Pratiwi", email: "ayu@demogym.id", role: "Owner", can: "Everything, including finance, refunds, staff and settings" },
+  { name: "Rudi Hartono", email: "rudi@demogym.id", role: "Staff", can: "Members, check-ins, classes, guests, fields. No finance or billing" },
+  { name: "Nina Sari", email: "nina@demogym.id", role: "Staff", can: "Same as Rudi; each action is recorded under her name" },
+];
+
+export const REFUNDS = [
+  { date: "14 Oct", to: "Budi Santoso", forWhat: "Field booking · Cash", reason: "Rained out, court leaked", amount: 120000 },
+];
