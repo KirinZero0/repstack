@@ -27,6 +27,8 @@ export async function GET(req: NextRequest) {
   const dueGyms = await prisma.gym.findMany({
     where: {
       isLifetime: false,
+      // A test gym is never billed or suspended.
+      isTest: false,
       nextBillingDate: { lte: now },
       subscriptionStatus: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] },
     },
@@ -67,7 +69,7 @@ export async function GET(req: NextRequest) {
 
   // Grace period over: suspend, and remember why so the owner can still get in to pay.
   const pastDueGyms = await prisma.gym.findMany({
-    where: { subscriptionStatus: "PAST_DUE", isLifetime: false },
+    where: { subscriptionStatus: "PAST_DUE", isLifetime: false, isTest: false },
     include: { staff: { where: { role: "OWNER" } } },
   });
   const cutoff = new Date(now.getTime() - GRACE_PERIOD_MS);

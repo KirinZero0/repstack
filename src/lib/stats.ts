@@ -169,22 +169,27 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
   };
 }
 
+/**
+ * Liftmora's own money picture for the superadmin. Test gyms (Gym.isTest) are left out of every figure here, so
+ * trying things out never shows up as revenue, gyms or members.
+ */
 export async function getPlatformFinance(timezone = "Asia/Jakarta") {
   const months = lastMonthKeys(12, timezone);
   const since = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
+  const real = { gym: { isTest: false } };
 
   const [gyms, memberCount, paid, pendingAgg, setupAgg] = await Promise.all([
-    prisma.gym.findMany({ include: { saasPlan: true, _count: { select: { members: true } } } }),
-    prisma.member.count({ where: { status: "ACTIVE" } }),
+    prisma.gym.findMany({ where: { isTest: false }, include: { saasPlan: true, _count: { select: { members: true } } } }),
+    prisma.member.count({ where: { status: "ACTIVE", ...real } }),
     // Subscription money only: setup fees are one-time and reported on their own below.
-    prisma.platformPayment.findMany({ where: { kind: "SUBSCRIPTION", status: "PAID", paidAt: { gte: since } } }),
+    prisma.platformPayment.findMany({ where: { kind: "SUBSCRIPTION", status: "PAID", paidAt: { gte: since }, ...real } }),
     prisma.platformPayment.aggregate({
-      where: { status: "PENDING" },
+      where: { status: "PENDING", ...real },
       _sum: { amount: true },
       _count: true,
     }),
     prisma.platformPayment.aggregate({
-      where: { kind: "SETUP", status: "PAID" },
+      where: { kind: "SETUP", status: "PAID", ...real },
       _sum: { amount: true },
       _count: true,
     }),

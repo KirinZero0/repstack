@@ -84,6 +84,17 @@ async function emailMember(
 }
 
 /**
+ * A test gym (Gym.isTest) sends nothing on its own: an automatic message is logged as skipped and goes nowhere.
+ * Send buttons (manual) still work there, so the people trying it out can still reach themselves.
+ */
+async function skipForTestGym(gymId: string, type: NotificationType | SystemEmailType, memberId: string | null): Promise<NotifyResult> {
+  await prisma.notificationLog
+    .create({ data: { gymId, memberId, type, channel: "email", status: "SKIPPED" } })
+    .catch((err) => console.error("Test gym skip log failed", err));
+  return { email: "SKIPPED" };
+}
+
+/**
  * Tells a member something. By default (`auto`) that is an email, if the gym has email on. When someone
  * clicked a send button (`trigger: "manual"`) they pick the channel: `channel` sends on that one only, WhatsApp
  * (if the gym allows it) or email (even if the gym turned automatic email off); without `channel` a manual
@@ -94,10 +105,11 @@ export async function notifyMember(
   gymId: string,
   opts: { to: string; message: string; type: NotificationType; memberId: string; trigger?: Trigger; channel?: Channel },
 ): Promise<NotifyResult> {
-  const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, address: true, settings: true } });
+  const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, address: true, settings: true, isTest: true } });
   if (!gym) return {};
   const allowed = notificationChannels(gym.settings);
   const manual = opts.trigger === "manual";
+  if (gym.isTest && !manual) return skipForTestGym(gymId, opts.type, opts.memberId);
   const wantWhatsapp = manual && allowed.whatsapp && (opts.channel ? opts.channel === "whatsapp" : true);
   const wantEmail = opts.channel && manual ? opts.channel === "email" : allowed.email;
 
@@ -130,11 +142,12 @@ export async function notifyGuest(
   gymId: string,
   opts: { phone: string; email: string | null; name: string; message: string; type: NotificationType; channel?: Channel; trigger?: Trigger },
 ): Promise<NotifyResult> {
-  const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, address: true, settings: true } });
+  const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, address: true, settings: true, isTest: true } });
   if (!gym) return {};
   const allowed = notificationChannels(gym.settings);
   // Staff clicking approve, decline or resend is manual (the default here); an automatic "we got your request" is email only.
   const auto = opts.trigger === "auto";
+  if (gym.isTest && auto) return skipForTestGym(gymId, opts.type, null);
   const wantWhatsapp = !auto && Boolean(opts.phone) && (opts.channel ? opts.channel === "whatsapp" : allowed.whatsapp);
   const wantEmail = Boolean(opts.email) && (opts.channel ? opts.channel === "email" : allowed.email);
 
@@ -181,6 +194,10 @@ export async function notifyOwner(opts: {
       .catch((err) => console.error("System message log failed", err));
   };
   const manual = opts.trigger === "manual";
+  if (!manual) {
+    const gym = await prisma.gym.findUnique({ where: { id: opts.gymId }, select: { isTest: true } });
+    if (gym?.isTest) return skipForTestGym(opts.gymId, opts.type, null);
+  }
 
   const sends: Promise<unknown>[] = [];
   if (opts.to.phone && manual && (!opts.channel || opts.channel === "whatsapp")) {

@@ -11,7 +11,7 @@ import FieldsManager, { type BookingRow, type FieldRow } from "./FieldsManager";
 export const dynamic = "force-dynamic";
 
 /** Owner and staff: set up fields (owner), see a day's bookings on a timeline, and approve requests. */
-export default async function FieldsPage({ params, searchParams }: { params: { slug: string }; searchParams: { date?: string } }) {
+export default async function FieldsPage({ params, searchParams }: { params: { slug: string }; searchParams: { date?: string; tab?: string } }) {
   let session, gym, db;
   try {
     ({ session, gym, db } = await requireTenantSession(params.slug));
@@ -110,6 +110,7 @@ export default async function FieldsPage({ params, searchParams }: { params: { s
         <FieldsManager
           slug={params.slug}
           isOwner={session.role === "OWNER"}
+          tab={searchParams.tab === "fields" ? "fields" : "bookings"}
           date={date}
           today={today}
           fields={fieldRows}

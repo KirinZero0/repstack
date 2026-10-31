@@ -481,4 +481,4 @@ staff approve, but the thing being booked is a stretch of time on one field, so 
   that took any payment is cancelled, never deleted.
 - **Messages** say "for N people" on a per-person booking.
 - **Deploy**: `npm run db:migrate`, then `npm run db:rls` (the new table needs its policy).
-- Tests: `e2e/46-field-pax.spec.ts`.
+- Tests: `e2e/47-field-pax.spec.ts`.
