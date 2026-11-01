@@ -39,7 +39,9 @@ async function remind(request: APIRequestContext, baseURL: string, f: Awaited<Re
   const { memberId } = await added.json();
   const marker = new Date();
   const res = await request.post(`${baseURL}/api/${f.slug}/members/${memberId}/remind`, { data: channel ? { channel } : {} });
-  const logs = await prisma.notificationLog.findMany({ where: { gymId: f.gym.id, memberId, sentAt: { gte: marker } } });
+  // Only the reminder's own logs: the welcome sent when the member was added can carry a database timestamp a
+  // millisecond past `marker` (the database clock is not Node's), which made this flaky.
+  const logs = await prisma.notificationLog.findMany({ where: { gymId: f.gym.id, memberId, type: "manual_reminder", sentAt: { gte: marker } } });
   return { res, logs: logs.map((l) => `${l.channel}:${l.status}`).sort() };
 }
 

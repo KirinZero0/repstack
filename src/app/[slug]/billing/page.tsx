@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireTenantSession, SessionError } from "@/lib/session";
 import { countMemberSeats } from "@/lib/limits";
+import { monthStartInTimezone } from "@/lib/date";
 import { isMockMode } from "@/lib/xendit";
 import { onlinePaymentsEnabled } from "@/lib/gateway";
 import { getPlatformBank, manualPlatformBilling, transferReference } from "@/lib/platformBank";
@@ -41,7 +42,7 @@ export default async function BillingPage({
     );
   }
 
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const monthStart = monthStartInTimezone(gym.timezone);
   const [saasPlan, payments, plans, seats, activeStaff, waUsed] = await Promise.all([
     db.saasPlan.findUnique({ where: { id: gym.saasPlanId } }),
     db.platformPayment.findMany({

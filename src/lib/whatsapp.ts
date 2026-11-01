@@ -1,6 +1,7 @@
 import type { NotificationType } from "@/config/email";
 import { prisma } from "./prisma";
 import { decrypt } from "./crypto";
+import { monthStartInTimezone } from "./date";
 
 export type GatewayProvider = "fonnte" | "wablas";
 
@@ -75,11 +76,12 @@ function platformGateway(): { provider: GatewayProvider; apiKey: string } | null
   return { provider: (process.env.PLATFORM_WHATSAPP_PROVIDER ?? "fonnte") as GatewayProvider, apiKey };
 }
 
-/** Messages sent for a gym so far this calendar month (SENT only, so failures and blocked sends don't use up the quota). */
-export async function gymWhatsappUsage(gymId: string): Promise<number> {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  return prisma.notificationLog.count({ where: { gymId, channel: "whatsapp", status: "SENT", sentAt: { gte: monthStart } } });
+/**
+ * Messages sent for a gym so far this calendar month, on the gym's own calendar (SENT only, so failures and blocked
+ * sends don't use up the quota). The allowance resets at midnight on the 1st where the gym is, not on the server's clock.
+ */
+export async function gymWhatsappUsage(gymId: string, timezone: string): Promise<number> {
+  return prisma.notificationLog.count({ where: { gymId, channel: "whatsapp", status: "SENT", sentAt: { gte: monthStartInTimezone(timezone) } } });
 }
 
 /**
@@ -108,7 +110,7 @@ export async function sendGymWhatsapp(
   gymId: string,
   opts: { to: string; message: string; type: NotificationType; memberId?: string },
 ): Promise<SendResult> {
-  const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, saasPlan: { select: { maxWhatsappPerMonth: true } } } });
+  const gym = await prisma.gym.findUnique({ where: { id: gymId }, select: { name: true, timezone: true, saasPlan: { select: { maxWhatsappPerMonth: true } } } });
   const own = gym ? await gymGateway(gymId) : null;
 
   let result: SendResult;
@@ -127,7 +129,7 @@ export async function sendGymWhatsapp(
     if (!gateway) {
       result = skippedSend(opts.to, opts.message);
       status = "SKIPPED";
-    } else if ((await gymWhatsappUsage(gymId)) >= gym.saasPlan.maxWhatsappPerMonth) {
+    } else if ((await gymWhatsappUsage(gymId, gym.timezone)) >= gym.saasPlan.maxWhatsappPerMonth) {
       console.log(`[whatsapp:limit] gym ${gymId} reached its monthly allowance, not sending to ${opts.to}`);
       result = { ok: false, skipped: true, error: "Monthly WhatsApp limit reached", providerResponse: { limit: true } };
       status = "LIMIT";

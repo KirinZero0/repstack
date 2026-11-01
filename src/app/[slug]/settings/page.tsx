@@ -8,6 +8,7 @@ import { checkinRules } from "@/lib/checkin";
 import GymPhotosManager from "@/components/GymPhotosManager";
 import { gymAcceptsSignups } from "@/lib/memberSignup";
 import { notificationChannels } from "@/lib/notify";
+import { monthStartInTimezone } from "@/lib/date";
 import { emailConfigured } from "@/lib/email";
 import { gymPaymentsEnabled, onlinePaymentsEnabled } from "@/lib/gateway";
 import { MAX_GYM_PHOTOS } from "@/lib/validation/tenant";
@@ -37,7 +38,7 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
   }
 
   const channels = notificationChannels(gym.settings);
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const monthStart = monthStartInTimezone(gym.timezone);
   const [plan, waConfig, used, recent, ownTemplates, platformTemplates] = await Promise.all([
     db.saasPlan.findUnique({ where: { id: gym.saasPlanId } }),
     db.whatsappSenderConfig.findUnique({ where: { gymId: gym.id }, select: { senderNumber: true, isActive: true } }),

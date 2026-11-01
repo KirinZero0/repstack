@@ -1,6 +1,16 @@
 import { test, expect } from "@playwright/test";
 import { prisma } from "./helpers";
 import { sendGymWhatsapp } from "../src/lib/whatsapp";
+import { monthStartInTimezone } from "../src/lib/date";
+
+test("the monthly WhatsApp allowance resets at midnight on the 1st where the gym is, not on the server's clock", () => {
+  // 00:30 on 1 Nov in Jakarta (UTC+7) is still 31 Oct in UTC: the month is November, starting at Jakarta midnight.
+  expect(monthStartInTimezone("Asia/Jakarta", new Date("2026-10-31T17:30:00Z")).toISOString()).toBe("2026-10-31T17:00:00.000Z");
+  // Bali (UTC+8), mid-month.
+  expect(monthStartInTimezone("Asia/Makassar", new Date("2026-11-15T03:00:00Z")).toISOString()).toBe("2026-10-31T16:00:00.000Z");
+  // 23:30 on 31 Oct in Bali is still October there.
+  expect(monthStartInTimezone("Asia/Makassar", new Date("2026-10-31T15:30:00Z")).toISOString()).toBe("2026-09-30T16:00:00.000Z");
+});
 
 /** A gym that hasn't connected its own Fonnte token sends from the platform account, capped per plan (own-token sending is covered in 25-gym-whatsapp). */
 test("gym messages send from the platform account and are logged SENT", async () => {

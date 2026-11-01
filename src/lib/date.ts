@@ -30,6 +30,11 @@ export function zonedTimeToUtc(local: string, timezone: string): Date {
   return new Date(guess);
 }
 
+/** Midnight on the 1st of the current month in `timezone`: where "this month" starts for a gym, not for the server's clock. */
+export function monthStartInTimezone(timezone: string, now = new Date()): Date {
+  return zonedTimeToUtc(`${dayKeyInTimezone(now, timezone).slice(0, 7)}-01T00:00`, timezone);
+}
+
 /** Returns a YYYY-MM-DD key for `date` as observed in `timezone` — used for "same calendar day" checks. */
 export function dayKeyInTimezone(date: Date, timezone: string): string {
   return new Intl.DateTimeFormat("en-CA", {
