@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { getMemberAttendance } from "@/lib/stats";
@@ -35,11 +36,8 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
     include: { plan: true, gym: true },
   });
   if (!member || member.gymId !== session.gymId || member.anonymizedAt) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 text-white">
-        <p className="text-red-400">Account not found.</p>
-      </main>
-    );
+    // A deleted or erased account: drop the stale cookie and go back to the login.
+    redirect("/api/my/signout");
   }
 
   const showWhoIsIn = whoIsInEnabled(member.gym.settings);

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { tenantDb } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { rp } from "@/components/charts";
@@ -25,11 +26,8 @@ export default async function MyClassesPage() {
   const db = tenantDb(session.gymId);
   const member = await db.member.findUnique({ where: { id: session.memberId }, include: { gym: true } });
   if (!member || member.gymId !== session.gymId || member.anonymizedAt) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 text-white">
-        <p className="text-red-400">Account not found.</p>
-      </main>
-    );
+    // A deleted or erased account: drop the stale cookie and go back to the login.
+    redirect("/api/my/signout");
   }
 
   const now = new Date();
