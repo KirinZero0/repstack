@@ -1,9 +1,9 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import bcrypt from "bcryptjs";
-import { prisma, staffLoginUI } from "./helpers";
+import { prisma, readExportSheet, staffLoginUI } from "./helpers";
 import { decrypt, encrypt, hmacLookup } from "../src/lib/crypto";
 import { parseCsv, toCsv, excelText, detectDelimiter } from "../src/lib/csv";
-import { parseSheetDate, parseMemberSheet } from "../src/lib/memberImport";
+import { parseSheetDate, parseMemberSheet, parseMemberTable } from "../src/lib/memberImport";
 
 const DAY = 24 * 60 * 60 * 1000;
 let seq = 0;
@@ -77,9 +77,24 @@ test("the CSV helpers read what Excel writes: BOM, semicolons, quotes, Indonesia
   expect(sheet.rows[1].error).toBe("Name is too short");
   expect(sheet.rows[2].error).toBe("Same email as line 2");
   expect(parseMemberSheet("Name,Something\nA,B").missingColumns).toEqual(["Email", "Phone"]);
+
+  // A sheet with a title above the header (as an export has) and a Total line under it: both skipped,
+  // and line numbers stay the rows the spreadsheet shows, blank rows included.
+  const titled = parseMemberTable([
+    ["Gym X: members"],
+    ["2 members"],
+    [],
+    ["Name", "Email", "Phone"],
+    ["Sari", "sari@x.id", "0812345678"],
+    [],
+    ["Budi", "budi@x.id", "0812345679"],
+    ["Total: 2 members", "", ""],
+  ]);
+  expect(titled.missingColumns).toEqual([]);
+  expect(titled.rows.map((r) => [r.line, r.fullName, r.error])).toEqual([[5, "Sari", undefined], [7, "Budi", undefined]]);
 });
 
-test("owner exports the member list as CSV; staff and other gyms can't", async ({ request, baseURL, playwright }) => {
+test("owner exports the member list as Excel, with a total, and it imports back as a no-op; staff and other gyms can't", async ({ request, baseURL, playwright }) => {
   const f = await makeGym();
   const phone = "081200007777";
   const member = await prisma.member.create({
@@ -112,16 +127,28 @@ test("owner exports the member list as CSV; staff and other gyms can't", async (
   await login(request, baseURL!, f.slug, f.owner);
   const res = await request.get(`${baseURL}/api/${f.slug}/members/export`);
   expect(res.status()).toBe(200);
-  expect(res.headers()["content-type"]).toContain("text/csv");
-  expect(res.headers()["content-disposition"]).toContain(`members-${f.slug}-`);
+  expect(res.headers()["content-type"]).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  expect(res.headers()["content-disposition"]).toMatch(new RegExp(`members-${f.slug}-\\d{4}-\\d{2}-\\d{2}\\.xlsx`));
 
-  const text = await res.text();
-  expect(text.startsWith("﻿")).toBeTruthy();
-  const rows = parseCsv(text);
-  expect(rows[0]).toEqual(["Name", "Email", "Phone", "Plan", "Status", "Paid until", "Activated", "Joined"]);
-  expect(rows).toHaveLength(2);
-  expect(rows[1]).toEqual(['Sari "Dewi", Jr', member.email, `="${phone}"`, "Monthly", "ACTIVE", "2027-03-15", "Yes", expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)]);
-  expect(text).not.toContain("Erased");
+  const file = await res.body();
+  const sheet = await readExportSheet(file);
+  expect(sheet.title).toBe(`${f.gym.name}: members`);
+  expect(sheet.info[0]).toBe("1 member (1 active)");
+  expect(sheet.rows[0]).toEqual(["Name", "Email", "Phone", "Plan", "Status", "Paid until", "Activated", "Joined"]);
+  expect(sheet.rows).toHaveLength(2);
+  // The phone is a text cell, so its leading 0 survives without any ="…" trick.
+  expect(sheet.rows[1]).toEqual(['Sari "Dewi", Jr', member.email, phone, "Monthly", "ACTIVE", "2027-03-15", "Yes", expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)]);
+  expect(sheet.totals).toEqual([["Total: 1 member", "", "", "", "1 active", "", "1 of 1", ""]]);
+  expect(JSON.stringify(sheet)).not.toContain("Erased");
+
+  // Fed straight back into the import, the export is recognised (title and total skipped) and changes nothing.
+  const back = await request.post(`${baseURL}/api/${f.slug}/members/import`, {
+    multipart: { file: { name: "members.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: file }, planId: f.monthly.id, dryRun: "1", notify: "0" },
+  });
+  expect(back.status(), await back.text()).toBe(200);
+  const b = await back.json();
+  expect(b.summary).toMatchObject({ total: 1, ok: 0, skipped: 1, errors: 0 });
+  expect(b.rows[0]).toMatchObject({ line: 6, email: member.email, phone, expiry: "2027-03-15", outcome: "skipped" });
 
   // Staff see members on screen, but the whole list as a file is the owner's call.
   const staffCtx = await playwright.request.newContext();
@@ -276,16 +303,16 @@ test("the members page shows Export and Import to the owner only, and the import
   await staffPage.waitForURL(`${baseURL}/${f.slug}/dashboard`);
   await staffPage.goto(`${baseURL}/${f.slug}/members`);
   await expect(staffPage.getByRole("button", { name: "+ Add member" })).toBeVisible();
-  await expect(staffPage.getByRole("button", { name: "Export CSV" })).toHaveCount(0);
-  await expect(staffPage.getByRole("button", { name: "Import CSV" })).toHaveCount(0);
+  await expect(staffPage.getByRole("button", { name: "Export to Excel" })).toHaveCount(0);
+  await expect(staffPage.getByRole("button", { name: "Import members" })).toHaveCount(0);
   await staffPage.context().close();
 
   await staffLoginUI(page, baseURL!, f.slug, f.owner.email, f.owner.password);
   await page.waitForURL(`${baseURL}/${f.slug}/dashboard`);
   await page.goto(`${baseURL}/${f.slug}/members`);
-  const [exported] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export CSV" }).click()]);
-  expect(exported.suggestedFilename()).toMatch(new RegExp(`^members-${f.slug}-.*\.csv$`));
-  await page.getByRole("button", { name: "Import CSV" }).click();
+  const [exported] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Export to Excel" }).click()]);
+  expect(exported.suggestedFilename()).toMatch(new RegExp(`^members-${f.slug}-.*\.xlsx$`));
+  await page.getByRole("button", { name: "Import members" }).click();
   await expect(page.getByRole("link", { name: "Download a template" })).toBeVisible();
 
   const email = `${uniq("ui")}@test.local`;

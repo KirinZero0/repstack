@@ -1,9 +1,19 @@
 import { z } from "zod";
 import { parseCsv, unwrapExcelText } from "./csv";
 import { normalizePhone } from "./crypto";
+import type { SheetColumn } from "./xlsx";
 
-/** The columns a member CSV can carry. Export writes them in this order; import accepts them in any order. */
-export const MEMBER_CSV_COLUMNS = ["Name", "Email", "Phone", "Plan", "Status", "Paid until", "Activated", "Joined"] as const;
+/** The columns a member sheet can carry. Export writes them in this order; import accepts them in any order. */
+export const MEMBER_COLUMNS: SheetColumn[] = [
+  { header: "Name" },
+  { header: "Email" },
+  { header: "Phone" },
+  { header: "Plan" },
+  { header: "Status" },
+  { header: "Paid until", kind: "date" },
+  { header: "Activated" },
+  { header: "Joined", kind: "date" },
+];
 
 /** Columns import reads. Status, Activated and Joined are export-only: they describe the account, not the person. */
 type Field = "fullName" | "email" | "phone" | "plan" | "expiry";
@@ -96,12 +106,35 @@ export interface ParsedSheet {
 
 export const MAX_IMPORT_ROWS = 1000;
 
+/** How far down to look for the header row: an export (or a hand-kept sheet) may have a title above it. */
+const HEADER_SEARCH_ROWS = 10;
+
 /** Reads a member CSV into validated rows. Problems are attached per row, never thrown: the person sees them all at once. */
 export function parseMemberSheet(text: string): ParsedSheet {
-  const table = parseCsv(text);
-  if (table.length === 0) return { rows: [], unknownColumns: [], missingColumns: ["Name", "Email", "Phone"] };
+  return parseMemberTable(parseCsv(text));
+}
 
-  const { columns, unknown } = mapHeaders(table[0]);
+/**
+ * Same, from rows already read (a CSV, or the first sheet of an .xlsx). The header is the first row
+ * that names the required columns, so title lines above it are skipped; a "Total…" line at the bottom
+ * (as in a Liftmora export) is not a member and is dropped.
+ */
+export function parseMemberTable(input: string[][]): ParsedSheet {
+  if (input.length === 0) return { rows: [], unknownColumns: [], missingColumns: ["Name", "Email", "Phone"] };
+
+  const required: Field[] = ["fullName", "email", "phone"];
+  const found = input.slice(0, HEADER_SEARCH_ROWS).findIndex((r) => {
+    const { columns } = mapHeaders(r);
+    return required.every((f) => columns[f] !== undefined);
+  });
+  const headerAt = found === -1 ? 0 : found;
+  // Line numbers are rows as the spreadsheet shows them (1-based), so blank rows in between still count.
+  const body = input
+    .map((r, i) => ({ r, line: i + 1 }))
+    .slice(headerAt + 1)
+    .filter(({ r }) => r.some((c) => c.trim() !== "") && !/^total\b/i.test((r[0] ?? "").trim()));
+
+  const { columns, unknown } = mapHeaders(input[headerAt]);
   const missing = (["fullName", "email", "phone"] as Field[]).filter((f) => columns[f] === undefined);
   if (missing.length > 0) {
     const label: Record<Field, string> = { fullName: "Name", email: "Email", phone: "Phone", plan: "Plan", expiry: "Paid until" };
@@ -110,8 +143,7 @@ export function parseMemberSheet(text: string): ParsedSheet {
 
   const cell = (r: string[], f: Field) => (columns[f] === undefined ? "" : (r[columns[f]!] ?? ""));
   const seenEmails = new Map<string, number>();
-  const rows: ParsedRow[] = table.slice(1, MAX_IMPORT_ROWS + 1).map((r, i) => {
-    const line = i + 2;
+  const rows: ParsedRow[] = body.slice(0, MAX_IMPORT_ROWS).map(({ r, line }) => {
     const parsed = rowSchema.safeParse({
       fullName: cell(r, "fullName"),
       email: cell(r, "email"),

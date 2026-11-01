@@ -15,7 +15,7 @@ const inputCls = "rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 
 
 /**
  * Two downloads for the bookkeeper: every payment in a date range, or one line per month. Each button
- * fetches the export route and saves the file under its proper .csv name.
+ * fetches the export route and saves the file under its proper .xlsx name.
  */
 export default function FinanceExportCard({ slug, monthStart, today, yearStart }: Props) {
   const [from, setFrom] = useState(monthStart);
@@ -30,7 +30,7 @@ export default function FinanceExportCard({ slug, monthStart, today, yearStart }
   return (
     <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-5">
       <h2 className="mb-1 text-sm font-medium text-neutral-300">Export for your bookkeeper</h2>
-      <p className="mb-4 text-xs text-neutral-500">CSV files that open in Excel or Google Sheets. Dates follow your gym&apos;s timezone.</p>
+      <p className="mb-4 text-xs text-neutral-500">Excel files with totals at the bottom; they open in Excel or Google Sheets too. Dates follow your gym&apos;s timezone.</p>
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="block text-xs text-neutral-400">
@@ -50,7 +50,7 @@ export default function FinanceExportCard({ slug, monthStart, today, yearStart }
         </label>
         <DownloadButton
           href={transactionsHref}
-          fallbackName={`finance-transactions-${slug}-${from}-to-${to}.csv`}
+          fallbackName={`finance-transactions-${slug}-${from}-to-${to}.xlsx`}
           disabled={!valid}
           className="rounded-md bg-white px-4 py-2 text-sm font-medium text-neutral-950 hover:bg-neutral-200"
         >
@@ -61,7 +61,7 @@ export default function FinanceExportCard({ slug, monthStart, today, yearStart }
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-neutral-800 pt-4">
         <DownloadButton
           href={monthlyHref}
-          fallbackName={`finance-monthly-${slug}-${yearStart}-to-${today}.csv`}
+          fallbackName={`finance-monthly-${slug}-${yearStart}-to-${today}.xlsx`}
           className="rounded-md border border-neutral-600 px-4 py-2 text-sm text-white hover:bg-neutral-800"
         >
           Download monthly summary

@@ -296,7 +296,7 @@ const STEPS: TourStep[] = [
   },
   {
     title: "Know where the money is",
-    body: "Revenue by month, by plan or class and by how people paid, invoices still unpaid, refunds you gave back, and a CSV export for your accountant. Only the owner sees this page.",
+    body: "Revenue by month, by plan or class and by how people paid, invoices still unpaid, refunds you gave back, and an Excel export with totals for your accountant. Only the owner sees this page.",
     target: "finance",
     tab: "finance",
   },
@@ -650,8 +650,8 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
               >
                 + Add member
               </button>
-              <button className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800">Export CSV</button>
-              <button className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800">Import CSV</button>
+              <button className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800">Export to Excel</button>
+              <button className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800">Import members</button>
             </div>
 
             {requests.length > 0 && (
@@ -1072,7 +1072,7 @@ export default function DemoApp({ contactUrl }: { contactUrl: string }) {
                 <div className="flex flex-wrap items-center gap-3">
                   <button className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-neutral-950 hover:bg-neutral-200">Download transactions</button>
                   <button className="rounded-lg border border-neutral-700 px-4 py-2 text-sm hover:bg-neutral-800">Download monthly summary</button>
-                  <span className="text-xs text-neutral-500">CSV files for Excel or Google Sheets: every payment and refund, or one row per month.</span>
+                  <span className="text-xs text-neutral-500">Excel files with totals: every payment and refund, or one row per month.</span>
                 </div>
               </Card>
             </div>

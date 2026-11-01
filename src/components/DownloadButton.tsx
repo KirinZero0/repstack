@@ -6,7 +6,7 @@ import { useState } from "react";
  * Downloads a file from `href` under a name we pick. A plain `<a download>` lets the browser name the
  * file, and it falls back to the last URL segment ("export", no extension) whenever it distrusts the
  * response headers, e.g. on a self-signed or plain-http origin. Fetching the bytes ourselves and saving
- * them from a blob URL keeps the name and the .csv extension no matter what.
+ * them from a blob URL keeps the name and the extension no matter what.
  */
 export default function DownloadButton({
   href,
@@ -35,7 +35,7 @@ export default function DownloadButton({
         return;
       }
       const name = /filename="?([^";]+)"?/i.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? fallbackName;
-      const blob = new Blob([await res.blob()], { type: "text/csv;charset=utf-8" });
+      const blob = new Blob([await res.blob()], { type: res.headers.get("Content-Type") ?? "application/octet-stream" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

@@ -2,7 +2,7 @@ import type { PaymentProvider, PaymentStatus } from "@prisma/client";
 import type { TenantDb } from "./prisma";
 import { dayKeyInTimezone, zonedTimeToUtc } from "./date";
 import { monthKey, monthLabel } from "./stats";
-import type { CsvCell } from "./csv";
+import type { SheetCell, SheetColumn } from "./xlsx";
 import { REFUND_CATEGORY_LABEL, REFUND_METHOD_LABEL } from "./refunds";
 
 export interface DateRange {
@@ -37,20 +37,23 @@ function statusLabel(status: PaymentStatus, provider: PaymentProvider): string {
   return status === "FAILED" && provider === "CASH" ? "VOIDED" : status;
 }
 
-export const TRANSACTION_COLUMNS = [
-  "Date",
-  "Type",
-  "Member",
-  "Item",
-  "Amount",
-  "Currency",
-  "Status",
-  "Method",
-  "Recorded by",
-  "Note",
-  "Invoice ID",
-  "Payment ID",
-] as const;
+export const TRANSACTION_COLUMNS: SheetColumn[] = [
+  { header: "Date", kind: "date" },
+  { header: "Type" },
+  { header: "Member" },
+  { header: "Item" },
+  { header: "Amount", kind: "money" },
+  { header: "Currency" },
+  { header: "Status" },
+  { header: "Method" },
+  { header: "Recorded by" },
+  { header: "Note" },
+  { header: "Invoice ID" },
+  { header: "Payment ID" },
+];
+
+/** Column positions the totals refer to. */
+export const TX = { type: 1, amount: 4, status: 6 } as const;
 
 interface Txn {
   when: Date;
@@ -188,28 +191,38 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
   return rows.sort((a, b) => a.when.getTime() - b.when.getTime());
 }
 
-export async function transactionsReport(db: TenantDb, gymId: string, range: DateRange, timezone: string, onlyPaid: boolean): Promise<CsvCell[][]> {
+/** One row per payment or refund, oldest first, in TRANSACTION_COLUMNS order. */
+export async function transactionsReport(db: TenantDb, gymId: string, range: DateRange, timezone: string, onlyPaid: boolean): Promise<SheetCell[][]> {
   const rows = await loadTransactions(db, gymId, range, timezone, onlyPaid);
-  return [
-    [...TRANSACTION_COLUMNS],
-    ...rows.map((r) => [
-      dayKeyInTimezone(r.when, timezone),
-      r.type,
-      r.member,
-      r.item,
-      String(r.amount),
-      r.currency,
-      r.status,
-      r.method,
-      r.recordedBy,
-      r.note,
-      r.invoiceId,
-      r.id,
-    ]),
-  ];
+  return rows.map((r) => [
+    dayKeyInTimezone(r.when, timezone),
+    r.type,
+    r.member,
+    r.item,
+    r.amount,
+    r.currency,
+    r.status,
+    r.method,
+    r.recordedBy,
+    r.note,
+    r.invoiceId,
+    r.id,
+  ]);
 }
 
-export const MONTHLY_COLUMNS = ["Month", "Membership revenue", "Class revenue", "Day pass revenue", "Field revenue", "Refunds", "Total revenue", "Paid payments", "Cash / transfer", "Online", "Voided"] as const;
+export const MONTHLY_COLUMNS: SheetColumn[] = [
+  { header: "Month" },
+  { header: "Membership revenue", kind: "money" },
+  { header: "Class revenue", kind: "money" },
+  { header: "Day pass revenue", kind: "money" },
+  { header: "Field revenue", kind: "money" },
+  { header: "Refunds", kind: "money" },
+  { header: "Total revenue", kind: "money" },
+  { header: "Paid payments", kind: "count" },
+  { header: "Cash / transfer", kind: "money" },
+  { header: "Online", kind: "money" },
+  { header: "Voided", kind: "count" },
+];
 
 /** Month keys (YYYY-MM) from the month of `from` to the month of `to`, inclusive. */
 function monthsIn(range: DateRange): string[] {
@@ -231,7 +244,7 @@ function monthsIn(range: DateRange): string[] {
  * One row per month: what came in, split by membership vs class and by how it was paid. Paid money only, plus a count
  * of voided entries. Refunds the owner recorded are their own (negative) column, and Total revenue is net of them.
  */
-export async function monthlyReport(db: TenantDb, gymId: string, range: DateRange, timezone: string): Promise<CsvCell[][]> {
+export async function monthlyReport(db: TenantDb, gymId: string, range: DateRange, timezone: string): Promise<SheetCell[][]> {
   const rows = await loadTransactions(db, gymId, range, timezone, false);
   type Bucket = { membership: number; classes: number; dayPasses: number; fields: number; refunds: number; count: number; cash: number; online: number; voided: number };
   const buckets = new Map<string, Bucket>(monthsIn(range).map((k) => [k, { membership: 0, classes: 0, dayPasses: 0, fields: 0, refunds: 0, count: 0, cash: 0, online: 0, voided: 0 }]));
@@ -255,20 +268,17 @@ export async function monthlyReport(db: TenantDb, gymId: string, range: DateRang
     if (r.method === METHOD.CASH) b.cash += r.amount;
     else b.online += r.amount;
   }
-  return [
-    [...MONTHLY_COLUMNS],
-    ...Array.from(buckets.entries()).map(([key, b]) => [
-      `${monthLabel(key)} ${key.slice(0, 4)}`,
-      String(b.membership),
-      String(b.classes),
-      String(b.dayPasses),
-      String(b.fields),
-      String(b.refunds),
-      String(b.membership + b.classes + b.dayPasses + b.fields + b.refunds),
-      String(b.count),
-      String(b.cash),
-      String(b.online),
-      String(b.voided),
-    ]),
-  ];
+  return Array.from(buckets.entries()).map(([key, b]) => [
+    `${monthLabel(key)} ${key.slice(0, 4)}`,
+    b.membership,
+    b.classes,
+    b.dayPasses,
+    b.fields,
+    b.refunds,
+    b.membership + b.classes + b.dayPasses + b.fields + b.refunds,
+    b.count,
+    b.cash,
+    b.online,
+    b.voided,
+  ]);
 }

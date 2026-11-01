@@ -39,3 +39,21 @@ export async function buildTokenForMember(memberId: string) {
   const member = await prisma.member.findUniqueOrThrow({ where: { id: memberId } });
   return buildQrToken({ gymId: member.gymId, memberId: member.id, issuedAt: Date.now() }, member.qrSecret);
 }
+
+/**
+ * Splits an exported .xlsx into its parts: the grey lines above the table, the table itself (header
+ * first, every cell as text: numbers plain, dates YYYY-MM-DD) and the totals block under it.
+ */
+export async function readExportSheet(body: Buffer) {
+  const { readXlsxRows } = await import("../src/lib/xlsx");
+  const all = await readXlsxRows(body);
+  const blank = (r: string[]) => r.every((c) => c === "");
+  const firstBlank = all.findIndex(blank);
+  const info = all.slice(1, firstBlank).map((r) => r[0]);
+  const headerAt = firstBlank + 1;
+  let end = all.findIndex((r, i) => i > headerAt && blank(r));
+  if (end === -1) end = all.length;
+  const rows = all.slice(headerAt, end);
+  const totals = all.slice(end).filter((r) => !blank(r));
+  return { title: all[0]?.[0] ?? "", info, rows, totals };
+}

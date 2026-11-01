@@ -39,7 +39,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       },
       {
         title: "Search and export",
-        body: "Find anyone by name or phone number. Download the roster as CSV whenever you like. Your members are your data.",
+        body: "Find anyone by name or phone number. Download the roster as an Excel file whenever you like. Your members are your data.",
       },
     ],
   },
@@ -135,7 +135,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       },
       {
         title: "Export for the accountant",
-        body: "Every payment in a date range, or one line per month, as a CSV that opens cleanly in Excel. Paid only, or everything including voided and unpaid.",
+        body: "Every payment in a date range, or one line per month, as a tidy Excel file with totals. Paid only, or everything including voided and unpaid.",
       },
       {
         title: "Owner-only",
@@ -219,7 +219,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       },
       {
         title: "Your data is yours",
-        body: "Export members and finances as CSV at any time. Erase a member on request. If you stop paying, your account is suspended, not deleted.",
+        body: "Export members and finances to Excel at any time. Erase a member on request. If you stop paying, your account is suspended, not deleted.",
       },
     ],
   },

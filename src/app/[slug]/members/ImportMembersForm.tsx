@@ -89,7 +89,7 @@ export default function ImportMembersForm({ slug, plans }: { slug: string; plans
         onClick={() => setOpen(true)}
         className="rounded-md border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
       >
-        Import CSV
+        Import members
       </button>
     );
   }
@@ -102,9 +102,9 @@ export default function ImportMembersForm({ slug, plans }: { slug: string; plans
         <div>
           <h2 className="text-lg font-semibold text-white">Import members from a spreadsheet</h2>
           <p className="mt-1 text-sm text-neutral-400">
-            A CSV with columns <span className="text-neutral-200">Name, Email, Phone</span> and optionally{" "}
-            <span className="text-neutral-200">Plan</span> and <span className="text-neutral-200">Paid until</span>. In Excel or Google Sheets, use
-            &ldquo;Save as&rdquo; or &ldquo;Download&rdquo; and pick CSV.{" "}
+            An Excel (.xlsx) or CSV file with columns <span className="text-neutral-200">Name, Email, Phone</span> and optionally{" "}
+            <span className="text-neutral-200">Plan</span> and <span className="text-neutral-200">Paid until</span>. A Liftmora member export
+            works as it is. From Google Sheets, use &ldquo;Download&rdquo; and pick .xlsx or CSV.{" "}
             <a href={templateHref} download="liftmora-members-template.csv" className="underline underline-offset-2 hover:text-white">
               Download a template
             </a>
@@ -126,10 +126,10 @@ export default function ImportMembersForm({ slug, plans }: { slug: string; plans
       {!committed && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className="block text-sm text-neutral-300">
-            <span className="mb-1 block">CSV file</span>
+            <span className="mb-1 block">Excel or CSV file</span>
             <input
               type="file"
-              accept=".csv,text/csv,text/plain"
+              accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain"
               onChange={(e) => {
                 setFile(e.target.files?.[0] ?? null);
                 setResult(null);

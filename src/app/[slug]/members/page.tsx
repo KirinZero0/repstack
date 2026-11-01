@@ -100,10 +100,10 @@ export default async function MembersPage({ params }: { params: { slug: string }
             <>
               <DownloadButton
                 href={`/api/${params.slug}/members/export`}
-                fallbackName={`members-${params.slug}.csv`}
+                fallbackName={`members-${params.slug}.xlsx`}
                 className="rounded-md border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800"
               >
-                Export CSV
+                Export to Excel
               </DownloadButton>
               <div className="basis-full">
                 <ImportMembersForm slug={params.slug} plans={plans.map((p) => ({ id: p.id, name: p.name }))} />

@@ -1,12 +1,20 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import bcrypt from "bcryptjs";
-import { prisma } from "./helpers";
+import { prisma, readExportSheet } from "./helpers";
 import { encrypt } from "../src/lib/crypto";
 import { ticketTokenFor } from "../src/lib/guestPass";
 import { dayKeyInTimezone } from "../src/lib/date";
+import { readXlsxRows } from "../src/lib/xlsx";
 import { bookingInstants, bookingPrice, busyRanges, clock, freeRanges, parseClock, timeProblem } from "../src/lib/fieldBooking";
 
 /** A properly encrypted number, for rows made straight in the database (the staff page decrypts them). */
+
+/** A finance export (an .xlsx) as plain text: one line per row, cells joined by commas. */
+async function exportText(request: APIRequestContext, url: string): Promise<string> {
+  const res = await request.get(url);
+  expect(res.status()).toBe(200);
+  return (await readXlsxRows(await res.body())).map((r) => r.join(",")).join("\n");
+}
 const PHONE_ENC = encrypt("081200000000");
 const TZ = "Asia/Jakarta";
 const HOUR = 60 * 60 * 1000;
@@ -306,8 +314,8 @@ test("cancelling frees the time and kills the ticket; a paid cancel is the owner
   expect(await (await request.get(`${baseURL}/ticket/${ticket}`)).text()).toContain("isn&#x27;t valid");
   expect((await book(v, baseURL!, f.slug, field.id, "16:00", "17:00")).status()).toBe(201);
   expect((await act(request, baseURL!, f.slug, b.id, "cancel")).status()).toBe(409);
-  const csv = await (await request.get(`${baseURL}/api/${f.slug}/finance/export?report=transactions`)).text();
-  expect(csv).not.toContain("Court 1");
+  const sheet = await exportText(request, `${baseURL}/api/${f.slug}/finance/export?report=transactions`);
+  expect(sheet).not.toContain("Court 1");
 });
 
 test("the ticket scan only marks it attended: in the window, once, in the right gym", async ({ request, baseURL, playwright }) => {
@@ -396,12 +404,12 @@ test("requests and approvals send messages: email on request, ticket by WhatsApp
   await expect.poll(async () => (await logs()).filter((l) => l.startsWith("field_booking_rejected")).length).toBeGreaterThan(0);
 });
 
-test("a booking counts as revenue once approved, in Finance and the CSV; blocks and unapproved ones don't", async ({ request, baseURL, playwright }) => {
+test("a booking counts as revenue once approved, in Finance and the export; blocks and unapproved ones don't", async ({ request, baseURL, playwright }) => {
   const f = await makeGym();
   const field = await makeField(f);
   await login(request, baseURL!, f.slug, f.owner);
   const v = await visitor(playwright);
-  const csv = async () => (await request.get(`${baseURL}/api/${f.slug}/finance/export?report=transactions`)).text();
+  const csv = () => exportText(request, `${baseURL}/api/${f.slug}/finance/export?report=transactions`);
 
   expect((await book(v, baseURL!, f.slug, field.id, "10:00", "12:00")).status()).toBe(201); // Rp 120.000
   const b = await latest(field.id);
@@ -418,8 +426,8 @@ test("a booking counts as revenue once approved, in Finance and the CSV; blocks 
   await request.post(`${baseURL}/api/${f.slug}/field-bookings/manual`, { data: { fieldId: field.id, date: DAY, start: "14:00", end: "16:00", isBlock: true } });
   const after = await csv();
   expect(after.split("\n").filter((l) => l.includes("Court 1"))).toHaveLength(1);
-  const monthly = await (await request.get(`${baseURL}/api/${f.slug}/finance/export?report=monthly`)).text();
-  expect(monthly).toContain("Field revenue");
+  const monthly = await readExportSheet(await (await request.get(`${baseURL}/api/${f.slug}/finance/export?report=monthly`)).body());
+  expect(monthly.rows[0]).toContain("Field revenue");
 });
 
 test("the public page shows free times and takes a request; staff approve it from the Fields page", async ({ page, baseURL, playwright }) => {

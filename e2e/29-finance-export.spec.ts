@@ -1,8 +1,7 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import bcrypt from "bcryptjs";
-import { prisma, staffLoginUI } from "./helpers";
+import { prisma, readExportSheet, staffLoginUI } from "./helpers";
 import { encrypt, hmacLookup } from "../src/lib/crypto";
-import { parseCsv } from "../src/lib/csv";
 import { dayKeyInTimezone } from "../src/lib/date";
 import { defaultMonthlyRange, defaultTransactionsRange, rangeBounds } from "../src/lib/financeExport";
 
@@ -45,14 +44,12 @@ async function login(request: APIRequestContext, baseURL: string, slug: string, 
   expect(res.ok(), `login ${who.email}`).toBeTruthy();
 }
 
-/** Fetches a report and returns its parsed rows (header first). */
-async function fetchCsv(request: APIRequestContext, baseURL: string, slug: string, query: string) {
+/** Fetches a report and returns its table (header first), the totals under it and the lines above it. */
+async function fetchSheet(request: APIRequestContext, baseURL: string, slug: string, query: string) {
   const res = await request.get(`${baseURL}/api/${slug}/finance/export${query}`);
-  expect(res.status(), await res.text()).toBe(200);
-  expect(res.headers()["content-type"]).toContain("text/csv");
-  const text = await res.text();
-  expect(text.startsWith("﻿")).toBeTruthy();
-  return { rows: parseCsv(text), disposition: res.headers()["content-disposition"] ?? "" };
+  expect(res.status(), res.status() === 200 ? "" : await res.text()).toBe(200);
+  expect(res.headers()["content-type"]).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  return { ...(await readExportSheet(await res.body())), disposition: res.headers()["content-disposition"] ?? "" };
 }
 
 test("default ranges and bounds follow the gym's timezone", async () => {
@@ -99,8 +96,10 @@ test("owner downloads transactions: paid only by default, everything on request,
   const from = dayKeyInTimezone(new Date(now.getTime() - 7 * DAY), TZ);
   const to = dayKeyInTimezone(now, TZ);
 
-  const paid = await fetchCsv(request, baseURL!, f.slug, `?from=${from}&to=${to}`);
-  expect(paid.disposition).toContain(`finance-transactions-${f.slug}-${from}-to-${to}.csv`);
+  const paid = await fetchSheet(request, baseURL!, f.slug, `?from=${from}&to=${to}`);
+  expect(paid.disposition).toContain(`finance-transactions-${f.slug}-${from}-to-${to}.xlsx`);
+  expect(paid.title).toBe(`${f.gym.name}: transactions`);
+  expect(paid.info[1]).toBe("Paid payments and refunds only.");
   expect(paid.rows[0]).toEqual(["Date", "Type", "Member", "Item", "Amount", "Currency", "Status", "Method", "Recorded by", "Note", "Invoice ID", "Payment ID"]);
   const paidIds = paid.rows.slice(1).map((r) => r[11]);
   expect(new Set(paidIds)).toEqual(new Set([cash.id, classPay.id, online.id]));
@@ -118,19 +117,28 @@ test("owner downloads transactions: paid only by default, everything on request,
   expect(classRow[1]).toBe("Class");
   expect(classRow[3]).toBe(`Yoga (${dayKeyInTimezone(sessionStart, TZ)})`);
   expect(classRow[4]).toBe("50000");
+  // Totals at the bottom: per type, then what actually came in.
+  expect(paid.totals.map((r) => [r[0], r[4]])).toEqual([
+    ["Memberships", "450000"],
+    ["Classes", "50000"],
+    ["Total received (after refunds)", "500000"],
+  ]);
 
   // Everything: the unpaid invoice and the voided desk entry appear, labelled honestly.
-  const all = await fetchCsv(request, baseURL!, f.slug, `?from=${from}&to=${to}&status=all`);
+  const all = await fetchSheet(request, baseURL!, f.slug, `?from=${from}&to=${to}&status=all`);
   const byId = Object.fromEntries(all.rows.slice(1).map((r) => [r[11], r]));
   expect(Object.keys(byId)).toHaveLength(5);
   expect(byId[unpaid.id][6]).toBe("PENDING");
   expect(byId[voided.id][6]).toBe("VOIDED");
   expect(byId[voided.id][4]).toBe("99000");
+  // The unpaid and voided lines are listed but kept out of the total.
+  expect(all.totals.find((r) => r[0].startsWith("Total received"))?.[4]).toBe("500000");
+  expect(all.totals.find((r) => r[0].startsWith("Not counted"))?.[4]).toBe(String(250000 + 99000));
 
   // The default range is this month, so the 400-day-old payment never shows; a range that covers it does.
-  const defaults = await fetchCsv(request, baseURL!, f.slug, "");
+  const defaults = await fetchSheet(request, baseURL!, f.slug, "");
   expect(defaults.rows.slice(1).map((r) => r[4])).not.toContain("1");
-  const wide = await fetchCsv(request, baseURL!, f.slug, `?from=${dayKeyInTimezone(longAgo, TZ)}&to=${to}`);
+  const wide = await fetchSheet(request, baseURL!, f.slug, `?from=${dayKeyInTimezone(longAgo, TZ)}&to=${to}`);
   expect(wide.rows.slice(1).map((r) => r[4])).toContain("1");
 
   // Bad input and the wrong people.
@@ -186,7 +194,7 @@ test("the monthly summary has one row per month with revenue split by type and m
   await prisma.refund.create({ data: { gymId: f.gym.id, amount: 50000, recipientName: "Rina", reason: "No-show goodwill", category: "DAY_PASS", method: "CASH", refundedAt: now } });
 
   await login(request, baseURL!, f.slug, f.owner);
-  const { rows, disposition } = await fetchCsv(request, baseURL!, f.slug, `?report=monthly&from=${prevKey}-01&to=${dayKeyInTimezone(now, TZ)}`);
+  const { rows, disposition } = await fetchSheet(request, baseURL!, f.slug, `?report=monthly&from=${prevKey}-01&to=${dayKeyInTimezone(now, TZ)}`);
   expect(disposition).toContain(`finance-monthly-${f.slug}-`);
   expect(rows[0]).toEqual(["Month", "Membership revenue", "Class revenue", "Day pass revenue", "Field revenue", "Refunds", "Total revenue", "Paid payments", "Cash / transfer", "Online", "Voided"]);
   expect(rows).toHaveLength(3);
@@ -194,16 +202,19 @@ test("the monthly summary has one row per month with revenue split by type and m
   expect(rows[1].slice(1)).toEqual(["300000", "0", "0", "0", "0", "300000", "1", "300000", "0", "1"]);
   // This month: cash + online membership and an online class, less the refund; the pending invoice isn't revenue.
   expect(rows[2].slice(1)).toEqual(["450000", "40000", "60000", "0", "-50000", "500000", "5", "260000", "290000", "0"]);
+  // One bold Total line sums every column.
+  const { totals } = await fetchSheet(request, baseURL!, f.slug, `?report=monthly&from=${prevKey}-01&to=${dayKeyInTimezone(now, TZ)}`);
+  expect(totals).toEqual([["Total", "750000", "40000", "60000", "0", "-50000", "800000", "6", "560000", "290000", "1"]]);
 
   // The transactions export lists the refund as a negative line.
-  const tx = await fetchCsv(request, baseURL!, f.slug, `?report=transactions&from=${dayKeyInTimezone(now, TZ)}&to=${dayKeyInTimezone(now, TZ)}`);
+  const tx = await fetchSheet(request, baseURL!, f.slug, `?report=transactions&from=${dayKeyInTimezone(now, TZ)}&to=${dayKeyInTimezone(now, TZ)}`);
   const refundRow = tx.rows.find((r) => r[1] === "Refund");
   expect(refundRow?.slice(1, 8)).toEqual(["Refund", "Rina", "Day pass", "-50000", "IDR", "REFUNDED", "Cash"]);
   expect(refundRow?.[9]).toBe("No-show goodwill");
   expect(rows[2][0]).toMatch(/^[A-Z][a-z]{2} \d{4}$/);
 
   // The default monthly range is twelve months, all present even when empty.
-  const year = await fetchCsv(request, baseURL!, f.slug, "?report=monthly");
+  const year = await fetchSheet(request, baseURL!, f.slug, "?report=monthly");
   expect(year.rows).toHaveLength(13);
   expect(year.rows.slice(1, 11).every((r) => r[3] === "0")).toBeTruthy();
 });
@@ -220,12 +231,12 @@ test("the Finance page offers the exports to the owner with this month pre-fille
   await expect(page.getByRole("button", { name: "Download transactions" })).toBeEnabled();
   await page.getByLabel("Include").selectOption("all");
 
-  // The buttons save a properly named .csv, not a file called "export".
+  // The buttons save a properly named .xlsx, not a file called "export".
   const [tx] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download transactions" }).click()]);
-  expect(tx.suggestedFilename()).toBe(`finance-transactions-${f.slug}-${from}-to-${to}.csv`);
+  expect(tx.suggestedFilename()).toBe(`finance-transactions-${f.slug}-${from}-to-${to}.xlsx`);
   
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download monthly summary" }).click()]);
-  expect(download.suggestedFilename()).toMatch(new RegExp(`^finance-monthly-${f.slug}-.*\\.csv$`));
+  expect(download.suggestedFilename()).toMatch(new RegExp(`^finance-monthly-${f.slug}-.*\\.xlsx$`));
 });
 
 test("the owner records a refund on the Finance page, revenue drops by it, voiding keeps the record, and staff can't do either", async ({ page, request, baseURL }) => {
@@ -267,9 +278,9 @@ test("the owner records a refund on the Finance page, revenue drops by it, voidi
   // Voiding twice is refused; the paid-only export leaves it out, the full one lists it as VOIDED.
   expect((await page.request.post(`${baseURL}/api/${f.slug}/refunds/${saved.id}`)).status()).toBe(409);
   const day = dayKeyInTimezone(now, TZ);
-  const paidOnly = await fetchCsv(page.request, baseURL!, f.slug, `?report=transactions&from=${day}&to=${day}`);
+  const paidOnly = await fetchSheet(page.request, baseURL!, f.slug, `?report=transactions&from=${day}&to=${day}`);
   expect(paidOnly.rows.some((r) => r[1] === "Refund")).toBeFalsy();
-  const all = await fetchCsv(page.request, baseURL!, f.slug, `?report=transactions&from=${day}&to=${day}&status=all`);
+  const all = await fetchSheet(page.request, baseURL!, f.slug, `?report=transactions&from=${day}&to=${day}&status=all`);
   expect(all.rows.find((r) => r[1] === "Refund")?.[6]).toBe("VOIDED");
 
   // Staff can't record or remove refunds, and another gym's owner can't remove this gym's.

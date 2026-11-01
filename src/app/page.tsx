@@ -107,7 +107,7 @@ const faqs = [
   },
   {
     q: "We have 80 members in a spreadsheet. How long does switching take?",
-    a: "An afternoon. Export your sheet as CSV, upload it, check the preview, import. Each member gets their activation link, or you can send links later if you'd rather tell them first.",
+    a: "An afternoon. Upload your Excel sheet (or a CSV), check the preview, import. Each member gets their activation link, or you can send links later if you'd rather tell them first.",
   },
   {
     q: "What if a member forgets their password at the door?",
@@ -115,7 +115,7 @@ const faqs = [
   },
   {
     q: "What happens to my data if I stop?",
-    a: "Your account is suspended, not deleted, and you can export your members and finances as CSV at any time before or after.",
+    a: "Your account is suspended, not deleted, and you can export your members and finances to Excel at any time before or after.",
   },
 ];
 
@@ -208,7 +208,7 @@ export default async function Home() {
             {[
               { title: "Each gym is sealed off", body: "Scoped in the app, enforced again by the database. One gym can never see another." },
               { title: "Encrypted where it matters", body: "Member phone numbers and WhatsApp credentials are encrypted at rest. Lists show masked digits." },
-              { title: "Your data is yours", body: "Export members and finances as CSV any time. Erase a member on request. Leave whenever you like." },
+              { title: "Your data is yours", body: "Export members and finances to Excel any time. Erase a member on request. Leave whenever you like." },
             ].map((s) => (
               <div key={s.title}>
                 <h3 className="font-display text-lg font-semibold">{s.title}</h3>

@@ -3,7 +3,8 @@ import { requireTenantSession, SessionError } from "@/lib/session";
 import { extendedExpiry } from "@/lib/membership";
 import { countMemberSeats, memberLimitMessage } from "@/lib/limits";
 import { createMember, isUniqueViolation } from "@/lib/members";
-import { MAX_IMPORT_ROWS, parseMemberSheet, type ParsedRow } from "@/lib/memberImport";
+import { MAX_IMPORT_ROWS, parseMemberSheet, parseMemberTable, type ParsedRow, type ParsedSheet } from "@/lib/memberImport";
+import { looksLikeXlsx, readXlsxRows } from "@/lib/xlsx";
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 
@@ -20,7 +21,7 @@ export interface ImportRowResult {
 }
 
 /**
- * Bulk-adds members from a CSV (the gym's old spreadsheet, or a Liftmora export). Multipart form:
+ * Bulk-adds members from a CSV or an Excel .xlsx (the gym's old spreadsheet, or a Liftmora export). Multipart form:
  * `file`, `planId` (used for rows with no Plan, or when the sheet has no Plan column), `notify`
  * ("1" sends activation links, "0" doesn't) and `dryRun` ("1" validates and reports, creates nothing).
  *
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   if (!(file instanceof File) || file.size === 0) {
-    return NextResponse.json({ error: "Choose a CSV file to import" }, { status: 400 });
+    return NextResponse.json({ error: "Choose an Excel or CSV file to import" }, { status: 400 });
   }
   if (file.size > MAX_FILE_BYTES) {
     return NextResponse.json({ error: "The file must be under 2MB" }, { status: 400 });
@@ -55,8 +56,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const notify = form?.get("notify") !== "0";
   const defaultPlanId = typeof form?.get("planId") === "string" ? (form!.get("planId") as string) : "";
 
-  const text = await file.text();
-  const sheet = parseMemberSheet(text);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let sheet: ParsedSheet;
+  if (looksLikeXlsx(bytes)) {
+    const rows = await readXlsxRows(Buffer.from(bytes)).catch(() => null);
+    if (!rows) return NextResponse.json({ error: "That Excel file couldn't be opened. Save it again as .xlsx or CSV." }, { status: 400 });
+    sheet = parseMemberTable(rows);
+  } else {
+    sheet = parseMemberSheet(new TextDecoder().decode(bytes));
+  }
   if (sheet.missingColumns.length > 0) {
     return NextResponse.json(
       { error: `The file needs these columns: ${sheet.missingColumns.join(", ")}. Found: ${sheet.unknownColumns.join(", ") || "none recognised"}.` },
