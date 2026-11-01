@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { unstable_cache } from "next/cache";
 import { prisma } from "./prisma";
 import { getSession } from "./session";
 
@@ -11,8 +12,11 @@ export function isThemeMode(v: unknown): v is ThemeMode {
   return v === "light" || v === "dark" || v === "system";
 }
 
+/** Tag on the cached platform theme; saving Appearance in superadmin settings clears it. */
+export const PLATFORM_THEME_TAG = "platform-theme";
+
 /** Platform-wide theme settings from the AppConfig table (defaults: dark, user override allowed). */
-export async function getPlatformTheme(): Promise<{ mode: ThemeMode; allowUserOverride: boolean }> {
+async function loadPlatformTheme(): Promise<{ mode: ThemeMode; allowUserOverride: boolean }> {
   const rows = await prisma.appConfig.findMany({ where: { key: { in: [THEME_KEY, OVERRIDE_KEY] } } });
   const map = new Map(rows.map((r) => [r.key, r.value]));
   const mode = map.get(THEME_KEY);
@@ -22,6 +26,12 @@ export async function getPlatformTheme(): Promise<{ mode: ThemeMode; allowUserOv
     allowUserOverride: typeof override === "boolean" ? override : true,
   };
 }
+
+/**
+ * The platform theme, cached with no expiry: the root layout needs it on every page, and without the cache
+ * every page view, the landing page included, would query the database for it.
+ */
+export const getPlatformTheme = unstable_cache(loadPlatformTheme, ["platform-theme"], { tags: [PLATFORM_THEME_TAG] });
 
 export function gymThemeFromSettings(settings: unknown): ThemeMode | null {
   const t = (settings as { theme?: unknown } | null)?.theme;

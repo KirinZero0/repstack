@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireSuperadminSession, SessionError } from "@/lib/session";
 import { platformSettingsSchema } from "@/lib/validation/superadmin";
 import { writeAuditLog } from "@/lib/audit";
-import { OVERRIDE_KEY, THEME_KEY } from "@/lib/theme";
+import { OVERRIDE_KEY, PLATFORM_THEME_TAG, THEME_KEY } from "@/lib/theme";
 
 export async function POST(req: NextRequest) {
   let session;
@@ -22,6 +23,7 @@ export async function POST(req: NextRequest) {
     prisma.appConfig.upsert({ where: { key: THEME_KEY }, create: { key: THEME_KEY, value: themeDefault }, update: { value: themeDefault } }),
     prisma.appConfig.upsert({ where: { key: OVERRIDE_KEY }, create: { key: OVERRIDE_KEY, value: allowUserOverride }, update: { value: allowUserOverride } }),
   ]);
+  revalidateTag(PLATFORM_THEME_TAG);
 
   await writeAuditLog({
     superadminId: session.superadminId,

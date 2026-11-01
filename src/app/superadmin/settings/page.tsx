@@ -4,6 +4,8 @@ import { getPlatformTheme } from "@/lib/theme";
 import { Card } from "@/components/charts";
 import { getPlatformBank } from "@/lib/platformBank";
 import { PlatformSettingsForm, PlatformBankForm } from "@/components/SettingsForms";
+import { getLandingTiers } from "@/lib/landingPlans";
+import RefreshPlansButton from "./RefreshPlansButton";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,8 @@ export default async function SuperadminSettingsPage() {
   }
   const t = await getPlatformTheme();
   const bank = await getPlatformBank();
+  // What the landing page is showing right now: the cached copy, not a fresh read.
+  const tiers = await getLandingTiers().catch(() => null);
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
@@ -34,6 +38,29 @@ export default async function SuperadminSettingsPage() {
             Shown to gym owners when they pay their Liftmora subscription by bank transfer, until online payments are switched on.
             You confirm each transfer from Gyms.
           </p>
+        </Card>
+        <div className="h-6" />
+        <Card title="Landing page prices">
+          <p className="mb-3 text-xs text-neutral-500">
+            The landing page keeps a copy of the plan prices so visitors never wake the database. After changing a plan in the
+            database, refresh it here.
+          </p>
+          {tiers === null ? (
+            <p className="mb-3 text-sm text-red-400">Couldn&apos;t load the plans.</p>
+          ) : (
+            <ul className="mb-4 space-y-1 text-sm text-neutral-300" data-testid="landing-tiers">
+              {tiers.map((t) => (
+                <li key={t.name} className="flex justify-between gap-4">
+                  <span>{t.name}</span>
+                  <span className="tabular-nums text-neutral-400">
+                    Rp {t.monthly.toLocaleString("id-ID")} / month{t.annual ? ` · Rp ${t.annual.toLocaleString("id-ID")} / year` : ""}
+                  </span>
+                </li>
+              ))}
+              {tiers.length === 0 && <li className="text-neutral-500">No active plans.</li>}
+            </ul>
+          )}
+          <RefreshPlansButton />
         </Card>
         <div className="h-6" />
         <Card title="Appearance">

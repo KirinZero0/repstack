@@ -4,8 +4,10 @@ import Pricing, { type Tier } from "@/components/landing/Pricing";
 import { SiteFooter, SiteHeader } from "@/components/landing/SiteChrome";
 import { FEATURE_GROUPS } from "@/components/landing/features";
 import { PlateGlyph } from "@/components/BrandMark";
-import { prisma } from "@/lib/prisma";
+import { getLandingTiers } from "@/lib/landingPlans";
 
+// Rendered per request (the root layout reads the theme cookie), but with no database query for a logged-out
+// visitor: the plan prices come from getLandingTiers' cache, the platform theme from getPlatformTheme's.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -39,33 +41,6 @@ const JSON_LD = {
     },
   ],
 };
-
-async function loadTiers(): Promise<Tier[]> {
-  try {
-    const plans = await prisma.saasPlan.findMany({ where: { isActive: true } });
-    const byTier = new Map<string, Tier>();
-    for (const p of plans) {
-      const name = p.name.replace(/\s+(monthly|annual|yearly)$/i, "");
-      const tier =
-        byTier.get(name) ??
-        ({ name, monthly: 0, annual: null, monthlyId: "", annualId: null, maxMembers: p.maxMembers, maxStaff: p.maxStaff, maxWhatsappPerMonth: p.maxWhatsappPerMonth, customBranding: p.customBranding } as Tier);
-      if (p.billingInterval === "annual") {
-        tier.annual = Number(p.price);
-        tier.annualId = p.id;
-      } else {
-        tier.monthly = Number(p.price);
-        tier.monthlyId = p.id;
-      }
-      byTier.set(name, tier);
-    }
-    return Array.from(byTier.values())
-      .filter((t) => t.monthly > 0)
-      .sort((a, b) => a.monthly - b.monthly);
-  } catch (err) {
-    console.error("Failed to load plans for landing page", err);
-    return [];
-  }
-}
 
 const steps = [
   {
@@ -120,7 +95,10 @@ const faqs = [
 ];
 
 export default async function Home() {
-  const tiers = await loadTiers();
+  const tiers = await getLandingTiers().catch((err) => {
+    console.error("Failed to load plans for landing page", err);
+    return [] as Tier[];
+  });
   const groups = HOME_GROUPS.map((id) => FEATURE_GROUPS.find((g) => g.id === id)!);
 
   return (
