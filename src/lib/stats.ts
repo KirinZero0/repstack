@@ -1,5 +1,5 @@
 import { prisma, type TenantDb } from "./prisma";
-import { dayKeyInTimezone } from "./date";
+import { dayKeyInTimezone, zonedTimeToUtc } from "./date";
 
 export function monthKey(date: Date, timezone: string): string {
   return dayKeyInTimezone(date, timezone).slice(0, 7);
@@ -26,16 +26,15 @@ function monthlyEquivalent(price: number, interval: string) {
   return interval === "annual" ? price / 12 : price;
 }
 
-/**
- * The owner's money picture: membership payments and class payments together, since both are
- * revenue. Breakdowns are per item ("Monthly" plan, "Yoga class") and per method. Refunds the owner
- * recorded are subtracted from the totals on the day they went back, and listed on their own.
- */
-export async function getGymFinance(db: TenantDb, gymId: string, timezone: string) {
-  const months = lastMonthKeys(12, timezone);
-  const since = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
+type PaidRow = { when: Date; amount: number; item: string; kind: "membership" | "class" | "daypass" | "field" | "refund"; provider: string };
 
-  const [paid, paidClasses, paidDayPasses, paidFields, refunds, pendingAgg, pendingClassAgg, statusGroups, classStatusGroups, recent, recentClasses] = await Promise.all([
+/**
+ * Every bit of money that counts as revenue since `since`: paid membership and class payments, approved guest
+ * tickets, field booking payments, and refunds as negatives. The one definition of revenue, used by the Finance
+ * page and the dashboard alike, so the two can never disagree.
+ */
+async function loadRevenue(db: TenantDb, gymId: string, since: Date) {
+  const [paid, paidClasses, paidDayPasses, paidFields, refunds] = await Promise.all([
     db.payment.findMany({
       where: { gymId, status: "PAID", paidAt: { gte: since } },
       include: { plan: { select: { name: true } } },
@@ -57,25 +56,8 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       include: { booking: { select: { field: { select: { name: true } } } } },
     }),
     db.refund.findMany({ where: { gymId, refundedAt: { gte: since } }, orderBy: { refundedAt: "desc" }, include: { recordedBy: { select: { name: true } }, voidedBy: { select: { name: true } } } }),
-    db.payment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
-    db.classPayment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
-    db.payment.groupBy({ by: ["status"], where: { gymId }, _count: true }),
-    db.classPayment.groupBy({ by: ["status"], where: { gymId }, _count: true }),
-    db.payment.findMany({
-      where: { gymId },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      include: { plan: { select: { name: true } }, member: { select: { fullName: true } } },
-    }),
-    db.classPayment.findMany({
-      where: { gymId },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      include: { registration: { select: { member: { select: { fullName: true } }, session: { select: { class: { select: { name: true } } } } } } },
-    }),
   ]);
 
-  type PaidRow = { when: Date; amount: number; item: string; kind: "membership" | "class" | "daypass" | "field" | "refund"; provider: string };
   const rows: PaidRow[] = [
     ...paid.map((p) => ({ when: p.paidAt ?? p.createdAt, amount: Number(p.amount), item: p.plan.name, kind: "membership" as const, provider: p.provider })),
     ...paidClasses.map((p) => ({
@@ -97,6 +79,45 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     // A voided refund stays listed below but no longer comes off revenue.
     ...refunds.filter((r) => !r.voidedAt).map((r) => ({ when: r.refundedAt, amount: -Number(r.amount), item: "Refunds", kind: "refund" as const, provider: "CASH" })),
   ];
+
+  return { rows, dayPasses: paidDayPasses, refunds };
+}
+
+/** Revenue so far this month, on the gym's own calendar, net of refunds: the same figure as Finance's "Revenue this month". */
+export async function getMonthRevenue(db: TenantDb, gymId: string, timezone: string, now = new Date()): Promise<number> {
+  const key = monthKey(now, timezone);
+  const { rows } = await loadRevenue(db, gymId, zonedTimeToUtc(`${key}-01T00:00`, timezone));
+  return rows.filter((r) => monthKey(r.when, timezone) === key).reduce((sum, r) => sum + r.amount, 0);
+}
+
+/**
+ * The owner's money picture: membership payments and class payments together, since both are
+ * revenue. Breakdowns are per item ("Monthly" plan, "Yoga class") and per method. Refunds the owner
+ * recorded are subtracted from the totals on the day they went back, and listed on their own.
+ */
+export async function getGymFinance(db: TenantDb, gymId: string, timezone: string) {
+  const months = lastMonthKeys(12, timezone);
+  const since = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
+
+  const [{ rows, dayPasses: paidDayPasses, refunds }, pendingAgg, pendingClassAgg, statusGroups, classStatusGroups, recent, recentClasses] = await Promise.all([
+    loadRevenue(db, gymId, since),
+    db.payment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
+    db.classPayment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
+    db.payment.groupBy({ by: ["status"], where: { gymId }, _count: true }),
+    db.classPayment.groupBy({ by: ["status"], where: { gymId }, _count: true }),
+    db.payment.findMany({
+      where: { gymId },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      include: { plan: { select: { name: true } }, member: { select: { fullName: true } } },
+    }),
+    db.classPayment.findMany({
+      where: { gymId },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      include: { registration: { select: { member: { select: { fullName: true } }, session: { select: { class: { select: { name: true } } } } } } },
+    }),
+  ]);
 
   const byMonth = new Map<string, number>(months.map((k) => [k, 0]));
   const byMonthClasses = new Map<string, number>(months.map((k) => [k, 0]));

@@ -3,6 +3,7 @@ import { requireTenantSession, SessionError } from "@/lib/session";
 import { dayKeyInTimezone } from "@/lib/date";
 import { getOccupancy, occupancyWindowHours } from "@/lib/occupancy";
 import { getLeaderboard } from "@/lib/leaderboard";
+import { getMonthRevenue } from "@/lib/stats";
 import GymNav from "@/components/GymNav";
 import OccupancyList from "./OccupancyList";
 import RemoveCheckInButton from "./RemoveCheckInButton";
@@ -19,18 +20,16 @@ export default async function DashboardPage({ params }: { params: { slug: string
   }
 
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const soonCutoff = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  const [activeMembers, todaysCheckins, monthPayments, expiringSoon, present, board] = await Promise.all([
+  const [activeMembers, todaysCheckins, monthRevenue, expiringSoon, present, board] = await Promise.all([
     db.member.count({ where: { gymId: gym.id, status: "ACTIVE" } }),
     db.checkIn.findMany({
       where: { gymId: gym.id, checkedInAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) } },
       orderBy: { checkedInAt: "desc" },
     }),
-    db.payment.findMany({
-      where: { gymId: gym.id, status: "PAID", paidAt: { gte: monthStart } },
-    }),
+    // Same figure as Finance: memberships, classes, day passes and fields, less refunds, on the gym's calendar.
+    getMonthRevenue(db, gym.id, gym.timezone, now),
     db.member.findMany({
       where: {
         gymId: gym.id,
@@ -55,7 +54,6 @@ export default async function DashboardPage({ params }: { params: { slug: string
   });
   const nameOf = new Map(todaysMembers.map((m) => [m.id, m.fullName]));
 
-  const monthRevenue = monthPayments.reduce((sum, p) => sum + Number(p.amount), 0);
   const timeOf = (d: Date) => d.toLocaleTimeString("id-ID", { timeZone: gym.timezone, hour: "2-digit", minute: "2-digit" });
 
   return (

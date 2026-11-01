@@ -219,6 +219,27 @@ test("the monthly summary has one row per month with revenue split by type and m
   expect(year.rows.slice(1, 11).every((r) => r[3] === "0")).toBeTruthy();
 });
 
+test("the dashboard's revenue this month is the same figure as Finance: day passes, classes and fields count, refunds come off", async ({ request, baseURL }) => {
+  const f = await makeGym();
+  const now = new Date();
+  // No membership payments at all: only a day pass, a class and a refund. The dashboard used to say Rp 0 here.
+  const dayPlan = await prisma.dayPassPlan.create({ data: { gymId: f.gym.id, name: "Single visit", price: 105000 } });
+  await prisma.guestPass.create({
+    data: { gymId: f.gym.id, dayPassPlanId: dayPlan.id, visitDate: dayKeyInTimezone(now, TZ), fullName: "Walk In", phoneWhatsapp: "v1:x", phoneWhatsappLookup: `dash-${f.slug}`, status: "APPROVED", amount: 105000, reviewedAt: now },
+  });
+  const gymClass = await prisma.gymClass.create({ data: { gymId: f.gym.id, name: "Spin", price: 40000, durationMinutes: 45 } });
+  const session = await prisma.classSession.create({ data: { gymId: f.gym.id, classId: gymClass.id, startsAt: now } });
+  const reg = await prisma.classRegistration.create({ data: { gymId: f.gym.id, sessionId: session.id, memberId: f.member.id, status: "CONFIRMED" } });
+  await prisma.classPayment.create({ data: { gymId: f.gym.id, registrationId: reg.id, provider: "CASH", amount: 40000, status: "PAID", paidAt: now } });
+  await prisma.refund.create({ data: { gymId: f.gym.id, amount: 15000, recipientName: "Walk In", reason: "Overcharged", category: "DAY_PASS", method: "CASH", refundedAt: now } });
+
+  await login(request, baseURL!, f.slug, f.owner);
+  const dashboard = await (await request.get(`${baseURL}/${f.slug}/dashboard`)).text();
+  const finance = await (await request.get(`${baseURL}/${f.slug}/finance`)).text();
+  expect(finance).toContain("Rp 130.000");
+  expect(dashboard).toContain("Rp 130.000");
+});
+
 test("the Finance page offers the exports to the owner with this month pre-filled", async ({ page, baseURL }) => {
   const f = await makeGym();
   await staffLoginUI(page, baseURL!, f.slug, f.owner.email, f.owner.password);
