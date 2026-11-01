@@ -7,6 +7,8 @@ export interface DemoMember {
   plan: string;
   status: MemberStatus;
   expiresInDays: number | null;
+  /** Has set their own password (and so can log in to see their QR). */
+  activated: boolean;
 }
 
 export interface DemoPlan {
@@ -35,15 +37,30 @@ export const INITIAL_PLANS: DemoPlan[] = [
   { id: "p4", name: "Student week pass", days: 7, price: 60000, onSale: false, members: 0 },
 ];
 
+export const DAY_PASSES = [{ name: "Daily Pass", price: 35000, validDays: 30 }];
+
+export const CHECKED_IN_TODAY = [
+  { name: "Kevin Hartono", kind: "Day pass (Daily Pass)", time: "08:20" },
+  { name: "Dimas Pratama", kind: "Member", time: "08:05" },
+  { name: "Sari Dewi", kind: "Member", time: "07:42" },
+  { name: "Maya Lestari", kind: "Member", time: "06:58" },
+];
+
+export const MOST_VISITS = [
+  { name: "Sari Dewi", visits: 14 },
+  { name: "Dimas Pratama", visits: 11 },
+  { name: "Maya Lestari", visits: 9 },
+];
+
 export const INITIAL_MEMBERS: DemoMember[] = [
-  { name: "Sari Dewi", email: "sari.dewi@mail.com", phone: "0812 3400 4412", plan: "Annual", status: "ACTIVE", expiresInDays: 210 },
-  { name: "Budi Santoso", email: "budi.santoso@mail.com", phone: "0813 5500 9087", plan: "Monthly", status: "ACTIVE", expiresInDays: 12 },
-  { name: "Rina Putri", email: "rina.putri@mail.com", phone: "0857 2200 3351", plan: "Monthly", status: "ACTIVE", expiresInDays: 3 },
-  { name: "Dimas Pratama", email: "dimas.pratama@mail.com", phone: "0812 7700 7720", plan: "Quarterly", status: "ACTIVE", expiresInDays: 51 },
-  { name: "Andi Wijaya", email: "andi.wijaya@mail.com", phone: "0821 1100 1198", plan: "Monthly", status: "EXPIRED", expiresInDays: -6 },
-  { name: "Maya Lestari", email: "maya.lestari@mail.com", phone: "0815 6600 6604", plan: "Quarterly", status: "ACTIVE", expiresInDays: 5 },
-  { name: "Eko Nugroho", email: "eko.nugroho@mail.com", phone: "0838 4400 2275", plan: "Monthly", status: "FROZEN", expiresInDays: 20 },
-  { name: "Lala Kusuma", email: "lala.kusuma@mail.com", phone: "0819 8800 8836", plan: "Monthly", status: "PENDING_PAYMENT", expiresInDays: null },
+  { name: "Sari Dewi", email: "sari.dewi@mail.com", phone: "0812 3400 4412", plan: "Annual", status: "ACTIVE", expiresInDays: 210, activated: true },
+  { name: "Budi Santoso", email: "budi.santoso@mail.com", phone: "0813 5500 9087", plan: "Monthly", status: "ACTIVE", expiresInDays: 12, activated: true },
+  { name: "Rina Putri", email: "rina.putri@mail.com", phone: "0857 2200 3351", plan: "Monthly", status: "ACTIVE", expiresInDays: 3, activated: true },
+  { name: "Dimas Pratama", email: "dimas.pratama@mail.com", phone: "0812 7700 7720", plan: "Quarterly", status: "ACTIVE", expiresInDays: 51, activated: false },
+  { name: "Andi Wijaya", email: "andi.wijaya@mail.com", phone: "0821 1100 1198", plan: "Monthly", status: "EXPIRED", expiresInDays: -6, activated: true },
+  { name: "Maya Lestari", email: "maya.lestari@mail.com", phone: "0815 6600 6604", plan: "Quarterly", status: "ACTIVE", expiresInDays: 5, activated: true },
+  { name: "Eko Nugroho", email: "eko.nugroho@mail.com", phone: "0838 4400 2275", plan: "Monthly", status: "FROZEN", expiresInDays: 20, activated: true },
+  { name: "Lala Kusuma", email: "lala.kusuma@mail.com", phone: "0819 8800 8836", plan: "Monthly", status: "ACTIVE", expiresInDays: 26, activated: false },
 ];
 
 export const INITIAL_REQUESTS: DemoRequest[] = [
@@ -63,12 +80,14 @@ export const REVENUE_MONTHS = [
 export const REVENUE_BY_PLAN = [
   { label: "Annual", value: 5000000 },
   { label: "Monthly", value: 1250000 },
+  { label: "Boxing Basics (class)", value: 200000 },
+  { label: "Day passes", value: 140000 },
 ];
 
 export const RECENT_PAYMENTS = [
   { member: "Maya Lestari", plan: "Quarterly", amount: 650000, status: "PAID", date: "17 Sep" },
   { member: "Budi Santoso", plan: "Monthly", amount: 250000, status: "PAID", date: "16 Sep" },
-  { member: "Lala Kusuma", plan: "Monthly", amount: 250000, status: "PENDING", date: "15 Sep" },
+  { member: "Lala Kusuma", plan: "Monthly", amount: 250000, status: "PAID", date: "15 Sep" },
   { member: "Sari Dewi", plan: "Annual", amount: 2500000, status: "PAID", date: "12 Sep" },
 ];
 
