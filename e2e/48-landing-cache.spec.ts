@@ -2,6 +2,10 @@ import { test, expect } from "@playwright/test";
 import { prisma } from "./helpers";
 import { OVERRIDE_KEY, THEME_KEY } from "../src/lib/theme";
 
+// Its own address, so the suite's many logins from 127.0.0.1 don't trip the per-IP login limit here.
+const IP = `10.48.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
+test.use({ extraHTTPHeaders: { "x-forwarded-for": IP } });
+
 const SUPERADMIN = { email: "superadmin@test.local", password: "superadmin-pass-123" };
 
 test("the landing page keeps its plan prices until a superadmin presses Refresh, and only a superadmin can", async ({ request, baseURL, playwright }) => {
@@ -15,7 +19,7 @@ test("the landing page keeps its plan prices until a superadmin presses Refresh,
     expect(await (await request.get(`${baseURL}/`)).text()).not.toContain(name);
 
     // Nobody but a superadmin can clear it.
-    const anon = await playwright.request.newContext();
+    const anon = await playwright.request.newContext({ extraHTTPHeaders: { "x-forwarded-for": IP } });
     expect((await anon.post(`${baseURL}/api/superadmin/plans/refresh`)).status()).toBe(401);
     await anon.dispose();
 

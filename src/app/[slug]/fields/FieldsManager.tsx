@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import ChannelPicker, { type Channel } from "@/components/ChannelPicker";
-import { clock } from "@/lib/fieldBooking";
+import { blockLabel, clock, endTimes, parseClock } from "@/lib/fieldBooking";
 
 export interface FieldRow {
   id: string;
@@ -355,12 +355,6 @@ export default function FieldsManager({
   );
 }
 
-function timeOptions(f: FieldRow, from: number, to: number) {
-  const out: number[] = [];
-  for (let m = from; m <= to; m += f.stepMinutes) out.push(m);
-  return out;
-}
-
 /** The inline panel under the day's header: a phoned-in or walk-in booking, or a block of closed time. */
 function ManualBooking({
   slug,
@@ -443,16 +437,13 @@ function ManualBooking({
         <div className="grid grid-cols-2 gap-2">
           <label className="text-sm text-neutral-300">
             <span className="mb-1 block">From</span>
-            <select value={start} onChange={(e) => setStart(e.target.value)} className={input} aria-label="Booking from">
-              <option value="" />
-              {timeOptions(field, field.opensAt, field.closesAt - field.stepMinutes).map((m) => <option key={m} value={clock(m)}>{clock(m)}</option>)}
-            </select>
+            <input type="time" step={60} value={start} onChange={(e) => { setStart(e.target.value); setEnd(""); }} className={input} aria-label="Booking from" />
           </label>
           <label className="text-sm text-neutral-300">
             <span className="mb-1 block">Until</span>
             <select value={end} onChange={(e) => setEnd(e.target.value)} className={input} aria-label="Booking until">
               <option value="" />
-              {timeOptions(field, field.opensAt + field.stepMinutes, field.closesAt).map((m) => <option key={m} value={clock(m)}>{clock(m)}</option>)}
+              {(parseClock(start) === null ? [] : endTimes(field.stepMinutes, parseClock(start)!, field.closesAt)).map((m) => <option key={m} value={clock(m)}>{clock(m)}</option>)}
             </select>
           </label>
         </div>
@@ -540,7 +531,7 @@ function FieldSetup({ slug, fields }: { slug: string; fields: FieldRow[] }) {
             {fields.map((f) => (
               <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm" data-testid="field-row">
                 <span>
-                  <span className="font-medium">{f.name}</span> <span className="text-neutral-500">{f.sport} · {rp(f.pricePerHour)} {f.pricingType === "PER_PAX" ? `per person an hour${f.minPax && f.maxPax ? ` (${f.minPax} to ${f.maxPax} people)` : f.maxPax ? ` (up to ${f.maxPax})` : f.minPax ? ` (at least ${f.minPax})` : ""}` : "an hour"} · {f.opensLabel}–{f.closesLabel} · every {f.stepMinutes} min{f.isActive ? "" : " · off"}</span>
+                  <span className="font-medium">{f.name}</span> <span className="text-neutral-500">{f.sport} · {rp(f.pricePerHour)} {f.pricingType === "PER_PAX" ? `per person an hour${f.minPax && f.maxPax ? ` (${f.minPax} to ${f.maxPax} people)` : f.maxPax ? ` (up to ${f.maxPax})` : f.minPax ? ` (at least ${f.minPax})` : ""}` : "an hour"} · {f.opensLabel}–{f.closesLabel} · {blockLabel(f.stepMinutes)} blocks{f.isActive ? "" : " · off"}</span>
                 </span>
                 <span className="flex gap-2">
                   <button className={btn} onClick={() => {
@@ -576,7 +567,7 @@ function FieldSetup({ slug, fields }: { slug: string; fields: FieldRow[] }) {
           )}
           <label className="text-sm text-neutral-300"><span className="mb-1 block">Opens</span><input required type="time" value={form.opensAt} onChange={(e) => setForm({ ...form, opensAt: e.target.value })} className={input} aria-label="Opens" /></label>
           <label className="text-sm text-neutral-300"><span className="mb-1 block">Closes (24:00 = midnight)</span><input required value={form.closesAt} onChange={(e) => setForm({ ...form, closesAt: e.target.value })} className={input} aria-label="Closes" placeholder="22:00" /></label>
-          <label className="text-sm text-neutral-300"><span className="mb-1 block">Book in steps of</span>
+          <label className="text-sm text-neutral-300"><span className="mb-1 block">Booked in blocks of (starts any minute)</span>
             <select value={form.stepMinutes} onChange={(e) => setForm({ ...form, stepMinutes: e.target.value })} className={input} aria-label="Step">
               <option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option>
             </select>

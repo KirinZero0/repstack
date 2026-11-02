@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import TransferPayment, { type BankInfo, rupiah } from "@/components/TransferPayment";
-import { MAX_BOOKING_MINUTES, bookingAmount, clock, type FieldPricingType, type MinuteRange } from "@/lib/fieldBooking";
+import { bookingAmount, clock, endTimes, parseClock, roomAt, type FieldPricingType, type MinuteRange } from "@/lib/fieldBooking";
 
 export interface FieldOption {
   id: string;
@@ -37,7 +37,7 @@ export default function BookingForm({ slug, fields, bank, today, last }: { slug:
   const [date, setDate] = useState(today);
   const [avail, setAvail] = useState<Availability | null>(null);
   const [loading, setLoading] = useState(false);
-  const [start, setStart] = useState<number | null>(null);
+  const [startText, setStartText] = useState("");
   const [end, setEnd] = useState<number | null>(null);
   const [pax, setPax] = useState("2");
   const [fullName, setFullName] = useState("");
@@ -54,7 +54,7 @@ export default function BookingForm({ slug, fields, bank, today, last }: { slug:
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setStart(null);
+    setStartText("");
     setEnd(null);
     fetch(`/api/${slug}/fields/${fieldId}/availability?date=${date}`)
       .then((r) => (r.ok ? r.json() : null))
@@ -66,22 +66,14 @@ export default function BookingForm({ slug, fields, bank, today, last }: { slug:
     };
   }, [slug, fieldId, date]);
 
-  // A start can be any step inside a free stretch that leaves room for at least one more step.
-  const starts = useMemo(() => {
-    const out: number[] = [];
-    for (const r of avail?.free ?? []) for (let m = r.start; m + field.stepMinutes <= r.end; m += field.stepMinutes) out.push(m);
-    return out;
-  }, [avail, field.stepMinutes]);
+  // The start is any minute, typed; it counts once it sits in a free stretch with room for one whole block.
+  const free = useMemo(() => (avail?.free ?? []).filter((r) => r.end - r.start >= field.stepMinutes), [avail, field.stepMinutes]);
+  const typed = parseClock(startText);
+  const range = typed === null ? null : roomAt(free, typed, field.stepMinutes);
+  const start = range ? typed : null;
 
-  // An end is any later step in the same free stretch, up to the longest booking.
-  const ends = useMemo(() => {
-    if (start === null) return [];
-    const range = avail?.free.find((r) => start >= r.start && start < r.end);
-    if (!range) return [];
-    const out: number[] = [];
-    for (let m = start + field.stepMinutes; m <= range.end && m - start <= MAX_BOOKING_MINUTES; m += field.stepMinutes) out.push(m);
-    return out;
-  }, [avail, start, field.stepMinutes]);
+  // An end is a whole number of blocks later, inside the same free stretch, up to the longest booking.
+  const ends = useMemo(() => (start !== null && range ? endTimes(field.stepMinutes, start, range.end) : []), [start, range, field.stepMinutes]);
 
   const perPax = field.pricingType === "PER_PAX";
   const people = Number(pax);
@@ -162,30 +154,30 @@ export default function BookingForm({ slug, fields, bank, today, last }: { slug:
 
       {loading ? (
         <p className="text-sm text-neutral-500">Checking the times…</p>
-      ) : starts.length === 0 ? (
+      ) : free.length === 0 ? (
         <p className="rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm text-neutral-300" data-testid="nothing-free">
           Nothing is free on this day. Try another day.
         </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm text-neutral-300">
-            <span className="mb-1 block">From</span>
-            <select
-              value={start ?? ""}
+            <span className="mb-1 block">From (any minute)</span>
+            <input
+              type="time"
+              step={60}
+              value={startText}
               onChange={(e) => {
-                setStart(e.target.value === "" ? null : Number(e.target.value));
+                setStartText(e.target.value);
                 setEnd(null);
               }}
               className={input}
               aria-label="From"
-            >
-              <option value="">Pick a time</option>
-              {starts.map((m) => (
-                <option key={m} value={m}>
-                  {clock(m)}
-                </option>
-              ))}
-            </select>
+            />
+            {typed !== null && start === null && (
+              <span className="mt-1 block text-amber-400" role="alert">
+                That time isn&apos;t free for a full {length(field.stepMinutes)}. Pick a time in a free stretch below.
+              </span>
+            )}
           </label>
           <label className="block text-sm text-neutral-300">
             <span className="mb-1 block">Until</span>
@@ -199,6 +191,11 @@ export default function BookingForm({ slug, fields, bank, today, last }: { slug:
             </select>
           </label>
         </div>
+      )}
+      {!loading && free.length > 0 && (
+        <p className="-mt-3 text-sm text-neutral-500" data-testid="free-times">
+          Free: {free.map((r) => `${clock(r.start)}–${clock(r.end)}`).join(", ")} · booked in {length(field.stepMinutes)} blocks
+        </p>
       )}
       {start !== null && end !== null && (
         <p className="text-sm text-neutral-300" data-testid="booking-price">

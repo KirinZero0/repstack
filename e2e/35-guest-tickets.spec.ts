@@ -1,6 +1,6 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import bcrypt from "bcryptjs";
-import { prisma } from "./helpers";
+import { exportText, prisma } from "./helpers";
 import { ticketTokenFor } from "../src/lib/guestPass";
 import { dayKeyInTimezone } from "../src/lib/date";
 import { encrypt, hmacLookup } from "../src/lib/crypto";
@@ -200,7 +200,7 @@ test("day pass: owner sets it up, guest requests, staff approves, ticket scans o
   await prisma.dayPassPlan.update({ where: { id: planId }, data: { price: 99000 } });
   const finance = await (await request.get(`${baseURL}/${f.slug}/finance`)).text();
   expect(finance).toContain("from day passes");
-  const csv = await (await request.get(`${baseURL}/api/${f.slug}/finance/export?report=transactions`)).text();
+  const csv = await exportText(request, `${baseURL}/api/${f.slug}/finance/export?report=transactions`);
   expect(csv).toContain("Day pass");
   expect(csv).toContain("Day Dave (guest)");
   expect(csv).toContain(",50000,");
@@ -288,7 +288,7 @@ test("guest pays a day pass by transfer: proof attached, staff verify, approve, 
   expect(review).toContain("View transfer proof");
   const owner = { email: `owner-${f.slug}@test.local`, password: "owner-pass-123" };
   await prisma.staffUser.create({ data: { gymId: f.gym.id, name: "Owner", email: owner.email, passwordHash: await bcrypt.hash(owner.password, 10), role: "OWNER" } });
-  const csv = async () => (await request.get(`${baseURL}/api/${f.slug}/finance/export?report=transactions`)).text();
+  const csv = async () => exportText(request, `${baseURL}/api/${f.slug}/finance/export?report=transactions`);
   await login(request, baseURL!, f.slug, owner);
   expect(await csv()).not.toContain("Transfer Tina");
 
@@ -331,7 +331,7 @@ test("declined paid request is not revenue; free tickets take no proof; class gu
   const owner = { email: `owner2-${f.slug}@test.local`, password: "owner-pass-123" };
   await prisma.staffUser.create({ data: { gymId: f.gym.id, name: "Owner", email: owner.email, passwordHash: await bcrypt.hash(owner.password, 10), role: "OWNER" } });
   await login(request, baseURL!, f.slug, owner);
-  const csv = await (await request.get(`${baseURL}/api/${f.slug}/finance/export?report=transactions`)).text();
+  const csv = await exportText(request, `${baseURL}/api/${f.slug}/finance/export?report=transactions`);
   expect(csv).not.toContain("Class Carl");
   expect(csv).not.toContain("Free Fred");
 });

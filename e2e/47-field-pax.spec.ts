@@ -1,6 +1,6 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import bcrypt from "bcryptjs";
-import { prisma } from "./helpers";
+import { exportText, prisma } from "./helpers";
 import { encrypt } from "../src/lib/crypto";
 import { dayKeyInTimezone } from "../src/lib/date";
 import { ticketTokenFor } from "../src/lib/guestPass";
@@ -44,7 +44,7 @@ const book = (v: APIRequestContext, baseURL: string, slug: string, fieldId: stri
 const act = (c: APIRequestContext, baseURL: string, slug: string, id: string, data: object) => c.post(`${baseURL}/api/${slug}/field-bookings/${id}`, { data });
 const latest = (fieldId: string) => prisma.fieldBooking.findFirstOrThrow({ where: { fieldId }, orderBy: { createdAt: "desc" } });
 const ledger = async (bookingId: string) => (await prisma.fieldBookingPayment.findMany({ where: { bookingId }, orderBy: { createdAt: "asc" } })).map((p) => `${p.kind}:${Number(p.amount)}`);
-const csv = async (c: APIRequestContext, baseURL: string, slug: string) => (await c.get(`${baseURL}/api/${slug}/finance/export?report=transactions`)).text();
+const csv = (c: APIRequestContext, baseURL: string, slug: string) => exportText(c, `${baseURL}/api/${slug}/finance/export?report=transactions`);
 
 test("per-person price maths", () => {
   expect(bookingAmount("PER_PAX", 15000, 10, 90)).toBe(225000);
@@ -243,7 +243,7 @@ test("the public form asks for people on a per-person field and shows the price;
   await page.goto(`${baseURL}/${f.slug}/book`);
   await page.getByLabel("Day").fill(DAY);
   await expect(page.getByLabel("How many people")).toBeVisible();
-  await page.getByLabel("From").selectOption({ label: "18:00" });
+  await page.getByLabel("From").fill("18:00");
   await page.getByLabel("Until").selectOption({ label: "19:00 (1h)" });
   await page.getByLabel("How many people").fill("10");
   await expect(page.getByTestId("booking-price")).toContainText("10 people");

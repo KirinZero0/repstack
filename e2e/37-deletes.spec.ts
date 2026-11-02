@@ -1,6 +1,6 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import bcrypt from "bcryptjs";
-import { prisma } from "./helpers";
+import { exportText, prisma } from "./helpers";
 import { encrypt, hmacLookup } from "../src/lib/crypto";
 import { ticketTokenFor } from "../src/lib/guestPass";
 
@@ -85,7 +85,7 @@ test("guest requests: unpaid ones can be deleted by staff, paid ones only voided
   expect((await act(staffCtx, paid.id, "void")).status()).toBe(403);
   const token = ticketTokenFor(paid);
   const owner = { email: f.owner.email, password: f.owner.password };
-  const csv = async () => (await request.get(`${baseURL}/api/${f.slug}/finance/export?report=transactions`)).text();
+  const csv = async () => exportText(request, `${baseURL}/api/${f.slug}/finance/export?report=transactions`);
   expect(await csv()).toContain("Guest (guest)");
   expect((await act(request, paid.id, "void")).ok()).toBeTruthy();
   expect((await prisma.guestPass.findUniqueOrThrow({ where: { id: paid.id } })).status).toBe("VOIDED");

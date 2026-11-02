@@ -11,7 +11,7 @@ export interface FieldRules {
   /** Opening and closing time as minutes after midnight (closing may be 1440 = midnight). */
   opensAt: number;
   closesAt: number;
-  /** Bookings start and end on multiples of this many minutes. */
+  /** A booking lasts a whole number of these blocks. It can start on any minute: 14:37 to 15:37 on a 1-hour field. */
   stepMinutes: number;
   pricePerHour: number;
 }
@@ -34,11 +34,28 @@ export function parseClock(value: string): number | null {
   return Number(m[2]) < 60 && minutes <= 24 * 60 ? minutes : null;
 }
 
-/** Why a field's opening hours don't work, or null. Times must sit on the step so every booking can too. */
+/** Why a field's opening hours don't work, or null. They must fit at least one block. */
 export function hoursProblem(opensAt: number, closesAt: number, step: number): string | null {
   if (closesAt <= opensAt) return "The field must close after it opens.";
-  if (opensAt % step !== 0 || closesAt % step !== 0) return `Opening and closing times must be on the ${step}-minute mark.`;
+  if (closesAt - opensAt < step) return `The field must be open for at least one ${blockLabel(step)} block.`;
   return null;
+}
+
+/** "1-hour" or "30-minute": the length of one booking block, for messages. */
+export function blockLabel(step: number): string {
+  return step % 60 === 0 ? `${step / 60}-hour` : `${step}-minute`;
+}
+
+/** The free stretch a booking starting at `start` would sit in, if it has room for at least one whole block. */
+export function roomAt(free: MinuteRange[], start: number, step: number): MinuteRange | null {
+  return free.find((r) => start >= r.start && start + step <= r.end) ?? null;
+}
+
+/** Every end time for a booking starting at `start`: whole blocks, up to `limit` and the longest booking. */
+export function endTimes(step: number, start: number, limit: number): number[] {
+  const out: number[] = [];
+  for (let m = start + step; m <= limit && m - start <= MAX_BOOKING_MINUTES; m += step) out.push(m);
+  return out;
 }
 
 export function isDateKey(value: string): boolean {
@@ -83,8 +100,8 @@ export function bookingPrice(pricePerHour: number, minutes: number): number {
 /** Pass `now = null` for staff: they may log a booking that is already under way, and aren't held to the booking horizon. */
 export function timeProblem(rules: FieldRules, dateKey: string, startMin: number, endMin: number, timezone: string, now: Date | null = new Date()): string | null {
   if (!isDateKey(dateKey)) return "Pick a date.";
-  if (startMin % rules.stepMinutes !== 0 || endMin % rules.stepMinutes !== 0) return `Times must be on the ${rules.stepMinutes}-minute mark.`;
   if (endMin <= startMin) return "The end must be after the start.";
+  if ((endMin - startMin) % rules.stepMinutes !== 0) return `This field is booked in ${blockLabel(rules.stepMinutes)} blocks.`;
   if (startMin < rules.opensAt || endMin > rules.closesAt) return `This field is open ${clock(rules.opensAt)} to ${clock(rules.closesAt)}.`;
   if (endMin - startMin > MAX_BOOKING_MINUTES) return `A booking can be at most ${MAX_BOOKING_MINUTES / 60} hours.`;
   if (now === null) return null;

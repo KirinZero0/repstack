@@ -1,6 +1,7 @@
 import { APIRequestContext, Page } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { buildQrToken } from "../src/lib/qr";
+import { readXlsxRows } from "../src/lib/xlsx";
 
 export const prisma = new PrismaClient();
 
@@ -56,4 +57,11 @@ export async function readExportSheet(body: Buffer) {
   const rows = all.slice(headerAt, end);
   const totals = all.slice(end).filter((r) => !blank(r));
   return { title: all[0]?.[0] ?? "", info, rows, totals };
+}
+
+/** A finance export (an .xlsx) as plain text: one line per row, cells joined by commas. */
+export async function exportText(request: APIRequestContext, url: string): Promise<string> {
+  const res = await request.get(url);
+  if (res.status() !== 200) throw new Error(`export returned ${res.status()}`);
+  return (await readXlsxRows(await res.body())).map((r) => r.join(",")).join("\n");
 }

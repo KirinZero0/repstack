@@ -1,20 +1,13 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import bcrypt from "bcryptjs";
-import { prisma, readExportSheet } from "./helpers";
+import { exportText, prisma, readExportSheet } from "./helpers";
 import { encrypt } from "../src/lib/crypto";
 import { ticketTokenFor } from "../src/lib/guestPass";
 import { dayKeyInTimezone } from "../src/lib/date";
-import { readXlsxRows } from "../src/lib/xlsx";
-import { bookingInstants, bookingPrice, busyRanges, clock, freeRanges, parseClock, timeProblem } from "../src/lib/fieldBooking";
+import { bookingInstants, bookingPrice, busyRanges, clock, endTimes, freeRanges, hoursProblem, parseClock, roomAt, timeProblem } from "../src/lib/fieldBooking";
 
 /** A properly encrypted number, for rows made straight in the database (the staff page decrypts them). */
 
-/** A finance export (an .xlsx) as plain text: one line per row, cells joined by commas. */
-async function exportText(request: APIRequestContext, url: string): Promise<string> {
-  const res = await request.get(url);
-  expect(res.status()).toBe(200);
-  return (await readXlsxRows(await res.body())).map((r) => r.join(",")).join("\n");
-}
 const PHONE_ENC = encrypt("081200000000");
 const TZ = "Asia/Jakarta";
 const HOUR = 60 * 60 * 1000;
@@ -85,12 +78,32 @@ test("time maths: ranges, price, free stretches and the rules a booking must mee
   const rules = { opensAt: 480, closesAt: 1320, stepMinutes: 30, pricePerHour: 60000 };
   const now = new Date("2030-01-01T00:00:00Z");
   expect(timeProblem(rules, "2030-01-10", 600, 660, TZ, now)).toBeNull();
-  expect(timeProblem(rules, "2030-01-10", 610, 660, TZ, now)).toMatch(/30-minute/);
+  expect(timeProblem(rules, "2030-01-10", 610, 640, TZ, now)).toBeNull();
+  expect(timeProblem(rules, "2030-01-10", 610, 660, TZ, now)).toMatch(/30-minute blocks/);
   expect(timeProblem(rules, "2030-01-10", 660, 600, TZ, now)).toMatch(/after the start/);
   expect(timeProblem(rules, "2030-01-10", 420, 540, TZ, now)).toMatch(/open 08:00 to 22:00/);
   expect(timeProblem(rules, "2030-01-10", 600, 600 + 7 * 60, TZ, now)).toMatch(/at most 6 hours/);
   expect(timeProblem(rules, "2029-12-31", 600, 660, TZ, now)).toMatch(/already started/);
   expect(timeProblem(rules, "2030-06-10", 600, 660, TZ, now)).toMatch(/days ahead/);
+
+  // A booking starts on any minute, but lasts whole blocks: on a 1-hour field, 14:30 to 15:30 or 14:37 to 15:37.
+  const hourly = { ...rules, stepMinutes: 60 };
+  expect(timeProblem(hourly, "2030-01-10", 870, 930, TZ, now)).toBeNull();
+  expect(timeProblem(hourly, "2030-01-10", 877, 937, TZ, now)).toBeNull();
+  expect(timeProblem(hourly, "2030-01-10", 885, 945, TZ, now)).toBeNull();
+  expect(timeProblem(hourly, "2030-01-10", 885, 1005, TZ, now)).toBeNull();
+  expect(timeProblem(hourly, "2030-01-10", 870, 900, TZ, now)).toMatch(/1-hour blocks/);
+  expect(timeProblem(hourly, "2030-01-10", 870, 960, TZ, now)).toMatch(/1-hour blocks/);
+  // A start counts only where a whole block fits before the next booking or closing.
+  const gaps = [{ start: 480, end: 600 }, { start: 660, end: 700 }];
+  expect(roomAt(gaps, 537, 60)).toEqual({ start: 480, end: 600 });
+  expect(roomAt(gaps, 541, 60)).toBeNull();
+  expect(roomAt(gaps, 660, 60)).toBeNull();
+  expect(endTimes(60, 885, 1320).slice(0, 3)).toEqual([945, 1005, 1065]);
+  expect(endTimes(60, 885, 1000)).toEqual([945]);
+  expect(hoursProblem(510, 1320, 60)).toBeNull();
+  expect(hoursProblem(490, 1320, 60)).toBeNull();
+  expect(hoursProblem(480, 510, 60)).toMatch(/one 1-hour block/);
 
   // Bookings that touch share no time; free stretches are what is left of the open day.
   const day = "2030-01-10";
@@ -116,7 +129,6 @@ test("only the owner sets up fields, and bad opening hours are refused", async (
 
   for (const bad of [
     { ...body, closesAt: "07:00" },
-    { ...body, opensAt: "08:10" },
     { ...body, name: "x" },
     { ...body, pricePerHour: -1 },
     { ...body, stepMinutes: 20 },
@@ -127,8 +139,9 @@ test("only the owner sets up fields, and bad opening hours are refused", async (
   expect((await request.patch(`${baseURL}/api/${f.slug}/fields/${id}`, { data: { pricePerHour: 75000, isActive: false } })).ok()).toBeTruthy();
   const edited = await prisma.field.findUniqueOrThrow({ where: { id } });
   expect([Number(edited.pricePerHour), edited.isActive]).toEqual([75000, false]);
-  // Hours that don't sit on the field's step are refused on edit too.
-  expect((await request.patch(`${baseURL}/api/${f.slug}/fields/${id}`, { data: { stepMinutes: 60, opensAt: "08:30" } })).status()).toBe(400);
+  // Hours that leave no room for one block are refused on edit too; any minute is fine otherwise.
+  expect((await request.patch(`${baseURL}/api/${f.slug}/fields/${id}`, { data: { stepMinutes: 60, opensAt: "21:30" } })).status()).toBe(400);
+  expect((await request.patch(`${baseURL}/api/${f.slug}/fields/${id}`, { data: { stepMinutes: 60, opensAt: "08:10" } })).status()).toBe(200);
 
   // Another gym's owner can't touch it.
   const other = await makeGym();
@@ -442,7 +455,7 @@ test("the public page shows free times and takes a request; staff approve it fro
   await expect(page.getByRole("heading", { name: "Book a field" })).toBeVisible();
   await page.getByLabel("Day").fill(DAY);
   await expect(page.getByTestId("booked-times")).toContainText("10:00–11:00");
-  await page.getByLabel("From").selectOption({ label: "12:00" });
+  await page.getByLabel("From").fill("12:00");
   await page.getByLabel("Until").selectOption({ label: "13:30 (1h 30m)" });
   await expect(page.getByTestId("booking-price")).toContainText("12:00 to 13:30");
   await expect(page.getByTestId("booking-price")).toContainText("90.000");
