@@ -151,7 +151,7 @@ export default async function DashboardPage({ params }: { params: { slug: string
                 <tr key={m.id} className="border-t border-neutral-800">
                   <td className="px-4 py-3">{m.fullName}</td>
                   <td className="px-4 py-3 text-neutral-400">
-                    {m.membershipExpiry?.toLocaleDateString("id-ID")}
+                    {m.membershipExpiry?.toLocaleDateString("id-ID", { timeZone: gym.timezone })}
                   </td>
                 </tr>
               ))}

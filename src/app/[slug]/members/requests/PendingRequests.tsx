@@ -15,7 +15,7 @@ export interface PendingRow {
   kind: "JOIN" | "RENEWAL";
 }
 
-export default function PendingRequests({ slug, requests }: { slug: string; requests: PendingRow[] }) {
+export default function PendingRequests({ slug, requests, timezone }: { slug: string; requests: PendingRow[]; timezone: string }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +64,7 @@ export default function PendingRequests({ slug, requests }: { slug: string; requ
                 <p className="mt-1 text-xs text-neutral-500">
                   {r.email} · {r.phone}
                 </p>
-                <p className="text-xs text-neutral-600">Submitted {new Date(r.createdAt).toLocaleString("id-ID")}</p>
+                <p className="text-xs text-neutral-600">Submitted {new Date(r.createdAt).toLocaleString("id-ID", { timeZone: timezone })}</p>
                 {!r.hasProof && <p className="mt-1 text-xs text-amber-400">No proof image attached</p>}
               </div>
             </div>

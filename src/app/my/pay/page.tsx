@@ -73,8 +73,8 @@ export default async function PayPage() {
           <span className="text-neutral-300">
             {member.membershipExpiry
               ? daysLeft !== null && daysLeft >= 0
-                ? `Active until ${member.membershipExpiry.toLocaleDateString("id-ID")} (${daysLeft} day${daysLeft === 1 ? "" : "s"} left)`
-                : `Expired on ${member.membershipExpiry.toLocaleDateString("id-ID")}`
+                ? `Active until ${member.membershipExpiry.toLocaleDateString("id-ID", { timeZone: member.gym.timezone })} (${daysLeft} day${daysLeft === 1 ? "" : "s"} left)`
+                : `Expired on ${member.membershipExpiry.toLocaleDateString("id-ID", { timeZone: member.gym.timezone })}`
               : "No active membership yet"}
           </span>
           {active && <span className="text-neutral-500">Renewing adds time on top of what you have left.</span>}

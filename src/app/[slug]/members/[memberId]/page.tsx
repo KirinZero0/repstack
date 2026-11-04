@@ -56,8 +56,8 @@ export default async function MemberDetailPage({ params }: { params: { slug: str
               <span className="text-neutral-400">
                 {member.membershipExpiry
                   ? daysLeft !== null && daysLeft >= 0
-                    ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} left · until ${member.membershipExpiry.toLocaleDateString("id-ID")}`
-                    : `expired ${member.membershipExpiry.toLocaleDateString("id-ID")}`
+                    ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} left · until ${member.membershipExpiry.toLocaleDateString("id-ID", { timeZone: gym.timezone })}`
+                    : `expired ${member.membershipExpiry.toLocaleDateString("id-ID", { timeZone: gym.timezone })}`
                   : "no active period"}
               </span>
             </div>
@@ -79,7 +79,7 @@ export default async function MemberDetailPage({ params }: { params: { slug: str
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between gap-4"><dt className="text-neutral-400">Plan</dt><dd>{member.plan.name}</dd></div>
               <div className="flex justify-between gap-4"><dt className="text-neutral-400">Visits</dt><dd>{visits}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-neutral-400">Last visit</dt><dd>{lastVisit ? lastVisit.checkedInAt.toLocaleDateString("id-ID") : "—"}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-neutral-400">Last visit</dt><dd>{lastVisit ? lastVisit.checkedInAt.toLocaleDateString("id-ID", { timeZone: gym.timezone }) : "—"}</dd></div>
             </dl>
             {!member.anonymizedAt && (
               <div className="mt-4 border-t border-neutral-800 pt-4">
@@ -93,7 +93,7 @@ export default async function MemberDetailPage({ params }: { params: { slug: str
           <Card title="Manage membership">
             {member.anonymizedAt ? (
               <p className="text-sm text-neutral-400">
-                This member&apos;s personal data was erased on {member.anonymizedAt.toLocaleDateString("id-ID")}. Payment and visit history is kept, anonymised.
+                This member&apos;s personal data was erased on {member.anonymizedAt.toLocaleDateString("id-ID", { timeZone: gym.timezone })}. Payment and visit history is kept, anonymised.
               </p>
             ) : (
               <MemberActions
@@ -122,6 +122,7 @@ export default async function MemberDetailPage({ params }: { params: { slug: str
               plans={plans.map((p) => ({ id: p.id, name: p.name, price: Number(p.price), days: p.durationDays }))}
               defaultPlanId={member.planId}
               today={today}
+              timezone={gym.timezone}
             />
           </Card>
         </div>
@@ -144,7 +145,7 @@ export default async function MemberDetailPage({ params }: { params: { slug: str
                   const voided = p.provider === "CASH" && p.status === "FAILED";
                   return (
                     <tr key={p.id} className="border-t border-neutral-800 align-top">
-                      <td className="py-3 text-neutral-400">{(p.paidAt ?? p.createdAt).toLocaleDateString("id-ID")}</td>
+                      <td className="py-3 text-neutral-400">{(p.paidAt ?? p.createdAt).toLocaleDateString("id-ID", { timeZone: gym.timezone })}</td>
                       <td className="py-3">{p.plan.name}</td>
                       <td className={`py-3 ${voided ? "text-neutral-500 line-through" : ""}`}>{rp(Number(p.amount))}</td>
                       <td className="py-3 text-neutral-400">

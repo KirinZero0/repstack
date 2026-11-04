@@ -152,7 +152,7 @@ export default async function BillingPage({
             <p className="mt-1">
               Pay now to keep your gym running. Without payment it&apos;s suspended{" "}
               {gym.nextBillingDate
-                ? `after ${new Date(gym.nextBillingDate.getTime() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString("id-ID")}`
+                ? `after ${new Date(gym.nextBillingDate.getTime() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString("id-ID", { timeZone: gym.timezone })}`
                 : "shortly"}
               .
             </p>
@@ -175,7 +175,7 @@ export default async function BillingPage({
             {!gym.isLifetime && (
               <div>
                 <p className="text-neutral-400">Next billing date</p>
-                <p>{gym.nextBillingDate?.toLocaleDateString("id-ID") ?? "—"}</p>
+                <p>{gym.nextBillingDate?.toLocaleDateString("id-ID", { timeZone: gym.timezone }) ?? "—"}</p>
               </div>
             )}
           </div>
@@ -253,7 +253,7 @@ export default async function BillingPage({
             <tbody>
               {payments.map((p) => (
                 <tr key={p.id} className="border-t border-neutral-800">
-                  <td className="px-4 py-3">{p.createdAt.toLocaleDateString("id-ID")}</td>
+                  <td className="px-4 py-3">{p.createdAt.toLocaleDateString("id-ID", { timeZone: gym.timezone })}</td>
                   <td className="px-4 py-3 text-neutral-300">{p.kind === "SETUP" ? "Setup fee" : p.saasPlan.name}</td>
                   <td className="px-4 py-3">Rp {Number(p.amount).toLocaleString("id-ID")}</td>
                   <td className={`px-4 py-3 ${STATUS_TONE[p.status] ?? ""}`}>{p.status}</td>

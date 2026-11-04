@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
       if (owner) {
         const payUrl = url.startsWith("/") ? `${appUrl}${url}` : url;
         // Same date the Billing page shows: suspension comes GRACE_PERIOD_MS after the due date.
-        const graceEnds = new Date((gym.nextBillingDate ?? now).getTime() + GRACE_PERIOD_MS).toLocaleDateString("id-ID");
+        const graceEnds = new Date((gym.nextBillingDate ?? now).getTime() + GRACE_PERIOD_MS).toLocaleDateString("id-ID", { timeZone: gym.timezone });
         await notifyOwner({
           gymId: gym.id,
           gymName: gym.name,

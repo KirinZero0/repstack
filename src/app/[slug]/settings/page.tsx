@@ -162,7 +162,7 @@ export default async function GymSettingsPage({ params }: { params: { slug: stri
                         <span className={STATUS_TONE[n.status] ?? "text-neutral-400"}>
                           {n.status === "SKIPPED" ? `Not sent (${n.channel === "email" ? "email" : "WhatsApp"} unavailable)` : n.status === "LIMIT" ? "Not sent (monthly limit reached)" : n.status.toLowerCase()}
                         </span>
-                        <span className="text-neutral-500">{n.sentAt.toLocaleString("id-ID")}</span>
+                        <span className="text-neutral-500">{n.sentAt.toLocaleString("id-ID", { timeZone: gym.timezone })}</span>
                       </span>
                     </li>
                   ))}

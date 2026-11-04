@@ -112,7 +112,7 @@ export default async function MembersPage({ params }: { params: { slug: string }
           )}
         </div>
 
-        <MembersTable slug={params.slug} isOwner={session.role === "OWNER"} rows={rows} />
+        <MembersTable slug={params.slug} isOwner={session.role === "OWNER"} rows={rows} timezone={gym.timezone} />
       </div>
     </main>
   );

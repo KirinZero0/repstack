@@ -314,3 +314,32 @@ test("the owner records a refund on the Finance page, revenue drops by it, voidi
   expect((await request.post(`${baseURL}/api/${other.slug}/refunds/${keep.id}`)).status()).toBe(404);
   expect((await prisma.refund.findUniqueOrThrow({ where: { id: keep.id } })).voidedAt).toBeNull();
 });
+
+test("dates on the back office are the gym's calendar day, not the server's: 07:10 in Bali on 4 Nov is 4 Nov", async ({ request, baseURL, browser }) => {
+  const f = await makeGym();
+  await prisma.gym.update({ where: { id: f.gym.id }, data: { timezone: "Asia/Makassar" } });
+  // 07:10 WITA (UTC+8) on 4 Nov is still 3 Nov in UTC, where the server's clock runs.
+  const at = new Date("2026-11-03T23:10:00Z");
+  await prisma.payment.create({ data: { gymId: f.gym.id, memberId: f.member.id, planId: f.plan.id, provider: "CASH", amount: 250000, status: "PAID", createdAt: at, paidAt: at } });
+  // Membership runs out at 07:30 WITA on 1 Dec: 30 Nov in UTC.
+  await prisma.member.update({ where: { id: f.member.id }, data: { membershipExpiry: new Date("2026-11-30T23:30:00Z") } });
+  await login(request, baseURL!, f.slug, f.owner);
+
+  const finance = await (await request.get(`${baseURL}/${f.slug}/finance`)).text();
+  expect(finance).toContain("4/11/2026");
+  expect(finance).not.toContain("3/11/2026");
+
+  const detail = await (await request.get(`${baseURL}/${f.slug}/members/${f.member.id}`)).text();
+  expect(detail).toContain("4/11/2026");
+  expect(detail).toContain("1/12/2026");
+  expect(detail).not.toContain("30/11/2026");
+
+  // The members list is drawn in the browser: one whose clock is UTC still shows the gym's day.
+  const ctx = await browser.newContext({ timezoneId: "UTC" });
+  await login(ctx.request, baseURL!, f.slug, f.owner);
+  const page = await ctx.newPage();
+  await page.goto(`${baseURL}/${f.slug}/members`);
+  await expect(page.getByText("1/12/2026").first()).toBeVisible();
+  await expect(page.getByText("30/11/2026")).toHaveCount(0);
+  await ctx.close();
+});

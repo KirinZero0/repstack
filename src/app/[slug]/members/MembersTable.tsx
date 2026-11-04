@@ -22,7 +22,7 @@ const toLocal = (d: string) => (d.startsWith("62") ? `0${d.slice(2)}` : d);
 
 const PAGE_SIZE = 20;
 
-export default function MembersTable({ slug, isOwner, rows }: { slug: string; isOwner: boolean; rows: MemberRow[] }) {
+export default function MembersTable({ slug, isOwner, rows, timezone }: { slug: string; isOwner: boolean; rows: MemberRow[]; timezone: string }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
 
@@ -91,7 +91,7 @@ export default function MembersTable({ slug, isOwner, rows }: { slug: string; is
                 <td className="whitespace-nowrap px-4 py-3">{m.plan}</td>
                 <td className="whitespace-nowrap px-4 py-3"><StatusPill status={m.status} /></td>
                 <td className="px-4 py-3 text-neutral-400">
-                  {m.membershipExpiry ? new Date(m.membershipExpiry).toLocaleDateString("id-ID") : "—"}
+                  {m.membershipExpiry ? new Date(m.membershipExpiry).toLocaleDateString("id-ID", { timeZone: timezone }) : "—"}
                 </td>
                 <td className="px-4 py-3">{m.activated ? "Yes" : "Pending"}</td>
                 <td className="px-4 py-3">

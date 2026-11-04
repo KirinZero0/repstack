@@ -19,12 +19,14 @@ export function RecordPaymentForm({
   plans,
   defaultPlanId,
   today,
+  timezone,
 }: {
   slug: string;
   memberId: string;
   plans: PlanOption[];
   defaultPlanId: string;
   today: string;
+  timezone: string;
 }) {
   const router = useRouter();
   const first = plans.find((p) => p.id === defaultPlanId) ?? plans[0];
@@ -58,7 +60,7 @@ export function RecordPaymentForm({
       setError(typeof body.error === "string" ? body.error : "Could not record the payment.");
       return;
     }
-    setDone(`Recorded. Active until ${new Date(body.membershipExpiry).toLocaleDateString("id-ID")}.`);
+    setDone(`Recorded. Active until ${new Date(body.membershipExpiry).toLocaleDateString("id-ID", { timeZone: timezone })}.`);
     setNote("");
     router.refresh();
   }

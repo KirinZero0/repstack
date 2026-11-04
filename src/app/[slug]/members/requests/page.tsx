@@ -46,7 +46,7 @@ export default async function PendingRequestsPage({ params }: { params: { slug: 
             No pending requests.
           </p>
         ) : (
-          <PendingRequests slug={params.slug} requests={requests} />
+          <PendingRequests slug={params.slug} requests={requests} timezone={gym.timezone} />
         )}
       </div>
     </main>

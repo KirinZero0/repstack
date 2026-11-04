@@ -19,15 +19,14 @@ export async function GET(req: NextRequest) {
       status: "ACTIVE",
       membershipExpiry: { gte: now, lte: reminderCutoff },
     },
+    include: { gym: { select: { timezone: true } } },
   });
 
   let remindersSent = 0;
   for (const member of expiringSoon) {
     await notifyMember(member.gymId, {
       to: decrypt(member.phoneWhatsapp),
-      message: `Hi ${member.fullName}, your gym membership expires on ${member.membershipExpiry?.toLocaleDateString(
-        "id-ID",
-      )}. Renew soon to keep your access active.`,
+      message: `Hi ${member.fullName}, your gym membership expires on ${member.membershipExpiry?.toLocaleDateString("id-ID", { timeZone: member.gym.timezone })}. Renew soon to keep your access active.`,
       type: "expiry_reminder",
       memberId: member.id,
     });

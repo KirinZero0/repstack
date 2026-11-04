@@ -164,8 +164,8 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
               <span className={`text-sm ${expiringSoon ? "text-amber-400" : "text-neutral-300"}`}>
                 {member.membershipExpiry
                   ? daysLeft !== null && daysLeft >= 0
-                    ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} left · expires ${member.membershipExpiry.toLocaleDateString("id-ID")}`
-                    : `expired ${member.membershipExpiry.toLocaleDateString("id-ID")}`
+                    ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} left · expires ${member.membershipExpiry.toLocaleDateString("id-ID", { timeZone: member.gym.timezone })}`
+                    : `expired ${member.membershipExpiry.toLocaleDateString("id-ID", { timeZone: member.gym.timezone })}`
                   : "no active period"}
               </span>
             </div>
@@ -189,7 +189,7 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
           <StatCard label="Visits this month" value={String(att.thisMonth)} />
           <StatCard label="Current streak" value={`${att.streak} day${att.streak === 1 ? "" : "s"}`} />
           <StatCard label="Total visits" value={String(att.total)} />
-          <StatCard label="Last visit" value={att.last ? att.last.toLocaleDateString("id-ID") : "—"} />
+          <StatCard label="Last visit" value={att.last ? att.last.toLocaleDateString("id-ID", { timeZone: member.gym.timezone }) : "—"} />
         </div>
 
         <div className="mb-6 grid gap-6 sm:grid-cols-2">
@@ -254,7 +254,7 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
               <ul className="space-y-2 text-sm">
                 {att.recent.map((d, i) => (
                   <li key={i} className="flex justify-between border-b border-neutral-800 pb-2 last:border-0">
-                    <span>{d.toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })}</span>
+                    <span>{d.toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short", timeZone: member.gym.timezone })}</span>
                     <span className="text-neutral-500">
                       {d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: member.gym.timezone })}
                     </span>
@@ -272,7 +272,7 @@ export default async function MemberDashboardPage({ searchParams }: { searchPara
                   <li key={p.id} className="flex items-center justify-between border-b border-neutral-800 pb-2 last:border-0">
                     <span>
                       {p.plan.name}
-                      <span className="ml-2 text-neutral-500">{p.createdAt.toLocaleDateString("id-ID")}</span>
+                      <span className="ml-2 text-neutral-500">{p.createdAt.toLocaleDateString("id-ID", { timeZone: member.gym.timezone })}</span>
                     </span>
                     <span className="flex items-center gap-2">
                       {rp(Number(p.amount))} <StatusPill status={p.status} />

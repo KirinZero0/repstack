@@ -128,7 +128,7 @@ export default async function FinancePage({ params }: { params: { slug: string }
             <tbody>
               {f.recent.map((p) => (
                 <tr key={p.id} className="border-t border-neutral-800">
-                  <td className="py-2 text-neutral-400">{p.date.toLocaleDateString("id-ID")}</td>
+                  <td className="py-2 text-neutral-400">{p.date.toLocaleDateString("id-ID", { timeZone: gym.timezone })}</td>
                   <td className="py-2">{p.member}</td>
                   <td className="py-2 text-neutral-400">{p.plan}</td>
                   <td className="py-2">{rp(p.amount)}</td>
