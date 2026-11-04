@@ -1,5 +1,6 @@
 import { prisma, type TenantDb } from "./prisma";
 import { dayKeyInTimezone, zonedTimeToUtc } from "./date";
+import { methodLabel } from "./paymentMethod";
 
 export function monthKey(date: Date, timezone: string): string {
   return dayKeyInTimezone(date, timezone).slice(0, 7);
@@ -26,7 +27,7 @@ function monthlyEquivalent(price: number, interval: string) {
   return interval === "annual" ? price / 12 : price;
 }
 
-type PaidRow = { when: Date; amount: number; item: string; kind: "membership" | "class" | "daypass" | "field" | "refund"; provider: string };
+type PaidRow = { when: Date; amount: number; item: string; kind: "membership" | "class" | "daypass" | "field" | "refund"; provider: string; method: string };
 
 /**
  * Every bit of money that counts as revenue since `since`: paid membership and class payments, approved guest
@@ -59,13 +60,14 @@ async function loadRevenue(db: TenantDb, gymId: string, since: Date) {
   ]);
 
   const rows: PaidRow[] = [
-    ...paid.map((p) => ({ when: p.paidAt ?? p.createdAt, amount: Number(p.amount), item: p.plan.name, kind: "membership" as const, provider: p.provider })),
+    ...paid.map((p) => ({ when: p.paidAt ?? p.createdAt, amount: Number(p.amount), item: p.plan.name, kind: "membership" as const, provider: p.provider, method: methodLabel(p.method, p.provider) })),
     ...paidClasses.map((p) => ({
       when: p.paidAt ?? p.createdAt,
       amount: Number(p.amount),
       item: `${p.registration.session.class.name} class`,
       kind: "class" as const,
       provider: p.provider,
+      method: methodLabel(p.method, p.provider),
     })),
     ...paidDayPasses.map((p) => ({
       when: p.reviewedAt ?? p.createdAt,
@@ -73,11 +75,12 @@ async function loadRevenue(db: TenantDb, gymId: string, since: Date) {
       item: p.session ? `${p.session.class.name} class (guest)` : `${p.dayPassPlan?.name ?? "Day pass"} (day pass)`,
       kind: p.session ? ("class" as const) : ("daypass" as const),
       provider: "CASH",
+      method: methodLabel(p.method),
     })),
-    ...paidFields.map((p) => ({ when: p.createdAt, amount: Number(p.amount), item: `${p.booking.field.name} (field booking)`, kind: "field" as const, provider: "CASH" })),
+    ...paidFields.map((p) => ({ when: p.createdAt, amount: Number(p.amount), item: `${p.booking.field.name} (field booking)`, kind: "field" as const, provider: "CASH", method: methodLabel(p.method) })),
     // Negative, so every total below is net of what was given back.
     // A voided refund stays listed below but no longer comes off revenue.
-    ...refunds.filter((r) => !r.voidedAt).map((r) => ({ when: r.refundedAt, amount: -Number(r.amount), item: "Refunds", kind: "refund" as const, provider: "CASH" })),
+    ...refunds.filter((r) => !r.voidedAt).map((r) => ({ when: r.refundedAt, amount: -Number(r.amount), item: "Refunds", kind: "refund" as const, provider: "CASH", method: "Refund" })),
   ];
 
   return { rows, dayPasses: paidDayPasses, refunds };
@@ -138,8 +141,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     // The breakdowns show what came in; refunds are shown on their own rather than as negative bars.
     if (key === months[months.length - 1] && p.kind !== "refund") {
       byPlan.set(p.item, (byPlan.get(p.item) ?? 0) + p.amount);
-      const method = p.provider === "CASH" ? "Recorded manually" : "Online payment";
-      byMethod.set(method, (byMethod.get(method) ?? 0) + p.amount);
+      byMethod.set(p.method, (byMethod.get(p.method) ?? 0) + p.amount);
     }
   }
 
@@ -160,7 +162,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     .slice(0, 10);
 
   const recentAll = [
-    ...recent.map((p) => ({ id: p.id, member: p.member.fullName, plan: p.plan.name, amount: Number(p.amount), status: p.status, date: p.createdAt })),
+    ...recent.map((p) => ({ id: p.id, member: p.member.fullName, plan: p.plan.name, amount: Number(p.amount), status: p.status, date: p.createdAt, method: methodLabel(p.method, p.provider) })),
     ...recentClasses.map((p) => ({
       id: p.id,
       member: p.registration.member.fullName,
@@ -168,6 +170,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       amount: Number(p.amount),
       status: p.status,
       date: p.createdAt,
+      method: methodLabel(p.method, p.provider),
     })),
     ...recentDayPasses.map((p) => ({
       id: p.id,
@@ -176,6 +179,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       amount: Number(p.amount ?? 0),
       status: "PAID" as string,
       date: p.reviewedAt!,
+      method: methodLabel(p.method),
     })),
   ]
     .sort((a, b) => b.date.getTime() - a.date.getTime())

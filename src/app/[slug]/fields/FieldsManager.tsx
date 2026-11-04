@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import ChannelPicker, { type Channel } from "@/components/ChannelPicker";
 import { blockLabel, clock, endTimes, parseClock } from "@/lib/fieldBooking";
+import PaymentMethodPicker from "@/components/PaymentMethodPicker";
+import type { PaymentMethod } from "@/lib/paymentMethod";
 
 export interface FieldRow {
   id: string;
@@ -130,6 +132,10 @@ export default function FieldsManager({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
+  const [methods, setMethods] = useState<Record<string, PaymentMethod>>({});
+  const methodPicker = (b: BookingRow, fallback: PaymentMethod) => (
+    <PaymentMethodPicker compact value={methods[b.id] ?? fallback} onChange={(m) => setMethods((all) => ({ ...all, [b.id]: m }))} />
+  );
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   // Adding happens right on the day's list: closed until staff pick "Add booking" or "Block time".
@@ -142,7 +148,8 @@ export default function FieldsManager({
     setBusy(b.id);
     setError(null);
     setNote(null);
-    const { error: err } = await call(`/api/${slug}/field-bookings/${b.id}`, "POST", channel ? { action, channel } : { action });
+    const body = channel ? { action, channel } : action === "approve" && b.amount > 0 ? { action, method: methods[b.id] ?? "TRANSFER" } : { action };
+    const { error: err } = await call(`/api/${slug}/field-bookings/${b.id}`, "POST", body);
     setBusy(null);
     if (err) return setError(err);
     if (action === "resend") setNote(`Ticket sent again by ${channel === "email" ? "email" : "WhatsApp"}.`);
@@ -173,7 +180,7 @@ export default function FieldsManager({
     setBusy(b.id);
     setError(null);
     setNote(null);
-    const { error: err } = await call(`/api/${slug}/field-bookings/${b.id}`, "POST", { action });
+    const { error: err } = await call(`/api/${slug}/field-bookings/${b.id}`, "POST", { action, method: methods[b.id] ?? "CASH" });
     setBusy(null);
     if (err) return setError(err);
     setNote(action === "collect" ? `Recorded ${rp(sum)} collected.` : `Recorded ${rp(sum)} refunded.`);
@@ -244,6 +251,7 @@ export default function FieldsManager({
                     </div>
                     <div className="flex items-center gap-2">
                       {b.pax !== null && <button className={btn} disabled={busy === b.id} onClick={() => editPax(b)}>Edit people</button>}
+                      {b.amount > 0 && methodPicker(b, "TRANSFER")}
                       <button className={primary} disabled={busy === b.id} onClick={() => act(b, "approve")}>
                         {b.amount > 0 ? "Payment received, approve" : "Approve"}
                       </button>
@@ -318,10 +326,10 @@ export default function FieldsManager({
                                   <button className={btn} disabled={busy === b.id} onClick={() => editPax(b)}>Edit people</button>
                                 )}
                                 {!b.isBlock && b.amount - b.paid > 0 && b.status !== "PENDING_REVIEW" && (
-                                  <button className={primary} disabled={busy === b.id} onClick={() => settle(b, "collect")}>Collect {rp(b.amount - b.paid)}</button>
+                                  <>{methodPicker(b, "CASH")}<button className={primary} disabled={busy === b.id} onClick={() => settle(b, "collect")}>Collect {rp(b.amount - b.paid)}</button></>
                                 )}
                                 {!b.isBlock && b.amount - b.paid < 0 && isOwner && (
-                                  <button className={btn} disabled={busy === b.id} onClick={() => settle(b, "refund")}>Refund {rp(b.paid - b.amount)}</button>
+                                  <>{methodPicker(b, "CASH")}<button className={btn} disabled={busy === b.id} onClick={() => settle(b, "refund")}>Refund {rp(b.paid - b.amount)}</button></>
                                 )}
                                 {b.status === "APPROVED" && !b.isBlock && b.window !== "EARLY" && (
                                   <button className={btn} disabled={busy === b.id} onClick={() => act(b, "attend")}>Came</button>
@@ -379,6 +387,7 @@ function ManualBooking({
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [noteText, setNoteText] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>("CASH");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -400,6 +409,7 @@ function ManualBooking({
       fullName: fullName || undefined,
       phone: phone || undefined,
       note: noteText || undefined,
+      method: isBlock ? undefined : method,
     });
     setBusy(false);
     if (err) return setError(err);
@@ -463,6 +473,7 @@ function ManualBooking({
               <span className="mb-1 block">WhatsApp (optional)</span>
               <input value={phone} onChange={(e) => setPhone(e.target.value)} className={input} maxLength={30} aria-label="Booking phone" />
             </label>
+            <PaymentMethodPicker value={method} onChange={setMethod} />
           </>
         )}
         <label className="text-sm text-neutral-300">

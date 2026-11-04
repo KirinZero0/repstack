@@ -109,7 +109,7 @@ test("owner downloads transactions: paid only by default, everything on request,
   expect(paidIds).not.toContain(voided.id);
 
   const cashRow = paid.rows.find((r) => r[11] === cash.id)!;
-  expect(cashRow).toEqual([dayKeyInTimezone(inRange, TZ), "Membership", "Sari, Dewi", "Monthly", "200000", "IDR", "PAID", "Cash / transfer at desk", "Owner Ani", "Front desk, discounted", "", cash.id]);
+  expect(cashRow).toEqual([dayKeyInTimezone(inRange, TZ), "Membership", "Sari, Dewi", "Monthly", "200000", "IDR", "PAID", "At desk (not recorded)", "Owner Ani", "Front desk, discounted", "", cash.id]);
   const onlineRow = paid.rows.find((r) => r[11] === online.id)!;
   expect(onlineRow[7]).toBe("Online (Xendit)");
   expect(onlineRow[10]).toBe(online.externalInvoiceId);
@@ -196,7 +196,7 @@ test("the monthly summary has one row per month with revenue split by type and m
   await login(request, baseURL!, f.slug, f.owner);
   const { rows, disposition } = await fetchSheet(request, baseURL!, f.slug, `?report=monthly&from=${prevKey}-01&to=${dayKeyInTimezone(now, TZ)}`);
   expect(disposition).toContain(`finance-monthly-${f.slug}-`);
-  expect(rows[0]).toEqual(["Month", "Membership revenue", "Class revenue", "Day pass revenue", "Field revenue", "Refunds", "Total revenue", "Paid payments", "Cash / transfer", "Online", "Voided"]);
+  expect(rows[0]).toEqual(["Month", "Membership revenue", "Class revenue", "Day pass revenue", "Field revenue", "Refunds", "Total revenue", "Paid payments", "At desk (cash, transfer, QRIS)", "Online", "Voided"]);
   expect(rows).toHaveLength(3);
   // Previous month: one cash payment, one voided entry.
   expect(rows[1].slice(1)).toEqual(["300000", "0", "0", "0", "0", "300000", "1", "300000", "0", "1"]);
@@ -342,4 +342,49 @@ test("dates on the back office are the gym's calendar day, not the server's: 07:
   await expect(page.getByText("1/12/2026").first()).toBeVisible();
   await expect(page.getByText("30/11/2026")).toHaveCount(0);
   await ctx.close();
+});
+
+test("staff say how money came in (cash, transfer, QRIS) everywhere they record it, and Finance and the export show it", async ({ request, baseURL }) => {
+  const f = await makeGym();
+  await login(request, baseURL!, f.slug, f.owner);
+  const pay = (data: object) => request.post(`${baseURL}/api/${f.slug}/members/${f.member.id}/payments`, { data: { planId: f.plan.id, ...data } });
+
+  // A desk payment takes the method staff picked; one sent without (an older screen) is cash; nonsense is refused.
+  const qris = await pay({ amount: 150000, method: "QRIS" });
+  expect(qris.status()).toBe(201);
+  expect((await prisma.payment.findUniqueOrThrow({ where: { id: (await qris.json()).paymentId } })).method).toBe("QRIS");
+  await new Promise((r) => setTimeout(r, 10));
+  const plain = await pay({ amount: 160000 });
+  expect((await prisma.payment.findUniqueOrThrow({ where: { id: (await plain.json()).paymentId } })).method).toBe("CASH");
+  expect((await pay({ amount: 170000, method: "CHEQUE" })).status()).toBe(400);
+
+  // Adding a member records the plan price by the method chosen.
+  const added = await request.post(`${baseURL}/api/${f.slug}/members`, {
+    data: { fullName: "Transfer Tono", email: `tono-${f.slug}@test.local`, phoneWhatsapp: `0813${Date.now().toString().slice(-8)}`, planId: f.plan.id, method: "TRANSFER" },
+  });
+  expect(added.ok(), await added.text()).toBeTruthy();
+  const tono = await prisma.member.findFirstOrThrow({ where: { gymId: f.gym.id, fullName: "Transfer Tono" } });
+  expect((await prisma.payment.findFirstOrThrow({ where: { memberId: tono.id } })).method).toBe("TRANSFER");
+
+  // A walk-in day pass paid at the desk, and a guest request approved after a transfer (its default).
+  const dayPlan = await prisma.dayPassPlan.create({ data: { gymId: f.gym.id, name: "Single visit", price: 50000 } });
+  const walk = await request.post(`${baseURL}/api/${f.slug}/attendance/walk-in`, { data: { dayPassPlanId: dayPlan.id, fullName: "Walk Wati", method: "QRIS" } });
+  expect(walk.status()).toBe(201);
+  expect((await prisma.guestPass.findUniqueOrThrow({ where: { id: (await walk.json()).id } })).method).toBe("QRIS");
+  const asked = await prisma.guestPass.create({
+    data: { gymId: f.gym.id, dayPassPlanId: dayPlan.id, fullName: "Guest Gita", phoneWhatsapp: "v1:x", phoneWhatsappLookup: `gita-${f.slug}`, amount: 50000 },
+  });
+  expect((await request.post(`${baseURL}/api/${f.slug}/guest-passes/${asked.id}`, { data: { action: "approve" } })).ok()).toBeTruthy();
+  expect((await prisma.guestPass.findUniqueOrThrow({ where: { id: asked.id } })).method).toBe("TRANSFER");
+
+  // Finance splits this month by method, and Recent payments says how each was paid.
+  const finance = await (await request.get(`${baseURL}/${f.slug}/finance`)).text();
+  for (const label of [">QRIS<", ">Cash<", ">Transfer<"]) expect(finance).toContain(label);
+  expect(finance).toContain("Paid by");
+
+  // The export's Method column carries it too.
+  const { rows } = await fetchSheet(request, baseURL!, f.slug, "?report=transactions");
+  const methodCol = rows[0].indexOf("Method");
+  const methods = rows.slice(1).map((r) => r[methodCol]);
+  expect(methods).toEqual(expect.arrayContaining(["QRIS", "Cash", "Transfer"]));
 });

@@ -1,4 +1,4 @@
-import type { MemberStatus, Prisma } from "@prisma/client";
+import type { MemberStatus, PaymentMethod, Prisma } from "@prisma/client";
 import type { TenantDb } from "./prisma";
 import { encrypt, hmacLookup, normalizePhone } from "./crypto";
 import { createMagicLink } from "./magicLink";
@@ -20,7 +20,7 @@ export interface CreateMemberOptions {
    * Record a CASH payment of the plan's price, dated now. Right for "they just paid at the desk";
    * wrong for a member imported from the gym's old spreadsheet, who paid before Liftmora existed.
    */
-  recordPayment: { recordedById: string; amount: Prisma.Decimal | number; currency: string } | null;
+  recordPayment: { recordedById: string; amount: Prisma.Decimal | number; currency: string; method?: PaymentMethod } | null;
   /** Send the activation link on the gym's channels. Off lets an owner import quietly and hand links over later. */
   notify: boolean;
 }
@@ -61,6 +61,7 @@ export async function createMember(
         status: "PAID",
         paidAt: new Date(),
         recordedById: opts.recordPayment.recordedById,
+        method: opts.recordPayment.method ?? "CASH",
       },
     });
   }

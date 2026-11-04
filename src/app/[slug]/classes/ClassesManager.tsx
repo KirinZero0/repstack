@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import ChannelPicker, { type Channel } from "@/components/ChannelPicker";
+import PaymentMethodPicker from "@/components/PaymentMethodPicker";
+import type { PaymentMethod } from "@/lib/paymentMethod";
 
 export interface RegistrationRow {
   id: string;
@@ -227,6 +229,7 @@ function AddMember({ slug, session, members, onChanged }: { slug: string; sessio
 }
 
 function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: string; session: SessionRow; isOwner: boolean; price: number; members: MemberOption[]; onChanged: () => void }) {
+  const [methods, setMethods] = useState<Record<string, PaymentMethod>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -271,7 +274,7 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
     if (!Number.isFinite(amount)) return setError("Enter a whole number of rupiah.");
     setBusy(r.id);
     setError(null);
-    const { error } = await call(`/api/${slug}/class-registrations/${r.id}/confirm`, "POST", { amount });
+    const { error } = await call(`/api/${slug}/class-registrations/${r.id}/confirm`, "POST", { amount, method: methods[r.id] ?? (r.hasProof ? "TRANSFER" : "CASH") });
     setBusy(null);
     if (error) return setError(error);
     onChanged();
@@ -368,9 +371,12 @@ function Roster({ slug, session, isOwner, price, members, onChanged }: { slug: s
                       </a>
                     )}
                     {session.status === "SCHEDULED" && (
-                      <button onClick={() => confirm(r)} disabled={busy === r.id} className={ghostCls}>
-                        {busy === r.id ? "Saving…" : "Record payment"}
-                      </button>
+                      <>
+                        <PaymentMethodPicker compact value={methods[r.id] ?? (r.hasProof ? "TRANSFER" : "CASH")} onChange={(m) => setMethods((all) => ({ ...all, [r.id]: m }))} />
+                        <button onClick={() => confirm(r)} disabled={busy === r.id} className={ghostCls}>
+                          {busy === r.id ? "Saving…" : "Record payment"}
+                        </button>
+                      </>
                     )}
                     <button onClick={() => removeBooking(r)} disabled={busy === r.id} className={`${ghostCls} hover:border-red-800 hover:text-red-400`}>
                       Cancel booking

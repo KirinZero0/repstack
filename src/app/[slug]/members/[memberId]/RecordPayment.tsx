@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import PaymentMethodPicker from "@/components/PaymentMethodPicker";
+import type { PaymentMethod } from "@/lib/paymentMethod";
 
 export interface PlanOption {
   id: string;
@@ -34,6 +36,7 @@ export function RecordPaymentForm({
   const [amount, setAmount] = useState(String(first?.price ?? ""));
   const [paidOn, setPaidOn] = useState(today);
   const [note, setNote] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>("CASH");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -52,7 +55,7 @@ export function RecordPaymentForm({
     const res = await fetch(`/api/${slug}/members/${memberId}/payments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId, amount: Number(amount), paidOn, note: note || undefined }),
+      body: JSON.stringify({ planId, amount: Number(amount), paidOn, note: note || undefined, method }),
     });
     const body = await res.json().catch(() => ({}));
     setBusy(false);
@@ -98,8 +101,11 @@ export function RecordPaymentForm({
       </label>
       <label className="text-sm text-neutral-300">
         <span className="mb-1 block">Note (optional)</span>
-        <input maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} className={inputCls} placeholder="Cash at front desk" />
+        <input maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} className={inputCls} placeholder="Front desk" />
       </label>
+      <div className="col-span-full">
+        <PaymentMethodPicker value={method} onChange={setMethod} />
+      </div>
 
       {error && <p className="col-span-full text-sm text-red-400">{error}</p>}
       {done && <p className="col-span-full text-sm text-emerald-400">{done}</p>}

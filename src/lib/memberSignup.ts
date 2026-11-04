@@ -4,6 +4,7 @@ import { decrypt } from "./crypto";
 import { extendedExpiry } from "./membership";
 import { notifyMember } from "./notify";
 import { paymentProviderEnum } from "./gateway";
+import type { PaymentMethod } from "@prisma/client";
 
 export const MEMBER_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 /** Max signups one IP can start per hour, and max one gym can receive per hour. */
@@ -91,13 +92,13 @@ export async function completeMemberSignup(signupId: string, paidAt: Date) {
 export async function approveMemberSignup(
   gym: { id: string; name: string; slug: string; timezone: string },
   signupId: string,
-  opts: { recordedById?: string } = {},
+  opts: { recordedById?: string; method?: PaymentMethod } = {},
 ) {
   const created = await tenantTransaction(gym.id, async (tx) => {
     const signup = await tx.memberSignup.findUnique({ where: { id: signupId }, include: { plan: true } });
     if (!signup || signup.gymId !== gym.id || signup.status !== "PENDING_REVIEW") return null;
 
-    if (signup.kind === "RENEWAL") return approveRenewal(tx, signup, opts.recordedById);
+    if (signup.kind === "RENEWAL") return approveRenewal(tx, signup, opts.recordedById, opts.method);
 
     const taken = await tx.member.findUnique({ where: { email: signup.email } });
     if (taken) {
@@ -128,6 +129,7 @@ export async function approveMemberSignup(
         memberId: member.id,
         planId: signup.planId,
         provider: "CASH", // confirmed by staff from a bank-transfer proof, not an online gateway
+        method: opts.method ?? "TRANSFER",
         amount: signup.amount,
         currency: signup.plan.currency,
         status: "PAID",
@@ -165,7 +167,7 @@ type SignupWithPlan = NonNullable<Awaited<ReturnType<Tx["memberSignup"]["findUni
  * payment, and reactivates them. A frozen member stays frozen but still gets the time, the same as
  * a desk payment. A cancelled member can't renew this way; the request is left for staff to sort out.
  */
-async function approveRenewal(tx: Tx, signup: SignupWithPlan, recordedById?: string) {
+async function approveRenewal(tx: Tx, signup: SignupWithPlan, recordedById?: string, method: PaymentMethod = "TRANSFER") {
   if (!signup.memberId) return null;
   const member = await tx.member.findUnique({ where: { id: signup.memberId } });
   if (!member || member.gymId !== signup.gymId || member.anonymizedAt || member.status === "CANCELLED") return null;
@@ -190,7 +192,8 @@ async function approveRenewal(tx: Tx, signup: SignupWithPlan, recordedById?: str
       currency: signup.plan.currency,
       status: "PAID",
       paidAt,
-      note: "Bank transfer, confirmed from the member's renewal request",
+      method,
+      note: "Confirmed from the member's renewal request",
       recordedById: recordedById ?? null,
     },
   });

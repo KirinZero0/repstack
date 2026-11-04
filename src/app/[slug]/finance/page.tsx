@@ -122,6 +122,7 @@ export default async function FinancePage({ params }: { params: { slug: string }
                 <th className="pb-2 font-normal">Member</th>
                 <th className="pb-2 font-normal">Plan / class</th>
                 <th className="pb-2 font-normal">Amount</th>
+                <th className="pb-2 font-normal">Paid by</th>
                 <th className="pb-2 font-normal">Status</th>
               </tr>
             </thead>
@@ -132,11 +133,12 @@ export default async function FinancePage({ params }: { params: { slug: string }
                   <td className="py-2">{p.member}</td>
                   <td className="py-2 text-neutral-400">{p.plan}</td>
                   <td className="py-2">{rp(p.amount)}</td>
+                  <td className="py-2 text-neutral-400">{p.method}</td>
                   <td className="py-2"><StatusPill status={p.status} /></td>
                 </tr>
               ))}
               {f.recent.length === 0 && (
-                <tr><td colSpan={5} className="py-6 text-center text-neutral-500">No payments yet.</td></tr>
+                <tr><td colSpan={6} className="py-6 text-center text-neutral-500">No payments yet.</td></tr>
               )}
             </tbody>
           </table>

@@ -7,6 +7,7 @@ import { RecordPaymentForm, VoidPaymentButton } from "./RecordPayment";
 import PasswordLinkButton from "./PasswordLink";
 import MemberActions from "./MemberActions";
 import MemberQr from "./MemberQr";
+import { methodLabel } from "@/lib/paymentMethod";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,6 @@ export default async function MemberDetailPage({ params }: { params: { slug: str
   const today = dayKeyInTimezone(new Date(), gym.timezone);
   const isOwner = session.role === "OWNER";
 
-  const methodLabel = (p: { provider: string }) => (p.provider === "CASH" ? "Recorded manually" : "Online payment");
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
@@ -149,7 +149,7 @@ export default async function MemberDetailPage({ params }: { params: { slug: str
                       <td className="py-3">{p.plan.name}</td>
                       <td className={`py-3 ${voided ? "text-neutral-500 line-through" : ""}`}>{rp(Number(p.amount))}</td>
                       <td className="py-3 text-neutral-400">
-                        {methodLabel(p)}
+                        {methodLabel(p.method, p.provider)}
                         {p.recordedBy && <span className="block text-xs text-neutral-500">by {p.recordedBy.name}</span>}
                         {p.note && <span className="block text-xs text-neutral-500">&ldquo;{p.note}&rdquo;</span>}
                       </td>

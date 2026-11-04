@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import PaymentMethodPicker from "@/components/PaymentMethodPicker";
+import type { PaymentMethod } from "@/lib/paymentMethod";
 
 interface PlanOption {
   id: string;
@@ -22,6 +24,8 @@ export default function AddMemberForm({ slug, plans }: { slug: string; plans: Pl
     membershipExpiry: "",
   });
 
+  const [method, setMethod] = useState<PaymentMethod>("CASH");
+
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -34,7 +38,7 @@ export default function AddMemberForm({ slug, plans }: { slug: string; plans: Pl
       const res = await fetch(`/api/${slug}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, membershipExpiry: form.membershipExpiry || undefined }),
+        body: JSON.stringify({ ...form, membershipExpiry: form.membershipExpiry || undefined, method }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -121,8 +125,11 @@ export default function AddMemberForm({ slug, plans }: { slug: string; plans: Pl
         <span className="mt-1 block text-xs text-neutral-500">Leave blank to use the plan&apos;s standard length from today.</span>
       </label>
 
+      <div className="col-span-full">
+        <PaymentMethodPicker value={method} onChange={setMethod} />
+      </div>
       <p className="col-span-full text-xs text-neutral-500">
-        No online payment is collected here — the member is marked active and paid straight away, recorded as a cash payment.
+        No online payment is collected here: the member is marked active and paid straight away, with the plan&apos;s price recorded as paid by the method above.
       </p>
 
       {error && <p className="col-span-full text-sm text-red-400">{error}</p>}

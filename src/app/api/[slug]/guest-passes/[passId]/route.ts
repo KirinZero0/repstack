@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const parsed = guestPassActionSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-  const { action, channel } = parsed.data;
+  const { action, channel, method } = parsed.data;
 
   // Tenant isolation: the pass must belong to the session's gym.
   const pass = await db.guestPass.findUnique({ where: { id: params.passId }, include: { session: { include: { class: true } }, dayPassPlan: true } });
@@ -83,6 +83,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           status: action === "approve" ? "APPROVED" : "REJECTED",
           reviewedById: session.staffUserId,
           reviewedAt: new Date(),
+          // Approving confirms the money; a free pass has none to record.
+          ...(action === "approve" && Number(pass.amount ?? 0) > 0 ? { method: method ?? "TRANSFER" } : {}),
           // A flexible day pass starts its clock when staff approve it.
           ...(action === "approve" && pass.dayPassPlan && !pass.visitDate ? { expiresAt: dayPassExpiry(pass.dayPassPlan) } : {}),
         },

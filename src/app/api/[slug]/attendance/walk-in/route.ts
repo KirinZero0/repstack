@@ -42,6 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       phoneWhatsapp: encrypt(d.phone ?? ""),
       phoneWhatsappLookup: hmacLookup(phone || `walk-in:${randomUUID()}`),
       amount: d.amount ?? plan.price,
+      method: (d.amount ?? Number(plan.price)) > 0 ? d.method ?? "CASH" : null,
       status: "ATTENDED",
       reviewedById: session.staffUserId,
       reviewedAt: now,

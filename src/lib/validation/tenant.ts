@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { paymentMethodField } from "@/lib/paymentMethod";
 
 export const staffLoginSchema = z.object({
   email: z.string().email(),
@@ -32,6 +33,8 @@ export const addMemberSchema = z.object({
   planId: z.string().uuid(),
   /** YYYY-MM-DD. Defaults to the plan's standard duration from today when left blank. */
   membershipExpiry: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  /** Cash, transfer or QRIS: how the money arrived. Each route has its own default. */
+  method: paymentMethodField,
 });
 
 /** Every public form makes people accept the terms and privacy policy; the time is stored with the account. */
@@ -143,6 +146,8 @@ export const recordPaymentSchema = z.object({
   /** YYYY-MM-DD, the day the money was received. Defaults to today; can't be in the future. */
   paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   note: z.string().trim().max(200).optional(),
+  /** Cash, transfer or QRIS: how the money arrived. Each route has its own default. */
+  method: paymentMethodField,
 });
 
 export const joinSchema = z.object({
@@ -248,6 +253,8 @@ export const ATTENDANCE_OPENS_BEFORE_MS = 30 * 60 * 1000;
 export const confirmClassRegistrationSchema = z.object({
   amount: z.number().int().min(0).max(100_000_000),
   note: z.string().trim().max(200).optional(),
+  /** Cash, transfer or QRIS: how the money arrived. Each route has its own default. */
+  method: paymentMethodField,
 });
 
 /** Staff books a member into a session. */
@@ -302,6 +309,8 @@ export const guestPassActionSchema = z.object({
   action: z.enum(["approve", "reject", "resend", "void"]),
   /** Resend only: the one channel staff picked. */
   channel: z.enum(["whatsapp", "email"]).optional(),
+  /** Approve only: how the guest paid. */
+  method: paymentMethodField,
 });
 
 /** Front desk logs a walk-in who pays for a day pass on the spot. Phone is optional; amount defaults to the plan price. */
@@ -310,6 +319,8 @@ export const walkInSchema = z.object({
   fullName: z.string().trim().min(2, "Enter a name").max(80),
   phone: z.string().trim().max(30).optional(),
   amount: z.number().int().min(0).max(100_000_000).optional(),
+  /** Cash, transfer or QRIS: how the money arrived. Each route has its own default. */
+  method: paymentMethodField,
 });
 
 /** Front desk checks in a member by hand (forgot phone, QR won't scan). */
@@ -380,6 +391,7 @@ export const manualFieldBookingSchema = z
     fullName: z.string().trim().min(2).max(80).optional(),
     phone: z.string().trim().min(6).max(30).optional(),
     note: z.string().trim().max(200).optional(),
+    method: paymentMethodField,
   })
   .refine((v) => v.isBlock || Boolean(v.fullName), "Enter the name of who booked");
 
@@ -391,4 +403,9 @@ export const fieldBookingActionSchema = z.object({
   pax: z.number().int().min(1).max(200).optional(),
   /** collect / refund: how much, if not the whole balance. */
   amount: z.number().int().min(1).max(100_000_000).optional(),
+  /** approve / collect / refund: how the money moved. */
+  method: paymentMethodField,
 });
+
+/** Staff approve a join or renewal request: how the money arrived (it is usually a bank transfer). */
+export const approveSignupSchema = z.object({ method: paymentMethodField });

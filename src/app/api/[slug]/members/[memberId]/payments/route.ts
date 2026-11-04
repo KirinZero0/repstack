@@ -73,6 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         status: "PAID",
         paidAt,
         note: d.note || null,
+        method: d.method ?? "CASH",
         recordedById: session.staffUserId,
       },
     });

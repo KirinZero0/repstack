@@ -33,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const parsed = fieldBookingActionSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-  const { action, channel, pax, amount: asked } = parsed.data;
+  const { action, channel, pax, amount: asked, method } = parsed.data;
 
   // Tenant isolation: the booking must belong to the session's gym.
   const booking = await db.fieldBooking.findUnique({ where: { id: params.bookingId } });
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         });
         if (res.count !== 1) return false;
         if (Number(booking.amount) > 0) {
-          await tx.fieldBookingPayment.create({ data: { gymId: gym.id, bookingId: booking.id, amount: booking.amount, kind: "PAYMENT", recordedById: session.staffUserId } });
+          await tx.fieldBookingPayment.create({ data: { gymId: gym.id, bookingId: booking.id, amount: booking.amount, kind: "PAYMENT", method: method ?? "TRANSFER", recordedById: session.staffUserId } });
         }
         return true;
       });
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       if (owing <= 0) return NextResponse.json({ error: "Nothing is owed on this booking." }, { status: 409 });
       const take = asked ?? owing;
       if (take > owing) return NextResponse.json({ error: `Only Rp ${owing.toLocaleString("id-ID")} is owed.` }, { status: 400 });
-      await db.fieldBookingPayment.create({ data: { gymId: gym.id, bookingId: booking.id, amount: take, kind: "COLLECTION", recordedById: session.staffUserId } });
+      await db.fieldBookingPayment.create({ data: { gymId: gym.id, bookingId: booking.id, amount: take, kind: "COLLECTION", method: method ?? "CASH", recordedById: session.staffUserId } });
       return NextResponse.json({ ok: true, balance: owing - take });
     }
     // Giving money back is a money action, like cancelling a paid booking: owner only.
@@ -153,7 +153,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     if (owing >= 0) return NextResponse.json({ error: "Nothing is owed back on this booking." }, { status: 409 });
     const give = asked ?? -owing;
     if (give > -owing) return NextResponse.json({ error: `Only Rp ${(-owing).toLocaleString("id-ID")} is owed back.` }, { status: 400 });
-    await db.fieldBookingPayment.create({ data: { gymId: gym.id, bookingId: booking.id, amount: -give, kind: "REFUND", recordedById: session.staffUserId } });
+    await db.fieldBookingPayment.create({ data: { gymId: gym.id, bookingId: booking.id, amount: -give, kind: "REFUND", method: method ?? "CASH", recordedById: session.staffUserId } });
     return NextResponse.json({ ok: true, balance: owing + give });
   }
 

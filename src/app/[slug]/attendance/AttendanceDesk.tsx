@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import PaymentMethodPicker from "@/components/PaymentMethodPicker";
+import type { PaymentMethod } from "@/lib/paymentMethod";
 
 export interface PlanOption { id: string; name: string; price: number }
 export interface MemberOption { id: string; fullName: string; status: string }
@@ -26,6 +28,7 @@ export default function AttendanceDesk({ slug, plans, members, entries }: { slug
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState<string>(plans[0] ? String(plans[0].price) : "");
+  const [walkMethod, setWalkMethod] = useState<PaymentMethod>("CASH");
   const [walkBusy, setWalkBusy] = useState(false);
   const [walkMsg, setWalkMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -52,7 +55,7 @@ export default function AttendanceDesk({ slug, plans, members, entries }: { slug
     const res = await fetch(`/api/${slug}/attendance/walk-in`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dayPassPlanId: planId, fullName: name, phone: phone.trim() || undefined, amount: amount === "" ? undefined : Number(amount) }),
+      body: JSON.stringify({ dayPassPlanId: planId, fullName: name, phone: phone.trim() || undefined, amount: amount === "" ? undefined : Number(amount), method: walkMethod }),
     }).catch(() => null);
     const body = await res?.json().catch(() => ({}));
     setWalkBusy(false);
@@ -95,6 +98,7 @@ export default function AttendanceDesk({ slug, plans, members, entries }: { slug
               <input required minLength={2} maxLength={80} value={name} onChange={(e) => setName(e.target.value)} className={input} placeholder="Name" aria-label="Name" />
               <input type="tel" maxLength={30} value={phone} onChange={(e) => setPhone(e.target.value)} className={input} placeholder="Phone (optional)" aria-label="Phone" />
               <input type="number" min={0} step={1000} value={amount} onChange={(e) => setAmount(e.target.value)} className={input} placeholder="Amount paid (Rp)" aria-label="Amount paid" />
+              {Number(amount) > 0 && <PaymentMethodPicker value={walkMethod} onChange={setWalkMethod} />}
               {walkMsg && <p className={`text-sm ${walkMsg.ok ? "text-emerald-400" : "text-red-400"}`} role={walkMsg.ok ? "status" : "alert"}>{walkMsg.text}</p>}
               <button disabled={walkBusy} className="rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-neutral-950 hover:bg-neutral-200 disabled:opacity-50">
                 {walkBusy ? "Saving…" : "Log walk-in"}

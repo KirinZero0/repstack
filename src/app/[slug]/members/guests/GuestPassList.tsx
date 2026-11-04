@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import ChannelPicker, { type Channel } from "@/components/ChannelPicker";
+import PaymentMethodPicker from "@/components/PaymentMethodPicker";
+import type { PaymentMethod } from "@/lib/paymentMethod";
 
 export interface GuestPassRow {
   id: string;
@@ -33,6 +35,7 @@ const btn = "rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-n
 
 export default function GuestPassList({ slug, rows, isOwner }: { slug: string; rows: GuestPassRow[]; isOwner: boolean }) {
   const router = useRouter();
+  const [methods, setMethods] = useState<Record<string, PaymentMethod>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -57,7 +60,7 @@ export default function GuestPassList({ slug, rows, isOwner }: { slug: string; r
     const res = await fetch(`/api/${slug}/guest-passes/${id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(channel ? { action, channel } : { action }),
+      body: JSON.stringify(channel ? { action, channel } : action === "approve" ? { action, method: methods[id] ?? "TRANSFER" } : { action }),
     });
     const body = await res.json().catch(() => ({}));
     setBusy(null);
@@ -99,6 +102,7 @@ export default function GuestPassList({ slug, rows, isOwner }: { slug: string; r
               {!(r.status === "APPROVED" && !r.canResend) && <span className="text-sm text-neutral-400">{LABEL[r.status]}</span>}
               {r.status === "PENDING_REVIEW" && (
                 <>
+                  {r.amount > 0 && <PaymentMethodPicker compact value={methods[r.id] ?? "TRANSFER"} onChange={(m) => setMethods((all) => ({ ...all, [r.id]: m }))} />}
                   <button className={btn} disabled={busy === r.id} onClick={() => act(r.id, "approve")}>{r.amount > 0 ? "Payment received — approve" : "Approve"}</button>
                   <button className={btn} disabled={busy === r.id} onClick={() => act(r.id, "reject")}>Decline</button>
                 </>

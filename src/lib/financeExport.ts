@@ -4,6 +4,7 @@ import { dayKeyInTimezone, zonedTimeToUtc } from "./date";
 import { monthKey, monthLabel } from "./stats";
 import type { SheetCell, SheetColumn } from "./xlsx";
 import { REFUND_CATEGORY_LABEL, REFUND_METHOD_LABEL } from "./refunds";
+import { PAYMENT_METHOD_LABEL, type PaymentMethod } from "./paymentMethod";
 
 export interface DateRange {
   /** YYYY-MM-DD, inclusive, in the gym's timezone. */
@@ -30,7 +31,13 @@ export function rangeBounds(range: DateRange, timezone: string): { start: Date; 
   return { start: zonedTimeToUtc(`${range.from}T00:00`, timezone), end: zonedTimeToUtc(`${range.to}T23:59:59`, timezone) };
 }
 
-const METHOD: Record<PaymentProvider, string> = { CASH: "Cash / transfer at desk", XENDIT: "Online (Xendit)", MIDTRANS: "Online (Midtrans)" };
+const ONLINE: Record<PaymentProvider, string> = { CASH: "", XENDIT: "Online (Xendit)", MIDTRANS: "Online (Midtrans)" };
+
+/** Cash / Transfer / QRIS as staff recorded it, the gateway for an online payment, or a note for older desk rows. */
+function txnMethod(method: PaymentMethod | null, provider: PaymentProvider): string {
+  if (method) return PAYMENT_METHOD_LABEL[method];
+  return ONLINE[provider] || "At desk (not recorded)";
+}
 
 /** A voided desk payment is stored as FAILED, which reads wrong on a report; online FAILED really did fail. */
 function statusLabel(status: PaymentStatus, provider: PaymentProvider): string {
@@ -123,7 +130,7 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
       amount: Number(p.amount),
       currency: p.currency,
       status: statusLabel(p.status, p.provider),
-      method: METHOD[p.provider],
+      method: txnMethod(p.method, p.provider),
       recordedBy: p.recordedBy?.name ?? "",
       note: p.note ?? "",
       invoiceId: p.externalInvoiceId ?? "",
@@ -137,7 +144,7 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
       amount: Number(p.amount),
       currency: p.currency,
       status: statusLabel(p.status, p.provider),
-      method: METHOD[p.provider],
+      method: txnMethod(p.method, p.provider),
       recordedBy: p.recordedBy?.name ?? "",
       note: p.note ?? "",
       invoiceId: p.externalInvoiceId ?? "",
@@ -153,7 +160,7 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
       amount: Number(p.amount ?? 0),
       currency: "IDR",
       status: "PAID",
-      method: METHOD.CASH,
+      method: txnMethod(p.method, "CASH"),
       recordedBy: p.reviewedBy?.name ?? "",
       note: "",
       invoiceId: "",
@@ -167,7 +174,7 @@ async function loadTransactions(db: TenantDb, gymId: string, range: DateRange, t
       amount: Number(p.amount),
       currency: "IDR",
       status: "PAID",
-      method: METHOD.CASH,
+      method: txnMethod(p.method, "CASH"),
       recordedBy: p.recordedBy?.name ?? "",
       note: p.kind === "COLLECTION" ? "Extra collected" : p.kind === "REFUND" ? "Refund" : p.note ?? "",
       invoiceId: "",
@@ -219,7 +226,7 @@ export const MONTHLY_COLUMNS: SheetColumn[] = [
   { header: "Refunds", kind: "money" },
   { header: "Total revenue", kind: "money" },
   { header: "Paid payments", kind: "count" },
-  { header: "Cash / transfer", kind: "money" },
+  { header: "At desk (cash, transfer, QRIS)", kind: "money" },
   { header: "Online", kind: "money" },
   { header: "Voided", kind: "count" },
 ];
@@ -265,8 +272,8 @@ export async function monthlyReport(db: TenantDb, gymId: string, range: DateRang
     else if (r.type === "Class") b.classes += r.amount;
     else if (r.type === "Field") b.fields += r.amount;
     else b.dayPasses += r.amount;
-    if (r.method === METHOD.CASH) b.cash += r.amount;
-    else b.online += r.amount;
+    if (r.method.startsWith("Online")) b.online += r.amount;
+    else b.cash += r.amount;
   }
   return Array.from(buckets.entries()).map(([key, b]) => [
     `${monthLabel(key)} ${key.slice(0, 4)}`,

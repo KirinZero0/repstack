@@ -79,7 +79,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         reviewedById: session.staffUserId,
       },
       });
-      if (amount > 0) await tx.fieldBookingPayment.create({ data: { gymId: gym.id, bookingId: row.id, amount, kind: "PAYMENT", recordedById: session.staffUserId } });
+      if (amount > 0) await tx.fieldBookingPayment.create({ data: { gymId: gym.id, bookingId: row.id, amount, kind: "PAYMENT", method: d.method ?? "CASH", recordedById: session.staffUserId } });
       return row;
     });
     return NextResponse.json({ ok: true, id: created.id }, { status: 201 });

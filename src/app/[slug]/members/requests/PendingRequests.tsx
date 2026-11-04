@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import PaymentMethodPicker from "@/components/PaymentMethodPicker";
+import type { PaymentMethod } from "@/lib/paymentMethod";
 
 export interface PendingRow {
   id: string;
@@ -20,12 +22,17 @@ export default function PendingRequests({ slug, requests, timezone }: { slug: st
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoomedId, setZoomedId] = useState<string | null>(null);
+  const [methods, setMethods] = useState<Record<string, PaymentMethod>>({});
 
   async function act(id: string, action: "approve" | "reject") {
     setBusyId(id);
     setError(null);
     try {
-      const res = await fetch(`/api/${slug}/join/${id}/${action}`, { method: "POST" });
+      const res = await fetch(`/api/${slug}/join/${id}/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action === "approve" ? { method: methods[id] ?? "TRANSFER" } : {}),
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setError(typeof body.error === "string" ? body.error : "Failed to update request");
@@ -68,7 +75,8 @@ export default function PendingRequests({ slug, requests, timezone }: { slug: st
                 {!r.hasProof && <p className="mt-1 text-xs text-amber-400">No proof image attached</p>}
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              <PaymentMethodPicker compact value={methods[r.id] ?? "TRANSFER"} onChange={(m) => setMethods((all) => ({ ...all, [r.id]: m }))} />
               <button
                 disabled={busyId === r.id}
                 onClick={() => act(r.id, "approve")}
