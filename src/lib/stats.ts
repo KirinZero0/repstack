@@ -161,15 +161,16 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
     .sort((a, b) => b.reviewedAt!.getTime() - a.reviewedAt!.getTime())
     .slice(0, 10);
 
+  // Dated like the rest of Finance: the day the money was received (a desk payment can be entered a day late), else when issued.
   const recentAll = [
-    ...recent.map((p) => ({ id: p.id, member: p.member.fullName, plan: p.plan.name, amount: Number(p.amount), status: p.status, date: p.createdAt, method: methodLabel(p.method, p.provider) })),
+    ...recent.map((p) => ({ id: p.id, member: p.member.fullName, plan: p.plan.name, amount: Number(p.amount), status: p.status, date: p.paidAt ?? p.createdAt, method: methodLabel(p.method, p.provider) })),
     ...recentClasses.map((p) => ({
       id: p.id,
       member: p.registration.member.fullName,
       plan: `${p.registration.session.class.name} class`,
       amount: Number(p.amount),
       status: p.status,
-      date: p.createdAt,
+      date: p.paidAt ?? p.createdAt,
       method: methodLabel(p.method, p.provider),
     })),
     ...recentDayPasses.map((p) => ({

@@ -388,3 +388,17 @@ test("staff say how money came in (cash, transfer, QRIS) everywhere they record 
   const methods = rows.slice(1).map((r) => r[methodCol]);
   expect(methods).toEqual(expect.arrayContaining(["QRIS", "Cash", "Transfer"]));
 });
+
+test("a desk payment entered a day late shows on Finance on the day it was received, not the day it was typed in", async ({ request, baseURL }) => {
+  const f = await makeGym();
+  await prisma.gym.update({ where: { id: f.gym.id }, data: { timezone: "Asia/Makassar" } });
+  // Typed in at 07:34 WITA on 5 Nov, for money received on 4 Nov ("Date received").
+  const typedIn = new Date("2026-11-04T23:34:22Z");
+  await prisma.payment.create({
+    data: { gymId: f.gym.id, memberId: f.member.id, planId: f.plan.id, provider: "CASH", method: "CASH", amount: 300000, status: "PAID", createdAt: typedIn, paidAt: new Date("2026-11-04T12:00:00Z") },
+  });
+  await login(request, baseURL!, f.slug, f.owner);
+  const finance = await (await request.get(`${baseURL}/${f.slug}/finance`)).text();
+  expect(finance).toContain("4/11/2026");
+  expect(finance).not.toContain("5/11/2026");
+});
