@@ -41,7 +41,7 @@ export default async function FieldsPage({ params, searchParams }: { params: { s
   const dayStart = bookingInstants(date, 0, 0, gym.timezone).startsAt;
   const dayEnd = new Date(dayStart.getTime() + 25 * 3600 * 1000);
 
-  const [fields, dayBookings, pending] = await Promise.all([
+  const [fields, dayBookings, pending, members] = await Promise.all([
     db.field.findMany({ where: { gymId: gym.id }, orderBy: { name: "asc" } }),
     db.fieldBooking.findMany({
       where: { gymId: gym.id, startsAt: { lt: dayEnd }, endsAt: { gt: dayStart }, status: { in: ["APPROVED", "ATTENDED", "NO_SHOW"] } },
@@ -52,6 +52,8 @@ export default async function FieldsPage({ params, searchParams }: { params: { s
       orderBy: { startsAt: "asc" },
       take: 100,
     }),
+    // Names only, for "Block time": a member who books a court informally can be named on the block.
+    db.member.findMany({ where: { gymId: gym.id, status: { not: "CANCELLED" }, anonymizedAt: null }, select: { fullName: true }, orderBy: { fullName: "asc" } }),
   ]);
   const paidMap = await paidByBooking(db, [...dayBookings, ...pending].map((b) => b.id));
   const fieldName = new Map(fields.map((f) => [f.id, f.name]));
@@ -117,6 +119,7 @@ export default async function FieldsPage({ params, searchParams }: { params: { s
           fields={fieldRows}
           dayBookings={dayBookings.map(toRow)}
           pending={pending.map((b) => ({ ...toRow(b), start: 0, end: 0, date: dayKeyInTimezone(b.startsAt, gym.timezone) }))}
+          memberNames={Array.from(new Set(members.map((m) => m.fullName)))}
         />
       </div>
     </main>

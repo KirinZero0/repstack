@@ -96,19 +96,27 @@ function Lane({ field, bookings }: { field: FieldRow; bookings: BookingRow[] }) 
         const left = Math.max(0, ((b.start - field.opensAt) / span) * 100);
         const width = Math.min(100 - left, ((Math.min(b.end, field.closesAt) - Math.max(b.start, field.opensAt)) / span) * 100);
         if (width <= 0) return null;
+        // A block says why, so staff can see it on the bar without opening the list.
+        const label = b.isBlock ? blockedText(b) : b.fullName;
         return (
           <div
             key={b.id}
-            title={`${b.startLabel}–${b.endLabel} ${b.isBlock ? "Blocked" : b.fullName}`}
-            className={`absolute top-1 bottom-1 overflow-hidden rounded px-1.5 text-[11px] leading-7 ${b.isBlock ? "bg-neutral-600 text-white" : SEGMENT[b.status]}`}
+            title={`${b.startLabel}–${b.endLabel} ${label}`}
+            className={`absolute top-1 bottom-1 overflow-hidden text-ellipsis whitespace-nowrap rounded px-1.5 text-[11px] leading-7 ${b.isBlock ? "bg-neutral-600 text-white" : SEGMENT[b.status]}`}
             style={{ left: `${left}%`, width: `${width}%` }}
           >
-            {b.isBlock ? "Blocked" : b.fullName}
+            {label}
           </div>
         );
       })}
     </div>
   );
+}
+
+/** "Blocked for Hardy: futsal with friends". A block's name is "Blocked" unless staff named a member on it. */
+function blockedText(b: { fullName: string; note: string | null }): string {
+  const who = b.fullName && b.fullName !== "Blocked" ? ` for ${b.fullName}` : "";
+  return `Blocked${who}${b.note ? `: ${b.note}` : ""}`;
 }
 
 export default function FieldsManager({
@@ -120,6 +128,7 @@ export default function FieldsManager({
   fields,
   dayBookings,
   pending,
+  memberNames,
 }: {
   slug: string;
   isOwner: boolean;
@@ -129,6 +138,8 @@ export default function FieldsManager({
   fields: FieldRow[];
   dayBookings: BookingRow[];
   pending: BookingRow[];
+  /** The gym's members, suggested when a block is for one of them. */
+  memberNames: string[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -285,7 +296,7 @@ export default function FieldsManager({
               )}
             </div>
 
-            {adding && <ManualBooking key={adding} slug={slug} date={date} fields={activeFields} mode={adding} onClose={() => setAdding(null)} />}
+            {adding && <ManualBooking key={adding} slug={slug} date={date} fields={activeFields} mode={adding} memberNames={memberNames} onClose={() => setAdding(null)} />}
 
             {fields.length === 0 ? (
               <p className="rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-8 text-center text-sm text-neutral-500">
@@ -314,7 +325,7 @@ export default function FieldsManager({
                           {list.map((b) => (
                             <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm" data-testid="booking-row" data-status={b.status}>
                               <span>
-                                {b.startLabel}–{b.endLabel} · {b.isBlock ? `Blocked${b.note ? `: ${b.note}` : ""}` : b.fullName}
+                                {b.startLabel}–{b.endLabel} · {b.isBlock ? blockedText(b) : b.fullName}
                                 {!b.isBlock && <span className="text-neutral-500"> {b.phone}</span>}
                                 {!b.isBlock && b.pax !== null && <span className="text-neutral-500"> · {b.pax} {b.pax === 1 ? "person" : "people"}</span>}
                                 {!b.isBlock && b.amount > 0 && <span className="text-neutral-500"> · {rp(b.amount)}</span>}
@@ -369,12 +380,14 @@ function ManualBooking({
   date,
   fields,
   mode,
+  memberNames,
   onClose,
 }: {
   slug: string;
   date: string;
   fields: FieldRow[];
   mode: "booking" | "block";
+  memberNames: string[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -475,6 +488,15 @@ function ManualBooking({
             </label>
             <PaymentMethodPicker value={method} onChange={setMethod} />
           </>
+        )}
+        {isBlock && (
+          <label className="text-sm text-neutral-300">
+            <span className="mb-1 block">Member (optional)</span>
+            <input list="block-members" value={fullName} onChange={(e) => setFullName(e.target.value)} className={input} maxLength={80} aria-label="Block member" placeholder="If a member is using it" />
+            <datalist id="block-members">
+              {memberNames.map((n) => <option key={n} value={n} />)}
+            </datalist>
+          </label>
         )}
         <label className="text-sm text-neutral-300">
           <span className="mb-1 block">{isBlock ? "Reason (optional)" : "Note (optional)"}</span>

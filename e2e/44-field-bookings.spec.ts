@@ -300,6 +300,13 @@ test("staff can add a booking, block the time, and are told when it clashes", as
   // A block can be removed, and the time is free again.
   expect((await request.delete(`${baseURL}/api/${f.slug}/field-bookings/${blocked.id}`)).ok()).toBeTruthy();
   expect((await manual({ start: "12:00", end: "13:00", fullName: "Now Free" })).status()).toBe(201);
+
+  // A block can name the member using the court; staff see who and why, the public page sees only busy time.
+  expect((await manual({ start: "16:00", end: "17:00", isBlock: true, fullName: "Hardy Member", note: "Futsal with friends" })).status()).toBe(201);
+  const day = await (await request.get(`${baseURL}/${f.slug}/fields?date=${DAY}`)).text();
+  expect(day).toContain("Blocked for Hardy Member: Futsal with friends");
+  const after = await (await request.get(`${baseURL}/api/${f.slug}/fields/${field.id}/availability?date=${DAY}`)).json();
+  expect(JSON.stringify(after)).not.toContain("Hardy");
 });
 
 test("cancelling frees the time and kills the ticket; a paid cancel is the owner's; paid bookings aren't deleted", async ({ request, baseURL, playwright }) => {
