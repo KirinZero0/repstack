@@ -102,7 +102,7 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
   const months = lastMonthKeys(12, timezone);
   const since = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
 
-  const [{ rows, dayPasses: paidDayPasses, refunds }, pendingAgg, pendingClassAgg, statusGroups, classStatusGroups, recent, recentClasses] = await Promise.all([
+  const [{ rows, dayPasses: paidDayPasses, refunds }, pendingAgg, pendingClassAgg, statusGroups, classStatusGroups, recent, recentClasses, recentFields] = await Promise.all([
     loadRevenue(db, gymId, since),
     db.payment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
     db.classPayment.aggregate({ where: { gymId, status: "PENDING" }, _sum: { amount: true }, _count: true }),
@@ -119,6 +119,13 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       orderBy: { createdAt: "desc" },
       take: 10,
       include: { registration: { select: { member: { select: { fullName: true } }, session: { select: { class: { select: { name: true } } } } } } },
+    }),
+    // Field booking money, the same entries that count as revenue: bookings still held, never staff blocks.
+    db.fieldBookingPayment.findMany({
+      where: { gymId, booking: { status: { in: ["APPROVED", "ATTENDED", "NO_SHOW"] }, isBlock: false } },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      include: { booking: { select: { fullName: true, field: { select: { name: true } } } } },
     }),
   ]);
 
@@ -180,6 +187,15 @@ export async function getGymFinance(db: TenantDb, gymId: string, timezone: strin
       amount: Number(p.amount ?? 0),
       status: "PAID" as string,
       date: p.reviewedAt!,
+      method: methodLabel(p.method),
+    })),
+    ...recentFields.map((p) => ({
+      id: p.id,
+      member: `${p.booking.fullName} (guest)`,
+      plan: `${p.booking.field.name} (${p.kind === "REFUND" ? "field refund" : p.kind === "COLLECTION" ? "field, extra collected" : "field booking"})`,
+      amount: Number(p.amount),
+      status: (p.kind === "REFUND" ? "REFUNDED" : "PAID") as string,
+      date: p.createdAt,
       method: methodLabel(p.method),
     })),
   ]

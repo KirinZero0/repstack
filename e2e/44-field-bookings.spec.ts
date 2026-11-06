@@ -463,6 +463,8 @@ test("a booking counts as revenue once approved, in Finance and the export; bloc
   expect(rows).toContain("120000");
   const finance = await (await request.get(`${baseURL}/${f.slug}/finance`)).text();
   expect(finance).toContain("from fields");
+  // Recent payments lists the booking's money alongside memberships and day passes.
+  expect(finance).toContain("Court 1 (field booking)");
 
   await request.post(`${baseURL}/api/${f.slug}/field-bookings/manual`, { data: { fieldId: field.id, date: DAY, start: "14:00", end: "16:00", isBlock: true } });
   const after = await csv();
