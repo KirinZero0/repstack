@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import ChannelPicker, { type Channel } from "@/components/ChannelPicker";
-import { blockLabel, clock, endTimes, parseClock } from "@/lib/fieldBooking";
+import { blockLabel, bookingAmount, clock, endTimes, parseClock } from "@/lib/fieldBooking";
 import PaymentMethodPicker from "@/components/PaymentMethodPicker";
+import CustomAmount from "@/components/CustomAmount";
 import type { PaymentMethod } from "@/lib/paymentMethod";
 
 export interface FieldRow {
@@ -401,11 +402,20 @@ function ManualBooking({
   const [phone, setPhone] = useState("");
   const [noteText, setNoteText] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("CASH");
+  // "" = the field's price for the time and people; otherwise the special price staff typed.
+  const [customAmount, setCustomAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const field = fields.find((f) => f.id === fieldId);
   if (!field) return null;
+  const startMin = parseClock(start);
+  const endMin = parseClock(end);
+  const people = Number(pax);
+  const normalPrice =
+    startMin === null || endMin === null || endMin <= startMin
+      ? null
+      : bookingAmount(field.pricingType, field.pricePerHour, field.pricingType === "PER_PAX" ? (Number.isInteger(people) && people > 0 ? people : 1) : null, endMin - startMin);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -423,6 +433,7 @@ function ManualBooking({
       phone: phone || undefined,
       note: noteText || undefined,
       method: isBlock ? undefined : method,
+      amount: isBlock || customAmount === "" ? undefined : Number(customAmount),
     });
     setBusy(false);
     if (err) return setError(err);
@@ -486,7 +497,8 @@ function ManualBooking({
               <span className="mb-1 block">WhatsApp (optional)</span>
               <input value={phone} onChange={(e) => setPhone(e.target.value)} className={input} maxLength={30} aria-label="Booking phone" />
             </label>
-            <PaymentMethodPicker value={method} onChange={setMethod} />
+            <CustomAmount normal={normalPrice} amount={customAmount} onChange={setCustomAmount} />
+            {customAmount !== "0" && <PaymentMethodPicker value={method} onChange={setMethod} />}
           </>
         )}
         {isBlock && (

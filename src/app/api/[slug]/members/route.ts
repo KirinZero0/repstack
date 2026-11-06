@@ -57,7 +57,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       db,
       gym,
       { fullName: data.fullName, email: data.email, phoneWhatsapp: data.phoneWhatsapp, planId: plan.id, membershipExpiry, status: "ACTIVE" },
-      { recordPayment: { recordedById: session.staffUserId, amount: plan.price, currency: plan.currency, method: data.method ?? "CASH" }, notify: true },
+      {
+        recordPayment:
+          data.amount === 0 ? null : { recordedById: session.staffUserId, amount: data.amount ?? plan.price, currency: plan.currency, method: data.method ?? "CASH" },
+        notify: true,
+      },
     );
   } catch (err) {
     // The tenant-scoped lookup above can't see another gym's member with this email; the unique index can.

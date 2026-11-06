@@ -57,7 +57,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const phone = d.phone ? normalizePhone(d.phone) : "";
   try {
-    const amount = d.isBlock ? 0 : bookingAmount(field.pricingType, rules.pricePerHour, pax, endMin - startMin);
+    // A special price staff agreed replaces the field's price for this booking.
+    const amount = d.isBlock ? 0 : d.amount ?? bookingAmount(field.pricingType, rules.pricePerHour, pax, endMin - startMin);
     // Paid at the counter, so the booking and its payment entry are written together.
     const created = await tenantTransaction(gym.id, async (tx) => {
       const row = await tx.fieldBooking.create({

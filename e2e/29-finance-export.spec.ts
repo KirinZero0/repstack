@@ -402,3 +402,26 @@ test("a desk payment entered a day late shows on Finance on the day it was recei
   expect(finance).toContain("4/11/2026");
   expect(finance).not.toContain("5/11/2026");
 });
+
+test("adding a member can take a special price, or none at all, instead of the plan's", async ({ request, baseURL }) => {
+  const f = await makeGym();
+  await login(request, baseURL!, f.slug, f.owner);
+  const add = (name: string, extra: object) =>
+    request.post(`${baseURL}/api/${f.slug}/members`, {
+      data: { fullName: name, email: `${name.replace(/\W/g, "").toLowerCase()}-${f.slug}@test.local`, phoneWhatsapp: `0813${Date.now().toString().slice(-8)}`, planId: f.plan.id, ...extra },
+    });
+  const paymentsOf = async (name: string) => {
+    const m = await prisma.member.findFirstOrThrow({ where: { gymId: f.gym.id, fullName: name } });
+    return prisma.payment.findMany({ where: { memberId: m.id } });
+  };
+
+  expect((await add("Normal Nina", {})).ok()).toBeTruthy();
+  expect((await paymentsOf("Normal Nina")).map((p) => Number(p.amount))).toEqual([250000]);
+  expect((await add("Special Sari", { amount: 200000, method: "QRIS" })).ok()).toBeTruthy();
+  expect((await paymentsOf("Special Sari")).map((p) => [Number(p.amount), p.method])).toEqual([[200000, "QRIS"]]);
+  // Free: active member, nothing recorded as paid.
+  expect((await add("Free Fajar", { amount: 0 })).ok()).toBeTruthy();
+  expect(await paymentsOf("Free Fajar")).toEqual([]);
+  expect((await prisma.member.findFirstOrThrow({ where: { gymId: f.gym.id, fullName: "Free Fajar" } })).status).toBe("ACTIVE");
+  expect((await add("Minus Mira", { amount: -5 })).status()).toBe(400);
+});

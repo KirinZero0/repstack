@@ -307,6 +307,14 @@ test("staff can add a booking, block the time, and are told when it clashes", as
   expect(day).toContain("Blocked for Hardy Member: Futsal with friends");
   const after = await (await request.get(`${baseURL}/api/${f.slug}/fields/${field.id}/availability?date=${DAY}`)).json();
   expect(JSON.stringify(after)).not.toContain("Hardy");
+
+  // A special price replaces the field's (1 hour at Rp 60.000) for that booking, so nothing shows as owed; 0 is free.
+  expect((await manual({ start: "18:00", end: "19:00", fullName: "Regular Rudi", amount: 40000, method: "TRANSFER" })).status()).toBe(201);
+  const rudi = await prisma.fieldBooking.findFirstOrThrow({ where: { fieldId: field.id, fullName: "Regular Rudi" }, include: { payments: true } });
+  expect([Number(rudi.amount), rudi.payments.map((p) => [Number(p.amount), p.method])]).toEqual([40000, [[40000, "TRANSFER"]]]);
+  expect((await manual({ start: "19:00", end: "20:00", fullName: "Owner Friend", amount: 0 })).status()).toBe(201);
+  const friend = await prisma.fieldBooking.findFirstOrThrow({ where: { fieldId: field.id, fullName: "Owner Friend" }, include: { payments: true } });
+  expect([Number(friend.amount), friend.payments.length]).toEqual([0, 0]);
 });
 
 test("cancelling frees the time and kills the ticket; a paid cancel is the owner's; paid bookings aren't deleted", async ({ request, baseURL, playwright }) => {

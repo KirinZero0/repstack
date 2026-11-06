@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import PaymentMethodPicker from "@/components/PaymentMethodPicker";
+import CustomAmount from "@/components/CustomAmount";
 import type { PaymentMethod } from "@/lib/paymentMethod";
 
 interface PlanOption {
@@ -25,6 +26,9 @@ export default function AddMemberForm({ slug, plans }: { slug: string; plans: Pl
   });
 
   const [method, setMethod] = useState<PaymentMethod>("CASH");
+  // "" = the plan's price; otherwise the special price staff typed.
+  const [amount, setAmount] = useState("");
+  const planPrice = Number(plans.find((p) => p.id === form.planId)?.price ?? 0);
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -38,7 +42,7 @@ export default function AddMemberForm({ slug, plans }: { slug: string; plans: Pl
       const res = await fetch(`/api/${slug}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, membershipExpiry: form.membershipExpiry || undefined, method }),
+        body: JSON.stringify({ ...form, membershipExpiry: form.membershipExpiry || undefined, method, amount: amount === "" ? undefined : Number(amount) }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -47,6 +51,7 @@ export default function AddMemberForm({ slug, plans }: { slug: string; plans: Pl
       }
       setOpen(false);
       setForm({ fullName: "", email: "", phoneWhatsapp: "", planId: plans[0]?.id ?? "", membershipExpiry: "" });
+      setAmount("");
       router.refresh();
     } finally {
       setLoading(false);
@@ -126,10 +131,15 @@ export default function AddMemberForm({ slug, plans }: { slug: string; plans: Pl
       </label>
 
       <div className="col-span-full">
-        <PaymentMethodPicker value={method} onChange={setMethod} />
+        <CustomAmount normal={planPrice} amount={amount} onChange={setAmount} />
       </div>
+      {amount !== "0" && (
+        <div className="col-span-full">
+          <PaymentMethodPicker value={method} onChange={setMethod} />
+        </div>
+      )}
       <p className="col-span-full text-xs text-neutral-500">
-        No online payment is collected here: the member is marked active and paid straight away, with the plan&apos;s price recorded as paid by the method above.
+        No online payment is collected here: the member is marked active and paid straight away, with the amount above recorded as paid by the method chosen.
       </p>
 
       {error && <p className="col-span-full text-sm text-red-400">{error}</p>}

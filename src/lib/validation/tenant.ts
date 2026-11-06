@@ -33,6 +33,8 @@ export const addMemberSchema = z.object({
   planId: z.string().uuid(),
   /** YYYY-MM-DD. Defaults to the plan's standard duration from today when left blank. */
   membershipExpiry: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  /** A special price staff agreed, in whole rupiah, instead of the normal one. 0 = free (no payment recorded). */
+  amount: z.number().int().min(0).max(100_000_000).optional(),
   /** Cash, transfer or QRIS: how the money arrived. Each route has its own default. */
   method: paymentMethodField,
 });
@@ -391,6 +393,8 @@ export const manualFieldBookingSchema = z
     fullName: z.string().trim().min(2).max(80).optional(),
     phone: z.string().trim().min(6).max(30).optional(),
     note: z.string().trim().max(200).optional(),
+    /** A special price staff agreed, in whole rupiah, instead of the normal one. 0 = free (no payment recorded). */
+    amount: z.number().int().min(0).max(100_000_000).optional(),
     method: paymentMethodField,
   })
   .refine((v) => v.isBlock || Boolean(v.fullName), "Enter the name of who booked");
