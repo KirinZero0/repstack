@@ -80,7 +80,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         reviewedById: session.staffUserId,
       },
       });
-      if (amount > 0) await tx.fieldBookingPayment.create({ data: { gymId: gym.id, bookingId: row.id, amount, kind: "PAYMENT", method: d.method ?? "CASH", recordedById: session.staffUserId } });
+      // Paid at the counter on the day of play: a booking logged after it started (entered the next morning, say)
+      // is dated to its start, so Finance and the export count the money on the day it came in.
+      const paidAt = startsAt < new Date() ? startsAt : undefined;
+      if (amount > 0) {
+        await tx.fieldBookingPayment.create({
+          data: { gymId: gym.id, bookingId: row.id, amount, kind: "PAYMENT", method: d.method ?? "CASH", recordedById: session.staffUserId, createdAt: paidAt },
+        });
+      }
       return row;
     });
     return NextResponse.json({ ok: true, id: created.id }, { status: 201 });

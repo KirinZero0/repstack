@@ -317,6 +317,19 @@ test("staff can add a booking, block the time, and are told when it clashes", as
   expect([Number(friend.amount), friend.payments.length]).toEqual([0, 0]);
 });
 
+test("a booking logged the day after it was played counts its money on the day it was played", async ({ request, baseURL }) => {
+  const f = await makeGym();
+  const field = await makeField(f);
+  await login(request, baseURL!, f.slug, f.owner);
+  const yesterday = dayKeyInTimezone(new Date(Date.now() - 24 * HOUR), TZ);
+  const res = await request.post(`${baseURL}/api/${f.slug}/field-bookings/manual`, { data: { fieldId: field.id, date: yesterday, start: "10:00", end: "11:00", fullName: "Late Entry" } });
+  expect(res.status()).toBe(201);
+  const b = await prisma.fieldBooking.findFirstOrThrow({ where: { fieldId: field.id }, include: { payments: true } });
+  expect(b.payments.map((p) => dayKeyInTimezone(p.createdAt, TZ))).toEqual([yesterday]);
+  const sheet = await exportText(request, `${baseURL}/api/${f.slug}/finance/export?report=transactions&from=${yesterday}&to=${yesterday}`);
+  expect(sheet).toContain("Late Entry");
+});
+
 test("cancelling frees the time and kills the ticket; a paid cancel is the owner's; paid bookings aren't deleted", async ({ request, baseURL, playwright }) => {
   const f = await makeGym();
   const field = await makeField(f);
